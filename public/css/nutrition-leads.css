@@ -1,0 +1,758 @@
+.nutrition-leads-card .table th {
+    white-space: nowrap;
+}
+
+.nutrition-detail-list {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    gap: .75rem;
+    margin: 1rem 0 0;
+}
+
+.nutrition-detail-list dt {
+    color: var(--bs-secondary-color);
+    font-weight: 600;
+}
+
+.nutrition-detail-list dd {
+    margin: 0;
+    word-break: break-word;
+}
+
+.nutrition-meal {
+    display: grid;
+    grid-template-columns: minmax(145px, .7fr) 2fr;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.nutrition-meal small {
+    display: block;
+    color: var(--bs-secondary-color);
+    margin-top: .2rem;
+}
+
+@media (max-width: 576px) {
+    .nutrition-meal {
+        grid-template-columns: 1fr;
+        gap: .4rem;
+    }
+
+    .nutrition-detail-list {
+        grid-template-columns: 85px 1fr;
+    }
+}
+
+.lead-eyebrow {
+    display: block;
+    color: #168a64;
+    font-size: .72rem;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+
+.chart-review-head h4 {
+    margin: .35rem 0;
+    color: #123d35;
+}
+
+.review-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    white-space: nowrap;
+    color: #a76216;
+    background: #fff5dc;
+    border-radius: 999px;
+    padding: .5rem .85rem;
+    font-size: .8rem;
+    font-weight: 750;
+    text-transform: capitalize;
+}
+
+.lead-profile-card,
+.chart-review-card {
+    border: 1px solid #dce9e1;
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 12px 36px rgba(30, 78, 62, .06);
+}
+
+.lead-profile-card {
+    padding: 1.5rem;
+    position: sticky;
+    top: 1rem;
+}
+
+.lead-profile-head {
+    display: flex;
+    align-items: center;
+    gap: .85rem;
+    padding-bottom: 1.35rem;
+    border-bottom: 1px solid #e8eeeb;
+}
+
+.lead-profile-head span,
+.lead-profile-head small {
+    color: #75867f;
+    font-size: .8rem;
+}
+
+.lead-profile-head h5 {
+    margin: .15rem 0;
+    color: #173f36;
+}
+
+.lead-avatar {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 15px;
+    color: #fff;
+    font-size: 1.2rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #0e9e71, #35d39b);
+}
+
+.lead-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .7rem;
+    padding: 1.3rem 0;
+}
+
+.lead-metrics div {
+    padding: .7rem;
+    border-radius: 12px;
+    background: #f7faf8;
+}
+
+.lead-metrics span,
+.meal-select>span {
+    display: block;
+    color: #7b8b85;
+    font-size: .72rem;
+    font-weight: 700;
+}
+
+.lead-metrics strong {
+    display: block;
+    margin-top: .2rem;
+    color: #24483f;
+    font-size: .86rem;
+}
+
+.answer-drawer {
+    border-top: 1px solid #e8eeeb;
+    padding-top: 1rem;
+}
+
+.answer-drawer summary {
+    cursor: pointer;
+    color: #195c49;
+    font-weight: 750;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+}
+
+.answer-drawer summary::-webkit-details-marker {
+    display: none;
+}
+
+.answer-drawer summary span {
+    color: #fff;
+    background: #178b66;
+    border-radius: 999px;
+    padding: .1rem .45rem;
+    font-size: .7rem;
+}
+
+.lead-answer-list {
+    margin: 1rem 0 0;
+    display: grid;
+    gap: .55rem;
+}
+
+.lead-answer-list dt {
+    color: #71817b;
+    font-size: .76rem;
+}
+
+.lead-answer-list dd {
+    margin: -.35rem 0 .2rem;
+    color: #24483f;
+    font-size: .86rem;
+    font-weight: 650;
+}
+
+.chart-review-card {
+    padding: 1.75rem;
+}
+
+.chart-review-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid #e8eeeb;
+}
+
+.review-pill.is-approved {
+    color: #168a64;
+    background: #e8faf2;
+}
+
+.day-plan-list {
+    display: grid;
+    gap: .8rem;
+    margin-top: 1.25rem;
+}
+
+.day-plan {
+    overflow: hidden;
+    border: 1px solid #e0eae5;
+    border-radius: 15px;
+    transition: border-color .2s, box-shadow .2s;
+}
+
+.day-plan[open] {
+    border-color: #9fdcc5;
+    box-shadow: 0 7px 20px rgba(22, 138, 100, .08);
+}
+
+.day-plan summary {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    cursor: pointer;
+    padding: .9rem 1rem;
+    list-style: none;
+    color: #1d5144;
+}
+
+.day-plan summary::-webkit-details-marker {
+    display: none;
+}
+
+.day-plan summary i {
+    margin-left: auto;
+    font-size: 1.2rem;
+    transition: transform .2s;
+}
+
+.day-plan[open] summary i {
+    transform: rotate(180deg);
+}
+
+.day-plan summary small {
+    display: block;
+    color: #87958f;
+    font-size: .75rem;
+    margin-top: .1rem;
+}
+
+.day-number {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    color: #168a64;
+    background: #e5f8ef;
+    font-size: .75rem;
+    font-weight: 800;
+}
+
+.day-meals {
+    padding: 0 1rem .5rem;
+}
+
+.meal-editor {
+    display: grid;
+    grid-template-columns: minmax(150px, .7fr) 2fr;
+    align-items: end;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-top: 1px dashed #dce7e1;
+}
+
+.meal-slot {
+    display: flex;
+    gap: .65rem;
+    align-items: center;
+}
+
+.meal-slot-icon {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: #fff5df;
+    color: #d99118;
+}
+
+.meal-slot strong {
+    display: block;
+    color: #31584d;
+    font-size: .9rem;
+}
+
+.meal-slot small {
+    display: block;
+    color: #87958f;
+    font-size: .74rem;
+}
+
+.meal-select .form-select {
+    margin-top: .35rem;
+    border-color: #dce8e1;
+    border-radius: 10px;
+    min-height: 42px;
+    color: #254a40;
+}
+
+.approval-panel {
+    display: grid;
+    grid-template-columns: minmax(220px, .8fr) minmax(0, 1.2fr);
+    gap: 1.5rem;
+    align-items: start;
+    margin-top: 1.5rem;
+    padding: 1.5rem;
+    border: 1px solid #cfe8db;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #f2fbf6 0%, #fbfefc 100%);
+}
+
+.approval-heading {
+    display: flex;
+    align-items: flex-start;
+    gap: .85rem;
+}
+
+.approval-icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+    color: #168a64;
+    background: #ddf4e8;
+    font-size: 1.25rem;
+}
+
+.approval-panel h6 {
+    margin: .3rem 0 .45rem;
+    color: #1d5144;
+    font-size: 1.05rem;
+    font-weight: 750;
+}
+
+.approval-panel p {
+    margin: 0;
+    color: #6f817a;
+    font-size: .82rem;
+}
+
+.approval-actions {
+    display: grid;
+    gap: .65rem;
+    min-width: 0;
+}
+
+.approval-actions label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    color: #31584d;
+    font-size: .86rem;
+    font-weight: 750;
+}
+
+.approval-actions label span {
+    color: #7b8b85;
+    font-size: .72rem;
+    font-weight: 600;
+}
+
+.approval-actions textarea {
+    min-height: 112px;
+    min-width: 0;
+    resize: vertical;
+    border-color: #d7e7de;
+    border-radius: 11px;
+    background: #fff;
+}
+
+.approval-actions .approval-note-hint {
+    color: #71817b;
+    font-size: .75rem;
+}
+
+.approval-actions .btn {
+    justify-self: end;
+    white-space: nowrap;
+    padding: .7rem 1.1rem;
+    border-radius: 11px;
+}
+
+.chart-empty {
+    padding: 3.5rem 1rem;
+    text-align: center;
+}
+
+.chart-empty-icon {
+    margin: 0 auto .8rem;
+    width: 52px;
+    height: 52px;
+    display: grid;
+    place-items: center;
+    color: #168a64;
+    border-radius: 16px;
+    background: #e5f8ef;
+    font-size: 1.4rem;
+}
+
+.chart-empty h5 {
+    color: #1d5144;
+}
+
+.chart-empty p {
+    color: #6f817a;
+}
+
+@media (max-width: 991px) {
+    .lead-profile-card {
+        position: static;
+    }
+}
+
+@media (max-width: 576px) {
+
+    .approval-panel {
+        display: block;
+        padding: 1.25rem;
+    }
+
+    .meal-editor {
+        grid-template-columns: 1fr;
+        gap: .7rem;
+    }
+
+    .approval-actions {
+        display: grid;
+        min-width: 0;
+        margin-top: 1rem;
+    }
+
+    .chart-review-card {
+        padding: 1rem;
+    }
+}
+
+.lead-review-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.lead-review-toolbar .btn {
+    white-space: normal;
+}
+
+.lead-review-layout > aside,
+.lead-review-layout > section {
+    min-width: 0;
+}
+
+.lead-profile-card {
+    position: static;
+    padding: 1.25rem;
+}
+
+.lead-profile-head {
+    min-width: 0;
+    align-items: flex-start;
+}
+
+.lead-profile-head > div:last-child {
+    min-width: 0;
+}
+
+.lead-profile-head h5,
+.lead-customer-email {
+    overflow-wrap: anywhere;
+}
+
+.lead-metrics {
+    margin: 0;
+}
+
+.lead-metrics dt,
+.lead-context-list dt {
+    margin: 0;
+    color: #7b8b85;
+    font-size: .72rem;
+    font-weight: 700;
+}
+
+.lead-metrics dd,
+.lead-context-list dd {
+    margin: .2rem 0 0;
+    color: #24483f;
+    font-size: .86rem;
+    font-weight: 650;
+    overflow-wrap: anywhere;
+}
+
+.lead-diet-context {
+    padding: 1rem 0;
+    border-top: 1px solid #e8eeeb;
+}
+
+.lead-diet-context h5 {
+    margin: 0 0 .8rem;
+    color: #1d5144;
+    font-size: 1rem;
+    font-weight: 750;
+}
+
+.lead-context-list {
+    display: grid;
+    gap: .65rem;
+    margin: 0;
+}
+
+.clinical-review-alert {
+    margin: 0 0 1rem;
+    padding: .9rem 1rem;
+    border: 1px solid #f0d69a;
+    border-radius: 12px;
+    color: #6d4b12;
+    background: #fff9e9;
+    font-size: .84rem;
+}
+
+.clinical-review-alert p {
+    margin: .35rem 0 0;
+}
+
+.clinical-review-alert ul {
+    margin: .55rem 0 0;
+    padding-left: 1.1rem;
+}
+
+.clinical-review-alert li + li {
+    margin-top: .3rem;
+}
+
+.answer-drawer {
+    padding: 1rem 0;
+}
+
+.lead-answer-list {
+    padding: 0;
+}
+
+.lead-answer-list > div {
+    min-width: 0;
+}
+
+.lead-answer-list dd {
+    margin: .15rem 0 0;
+    overflow-wrap: anywhere;
+    font-weight: 500;
+}
+
+.generation-check-list {
+    display: grid;
+    gap: .45rem;
+    margin: 1rem 0 0;
+    padding-left: 1.1rem;
+    color: #526b61;
+    font-size: .82rem;
+}
+
+.chart-review-card {
+    min-width: 0;
+    padding: 1.35rem;
+}
+
+.chart-review-head {
+    gap: 1rem;
+}
+
+.chart-review-head h4 {
+    font-size: 1.25rem;
+}
+
+.recommended-products {
+    margin-top: 1.25rem;
+    border: 1px solid #e0eae5;
+    border-radius: 15px;
+    background: #fbfdfc;
+    overflow: hidden;
+}
+
+.recommended-products[open] {
+    border-color: #b9dfcd;
+    box-shadow: 0 8px 24px rgba(22, 138, 100, .06);
+}
+
+.recommended-products-summary {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    min-width: 0;
+    padding: .85rem 1rem;
+    cursor: pointer;
+    list-style: none;
+}
+
+.recommended-products-summary::-webkit-details-marker {
+    display: none;
+}
+
+.recommended-products-icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 38px;
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    color: #168a64;
+    background: #e5f8ef;
+    font-size: 1.1rem;
+}
+
+.recommended-products-title {
+    display: grid;
+    gap: .12rem;
+    min-width: 0;
+}
+
+.recommended-products-title strong {
+    color: #1d5144;
+    font-size: .92rem;
+}
+
+.recommended-products-title small {
+    color: #71817b;
+    font-size: .76rem;
+}
+
+.recommended-products-count {
+    margin-left: auto;
+    padding: .3rem .6rem;
+    border-radius: 999px;
+    color: #287258;
+    background: #eaf6ef;
+    font-size: .73rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.recommended-products-chevron {
+    color: #71817b;
+    font-size: 1.2rem;
+    transition: transform .2s;
+}
+
+.recommended-products[open] .recommended-products-chevron {
+    transform: rotate(180deg);
+}
+
+.recommended-products-content {
+    padding: 0 1rem 1rem;
+}
+
+.recommended-products-content form {
+    display: grid;
+    justify-items: start;
+    gap: .55rem;
+    padding-top: .9rem;
+    border-top: 1px solid #e8eeeb;
+}
+
+.recommended-products-content label {
+    color: #31584d;
+    font-size: .82rem;
+    font-weight: 700;
+}
+
+.recommended-products-content select {
+    width: 100%;
+    min-height: 96px;
+    border-color: #dce8e1;
+    border-radius: 10px;
+}
+
+.recommended-products-content small {
+    color: #71817b;
+    font-size: .74rem;
+}
+
+.day-plan-title {
+    min-width: 0;
+}
+
+.day-plan-title strong,
+.day-plan-title small {
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 767px) {
+    .lead-review-toolbar {
+        align-items: flex-start;
+    }
+
+    .recommended-products-summary {
+        flex-wrap: wrap;
+    }
+
+    .recommended-products-count {
+        margin-left: 46px;
+    }
+}
+
+@media (max-width: 576px) {
+    .lead-review-toolbar {
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+
+    .lead-profile-card,
+    .chart-review-card {
+        padding: 1rem;
+    }
+
+    .lead-metrics {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .chart-review-head {
+        align-items: flex-start;
+    }
+
+    .approval-actions {
+        display: grid;
+        min-width: 0;
+    }
+
+    .approval-panel {
+        grid-template-columns: 1fr;
+    }
+
+    .approval-actions .btn {
+        justify-self: stretch;
+        white-space: normal;
+    }
+}

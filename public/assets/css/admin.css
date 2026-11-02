@@ -1,0 +1,68 @@
+/* 
+ * ==========================================
+ * Admin Panel Custom Styles
+ * ==========================================
+ * Contains overrides and custom component styling 
+ * for the NutriBuddy admin dashboard.
+ */
+
+/* --- TomSelect Customization --- */
+.icon-field .ts-control {
+    padding-left: 40px !important;
+    border-radius: 16px !important;
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    background-color: rgba(255, 255, 255, 0.92) !important;
+    border: 1px solid var(--nb-line) !important;
+}
+.icon-field .icon {
+    z-index: 10;
+}
+.ts-dropdown {
+    border-radius: 16px !important;
+    box-shadow: 0 15px 40px rgba(0,0,0,0.12) !important;
+    border: 1px solid var(--nb-line) !important;
+    margin-top: 8px !important;
+    padding: 8px 0 !important;
+}
+.ts-dropdown .dropdown-input {
+    padding: 12px !important;
+    border-bottom: 1px solid var(--nb-line) !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+.ts-dropdown .dropdown-input:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
+.ts-dropdown .option {
+    padding: 10px 16px !important;
+    font-weight: 500;
+    color: var(--nb-ink);
+    transition: all 0.2s;
+}
+.ts-dropdown .option.active {
+    background-color: var(--nb-pink) !important;
+    color: #fff !important;
+}
+.ts-dropdown .option:hover:not(.active) {
+    background-color: rgba(16, 185, 129, 0.08) !important;
+}
+.ts-wrapper.focus .ts-control {
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12) !important;
+    border-color: rgba(16, 185, 129, 0.4) !important;
+}
+/* Make selected item look like plain text, not a tag */
+.ts-control .item {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    color: inherit !important;
+    font-weight: inherit !important;
+}
+.ts-wrapper.single .ts-control:after {
+    display: none !important; /* Hide default arrow to use our own if needed, or keep clean */
+}

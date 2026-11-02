@@ -1,0 +1,456 @@
+.diet-rules-page {
+    --rules-ink: #173d32;
+    --rules-muted: #6f8179;
+    --rules-border: #dfeae4;
+    display: grid;
+    gap: 1.25rem;
+    color: var(--rules-ink);
+}
+
+/* The shared admin typography uses !important for heading sizes, so keep this page's scale scoped here. */
+.diet-rules-page .diet-rules-hero h1 {
+    font-size: clamp(1.3rem, 1.8vw, 1.55rem) !important;
+}
+
+.diet-rules-page h2 {
+    font-size: .96rem !important;
+}
+
+.diet-rules-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2rem;
+    padding: clamp(1.4rem, 3vw, 2.4rem);
+    border: 1px solid #d9e9df;
+    border-radius: 20px;
+    background: linear-gradient(115deg, #fff 0%, #f0faf4 100%);
+    box-shadow: 0 14px 34px rgba(29, 66, 52, .06);
+}
+
+.diet-rules-hero-copy {
+    max-width: 850px;
+}
+
+.diet-rules-eyebrow,
+.diet-rules-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    color: #168a64;
+    font-size: .7rem;
+    font-weight: 800;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+}
+
+.diet-rules-hero h1 {
+    margin: .45rem 0 .55rem;
+    color: #153f33;
+    font-size: clamp(1.3rem, 1.8vw, 1.55rem);
+    font-weight: 750;
+}
+
+.diet-rules-hero p {
+    max-width: 760px;
+    margin: 0;
+    color: #687d73;
+    font-size: .94rem;
+    line-height: 1.7;
+}
+
+.diet-rules-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .55rem;
+    margin-top: 1.1rem;
+}
+
+.diet-rules-tags span {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .45rem .7rem;
+    border: 1px solid #d9ebe1;
+    border-radius: 999px;
+    color: #31624e;
+    background: #fff;
+    font-size: .75rem;
+    font-weight: 700;
+}
+
+.diet-rules-hero-icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 82px;
+    width: 82px;
+    height: 82px;
+    border: 1px solid #d6ebdf;
+    border-radius: 24px;
+    color: #168a64;
+    background: #e3f5ea;
+    font-size: 2rem;
+}
+
+.diet-rules-flow,
+.diet-rule-card,
+.diet-rules-boundaries {
+    border: 1px solid var(--rules-border);
+    border-radius: 17px;
+    background: #fff;
+    box-shadow: 0 9px 26px rgba(29, 66, 52, .045);
+}
+
+.diet-rules-flow {
+    padding: 1.3rem;
+}
+
+.diet-rules-section-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.diet-rules-section-heading h2,
+.diet-rule-card h2,
+.diet-boundaries-heading h2 {
+    margin: .25rem 0 0;
+    color: var(--rules-ink);
+    font-size: .96rem;
+    font-weight: 750;
+}
+
+.diet-rules-section-heading p {
+    max-width: 360px;
+    margin: 0;
+    color: var(--rules-muted);
+    font-size: .8rem;
+    text-align: right;
+}
+
+.diet-flow-steps {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: .65rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.diet-flow-steps li {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: .28rem;
+    min-width: 0;
+    padding: .75rem;
+    border: 1px solid #e7efea;
+    border-radius: 12px;
+    background: #fbfdfc;
+}
+
+.diet-flow-steps li > span {
+    display: grid;
+    place-items: center;
+    width: 25px;
+    height: 25px;
+    border-radius: 8px;
+    color: #168a64;
+    background: #e5f7ed;
+    font-size: .65rem;
+    font-weight: 800;
+}
+
+.diet-flow-steps strong {
+    color: #274b3e;
+    font-size: .76rem;
+}
+
+.diet-flow-steps small {
+    color: var(--rules-muted);
+    font-size: .68rem;
+    line-height: 1.45;
+}
+
+.diet-rules-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 1rem;
+}
+
+.diet-rule-card {
+    min-width: 0;
+    padding: 1.2rem;
+}
+
+.diet-rule-card-heading {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding-bottom: .85rem;
+    border-bottom: 1px solid #edf2ef;
+}
+
+.diet-rule-icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+    color: #18875f;
+    background: #e6f7ed;
+    font-size: 1.2rem;
+}
+
+.diet-rule-icon.is-amber { color: #a96c0c; background: #fff4dc; }
+.diet-rule-icon.is-blue { color: #3675ad; background: #eaf4fd; }
+.diet-rule-icon.is-purple { color: #7655ad; background: #f2ecfb; }
+.diet-rule-icon.is-rose { color: #ad5260; background: #fff0f1; }
+.diet-rule-icon.is-green { color: #21846a; background: #e7f6ef; }
+
+.diet-rule-card h2 {
+    font-size: .96rem;
+}
+
+.diet-rule-intro {
+    margin: .9rem 0;
+    color: var(--rules-muted);
+    font-size: .82rem;
+    line-height: 1.6;
+}
+
+.diet-rule-list {
+    display: grid;
+    gap: .55rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.diet-rule-list li {
+    display: grid;
+    grid-template-columns: minmax(115px, .42fr) minmax(0, 1fr);
+    gap: .7rem;
+    padding: .62rem .7rem;
+    border-radius: 10px;
+    background: #f7faf8;
+    font-size: .78rem;
+    line-height: 1.5;
+}
+
+.diet-rule-list strong {
+    color: #315a49;
+}
+
+.diet-rule-list span {
+    color: #63766d;
+}
+
+.diet-rule-list.compact li {
+    grid-template-columns: minmax(135px, .48fr) minmax(0, 1fr);
+}
+
+.diet-pattern-list {
+    display: grid;
+    gap: .55rem;
+}
+
+.diet-pattern-list div {
+    display: grid;
+    grid-template-columns: 125px minmax(0, 1fr);
+    gap: .75rem;
+    padding: .65rem .75rem;
+    border: 1px solid #e7efea;
+    border-radius: 10px;
+}
+
+.diet-pattern-list strong {
+    color: #315a49;
+    font-size: .78rem;
+}
+
+.diet-pattern-list span {
+    color: #63766d;
+    font-size: .76rem;
+}
+
+.diet-rule-footnote {
+    display: flex;
+    align-items: flex-start;
+    gap: .45rem;
+    margin: .85rem 0 0;
+    color: #6f8179;
+    font-size: .73rem;
+    line-height: 1.55;
+}
+
+.diet-rule-footnote i {
+    flex: 0 0 auto;
+    margin-top: .08rem;
+    color: #398263;
+}
+
+.diet-nutrient-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+}
+
+.diet-nutrient-chips span {
+    padding: .35rem .55rem;
+    border: 1px solid #e2ebe6;
+    border-radius: 999px;
+    color: #416354;
+    background: #f8fbf9;
+    font-size: .69rem;
+    font-weight: 650;
+}
+
+.diet-score-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .55rem;
+}
+
+.diet-score-list div {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: .15rem .5rem;
+    padding: .65rem .7rem;
+    border-radius: 10px;
+    background: #f7faf8;
+}
+
+.diet-score-list span {
+    color: #315a49;
+    font-size: .74rem;
+    font-weight: 700;
+}
+
+.diet-score-list strong {
+    color: #168a64;
+    font-size: .74rem;
+    white-space: nowrap;
+}
+
+.diet-score-list small {
+    grid-column: 1 / -1;
+    color: #71817a;
+    font-size: .68rem;
+}
+
+.diet-rules-boundaries {
+    padding: 1.2rem 1.3rem;
+    border-color: #ebdcae;
+    background: linear-gradient(120deg, #fffbef, #fff);
+}
+
+.diet-boundaries-heading {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+}
+
+.diet-boundaries-icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    color: #a96c0c;
+    background: #fff1cf;
+    font-size: 1.2rem;
+}
+
+.diet-boundaries-heading .diet-rules-kicker {
+    color: #9a6a20;
+}
+
+.diet-boundaries-heading h2 {
+    font-size: .96rem;
+}
+
+.diet-rules-boundaries ul {
+    display: grid;
+    gap: .5rem;
+    margin: .9rem 0 0;
+    padding-left: 1.15rem;
+    color: #705f3e;
+    font-size: .78rem;
+    line-height: 1.55;
+}
+
+@media (max-width: 1199px) {
+    .diet-flow-steps {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 767px) {
+    .diet-rules-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .diet-rules-section-heading {
+        display: block;
+    }
+
+    .diet-rules-section-heading p {
+        margin-top: .45rem;
+        text-align: left;
+    }
+
+    .diet-flow-steps {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 480px) {
+    .diet-rules-hero {
+        align-items: flex-start;
+        padding: 1.25rem;
+    }
+
+    .diet-rules-hero-icon {
+        flex-basis: 48px;
+        width: 48px;
+        height: 48px;
+        border-radius: 15px;
+        font-size: 1.3rem;
+    }
+
+    .diet-rules-tags span {
+        font-size: .68rem;
+    }
+
+    .diet-flow-steps {
+        grid-template-columns: 1fr 1fr;
+        gap: .45rem;
+    }
+
+    .diet-rule-card,
+    .diet-rules-flow,
+    .diet-rules-boundaries {
+        padding: 1rem;
+    }
+
+    .diet-rule-list li,
+    .diet-rule-list.compact li {
+        grid-template-columns: 1fr;
+        gap: .15rem;
+    }
+
+    .diet-pattern-list div {
+        grid-template-columns: 1fr;
+        gap: .2rem;
+    }
+
+    .diet-score-list {
+        grid-template-columns: 1fr;
+    }
+}
