@@ -10,13 +10,51 @@ use Illuminate\Support\Collection;
 
 class PricingService
 {
-    public function calculate(Collection $cartItems, ?Coupon $coupon = null, int $coinsToRedeem = 0): array
+    public static function isSameState(?string $shippingState, ?string $storeState = null): bool
+    {
+        $storeState = $storeState ?: (string) Setting::get('store_state', 'Gujarat');
+
+        if (empty(trim((string) $shippingState))) {
+            return true; // Default to same state if address not yet selected
+        }
+
+        $normalize = function (string $val): string {
+            $val = strtolower(trim($val));
+            $stateMap = [
+                'gj' => 'gujarat',
+                'mh' => 'maharashtra',
+                'dl' => 'delhi',
+                'rj' => 'rajasthan',
+                'mp' => 'madhya pradesh',
+                'up' => 'uttar pradesh',
+                'ka' => 'karnataka',
+                'tn' => 'tamil nadu',
+                'wb' => 'west bengal',
+                'pb' => 'punjab',
+                'hr' => 'haryana',
+            ];
+            $clean = (string) preg_replace('/[^a-z0-9]/', '', $val);
+            return $stateMap[$clean] ?? $clean;
+        };
+
+        return $normalize($shippingState) === $normalize($storeState);
+    }
+
+    public function calculate(
+        Collection $cartItems,
+        ?Coupon $coupon = null,
+        int $coinsToRedeem = 0,
+        ?string $shippingState = null
+    ): array
     {
         $subtotal = 0.0;
         $taxTotal = 0.0;
         $shippingTotal = 0.0;
         $lineItems = [];
         $totalCoinsEarned = 0;
+
+        $storeState = (string) Setting::get('store_state', 'Gujarat');
+        $isInterstate = !self::isSameState($shippingState, $storeState);
 
         // Variables for what the user sees in the checkout breakdown
         $displaySubtotal = 0.0;
@@ -44,6 +82,16 @@ class PricingService
                 ? ($lineSubTotal * $taxPercent) / 100
                 : 0.0;
             $lineShipping = ((float) ($product->shipping_price ?? 0)) * $quantity;
+
+            if ($isInterstate) {
+                $lineCgst = 0.0;
+                $lineSgst = 0.0;
+                $lineIgst = $lineTax;
+            } else {
+                $lineCgst = $taxPercent > 0 ? ($lineSubTotal * ($taxPercent / 2)) / 100 : 0.0;
+                $lineSgst = $lineTax - $lineCgst;
+                $lineIgst = 0.0;
+            }
 
             // Calculate Coins Earned for this line item
             $lineCoinsReward = (int) (!empty($product->coins_reward) ? $product->coins_reward : round($unitPrice * 0.05));
@@ -74,8 +122,14 @@ class PricingService
                 'display_unit_price' => round($displayUnitPrice, 0),
                 'display_line_total' => round($displayUnitPrice * $quantity, 0),
                 'tax_percent' => round($taxPercent, 2),
+                'cgst_rate' => $isInterstate ? 0.0 : round($taxPercent / 2, 2),
+                'sgst_rate' => $isInterstate ? 0.0 : round($taxPercent / 2, 2),
+                'igst_rate' => $isInterstate ? round($taxPercent, 2) : 0.0,
                 'tax_code' => $taxRate?->code,
                 'tax_amount' => round($lineTax, 0),
+                'cgst_amount' => round($lineCgst, 0),
+                'sgst_amount' => round($lineSgst, 0),
+                'igst_amount' => round($lineIgst, 0),
                 'show_gst_in_checkout' => $showGstInCheckout,
                 'shipping_amount' => round($lineShipping, 0),
                 'coins_earned' => $lineCoinsReward * $quantity,
@@ -160,10 +214,14 @@ class PricingService
             'display_discount_total' => round($displayDiscountTotal, 0),
             'display_coupon_discount' => round($displayCouponDiscount, 0),
             'display_coin_discount' => round($displayCoinDiscount, 0),
+            'is_interstate' => $isInterstate,
+            'tax_type' => $isInterstate ? 'IGST' : 'CGST+SGST',
+            'store_state' => $storeState,
+            'shipping_state' => $shippingState,
             'gst_total' => $roundedTaxTotal,
-            'cgst_total' => round($taxTotal / 2, 0),
-            'sgst_total' => round($taxTotal / 2, 0),
-            'igst_total' => 0.0,
+            'cgst_total' => $isInterstate ? 0.0 : round($taxTotal / 2, 0),
+            'sgst_total' => $isInterstate ? 0.0 : max(0.0, $roundedTaxTotal - round($taxTotal / 2, 0)),
+            'igst_total' => $isInterstate ? $roundedTaxTotal : 0.0,
             'shipping_total' => $roundedShippingTotal,
             'grand_total' => $grandTotal,
         ];

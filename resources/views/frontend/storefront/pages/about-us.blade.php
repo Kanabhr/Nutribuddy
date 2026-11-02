@@ -960,23 +960,10 @@
 
                 <!-- LEFT IMAGE GRID -->
                 <div class="aj-trust-grid">
-                    <!-- Replace with your real images -->
-                    <img src="{{ asset('img/girl.jpeg') }}">
-                    <img src="{{ asset('img/cidss.jpeg') }}">
-                    <img src="{{ asset('img/BUSY-P.jpg') }}">
-                    <img src="{{ asset('img/mom.png') }}">
-                    <img src="{{ asset('img/girl.jpeg') }}">
-                    <img src="{{ asset('img/cidss.jpeg') }}">
-                    <img src="{{ asset('img/BUSY-P.jpg') }}">
-                    <img src="{{ asset('img/mom.png') }}">
-                    <img src="{{ asset('img/girl.jpeg') }}">
-                    <img src="{{ asset('img/cidss.jpeg') }}">
-                    <img src="{{ asset('img/BUSY-P.jpg') }}">
-                    <img src="{{ asset('img/mom.png') }}">
-                    <img src="{{ asset('img/girl.jpeg') }}">
-                    <img src="{{ asset('img/cidss.jpeg') }}">
-                    <img src="{{ asset('img/BUSY-P.jpg') }}">
-                    <img src="{{ asset('img/mom.png') }}">
+                    @for ($image = 1; $image <= 16; $image++)
+                        <img src="{{ asset('img/about-trust/last' . $image . '.jpg') }}"
+                            alt="NutriBuddy family and product moments" loading="lazy" decoding="async">
+                    @endfor
                 </div>
 
                 <!-- RIGHT CONTENT -->

@@ -31,6 +31,15 @@
     $("body").removeClass("overlay-active");
   });
 
+  $(document).on("click", function(e){
+    if ($("body").hasClass("overlay-active")) {
+      if (!$(e.target).closest(".sidebar, .sidebar-mobile-toggle").length) {
+        $(".sidebar").removeClass("sidebar-open");
+        $("body").removeClass("overlay-active");
+      }
+    }
+  });
+
   //to keep the current page active
   $(function () {
     for (

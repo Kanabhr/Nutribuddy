@@ -19,6 +19,7 @@ class InvoiceController extends Controller
         $orders = Order::where('status', '!=', 'cancelled')
             ->when($request->search, function($q, $search) {
                 $q->where('order_number', 'like', "%{$search}%")
+                  ->orWhere('invoice_number', 'like', "%{$search}%")
                   ->orWhere('customer_name', 'like', "%{$search}%")
                   ->orWhere('customer_email', 'like', "%{$search}%");
             })

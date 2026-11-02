@@ -35,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->validateCsrfTokens(except: [
             'payment/cashfree/webhook',
+            'payment/razorpay/webhook',
             'webhooks/aisensy',
         ]);
         

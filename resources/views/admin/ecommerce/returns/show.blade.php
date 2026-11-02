@@ -22,7 +22,7 @@
                         </div>
                         <div class="col-md-6">
                             <h6 class="text-secondary-light fw-medium mb-8">Order Associated:</h6>
-                            <a href="{{ route('admin.ecommerce.orders.show', $orderReturn->order_id) }}" class="mb-0 fw-bold text-dark">#{{ $orderReturn->order->order_number }}</a>
+                            <a href="{{ $orderReturn->order_id ? route('admin.ecommerce.orders.show', $orderReturn->order_id) : '#' }}" class="mb-0 fw-bold text-dark">#{{ $orderReturn->order?->order_number ?? 'N/A' }}</a>
                         </div>
                         <div class="col-md-6">
                             <h6 class="text-secondary-light fw-medium mb-8">Refund Amount:</h6>
@@ -72,14 +72,19 @@
                         @endif
                     </div>
 
+                    @php
+                        $customerName = $orderReturn->order?->user?->name ?? $orderReturn->order?->customer_name ?? 'Guest Customer';
+                        $customerEmail = $orderReturn->order?->user?->email ?? $orderReturn->order?->customer_email ?? 'N/A';
+                        $avatarInitial = strtoupper(substr(trim($customerName), 0, 1) ?: 'C');
+                    @endphp
                     <h6 class="text-md fw-bold mb-16">Customer Information</h6>
                     <div class="d-flex align-items-center gap-3 p-16 radius-8 border mb-24">
                         <div class="w-48-px h-48-px radius-circle bg-primary-100 d-flex align-items-center justify-content-center text-primary-600 fw-bold">
-                            {{ substr($orderReturn->order->user->name, 0, 1) }}
+                            {{ $avatarInitial }}
                         </div>
                         <div>
-                            <h6 class="mb-0 fw-medium">{{ $orderReturn->order->user->name }}</h6>
-                            <p class="mb-0 text-sm text-secondary-light">{{ $orderReturn->order->user->email }}</p>
+                            <h6 class="mb-0 fw-medium">{{ $customerName }}</h6>
+                            <p class="mb-0 text-sm text-secondary-light">{{ $customerEmail }}</p>
                         </div>
                     </div>
 
@@ -192,7 +197,7 @@
                                 <span class="icon"><iconify-icon icon="lucide:indian-rupee"></iconify-icon></span>
                                 <input type="number" step="0.01" name="refund_amount" class="form-control" value="{{ $orderReturn->refund_amount }}" required>
                             </div>
-                            <small class="text-secondary-light">Suggested refund is based on the order grand total: INR {{ number_format($orderReturn->order->grand_total, 2) }}</small>
+                            <small class="text-secondary-light">Suggested refund is based on the order grand total: INR {{ number_format($orderReturn->order?->grand_total ?? 0, 2) }}</small>
                         </div>
 
                         <div class="mb-24">

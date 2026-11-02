@@ -7,8 +7,8 @@
 @endphp
 
 <aside class="sidebar">
-    <button type="button" class="sidebar-close-btn">
-        <iconify-icon icon="radix-icons:cross-2"></iconify-icon>
+    <button type="button" class="sidebar-close-btn" aria-label="Close Sidebar">
+        <i class="ri-close-line text-xl"></i>
     </button>
     <div>
         <a href="{{ route('admin.index') }}" class="sidebar-logo">
@@ -68,7 +68,7 @@
                     </li>
                     <li>
                         <a href="{{ route('admin.nutrition.lead-queue.index') }}"><i
-                                class="ri-circle-fill circle-icon text-info-main w-auto"></i> My Lead Queue</a>
+                                class="ri-circle-fill circle-icon text-info-main w-auto"></i> Diet Chart Generation</a>
                     </li>
                     @endcan
                     <li>

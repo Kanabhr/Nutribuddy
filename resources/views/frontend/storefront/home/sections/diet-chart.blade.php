@@ -1,335 +1,187 @@
 <section class="diet-section" id="diet-chart">
+    <div class="diet-header">
+        <span class="sec-eye">Free for Every Parent</span>
+        <h2 class="sec-title">Get Your Child's <span class="acc">Personalized</span><br>Diet Chart</h2>
+        <p class="sec-sub">Tell us about your child, then compare available plans and choose the one that fits your family.</p>
+    </div>
 
-        <div class="diet-header">
-            <span class="sec-eye">Free for Every Parent</span>
-            <h2 class="sec-title">Get Your Child's <span class="acc">Personalized</span><br>Diet Chart </h2>
-            <p class="sec-sub">Answer 4 quick questions — get a free 2-day expert diet plan. Subscribe to unlock the full
-                7-day plan + PDF download.</p>
+    <div class="stepper-wrap">
+        <div class="stepper-progress" aria-label="Diet chart steps">
+            <div class="sp-step active" data-home-diet-step="1"><div class="sp-ball">1</div><div class="sp-label">Child details</div></div>
+            <div class="sp-line"><div class="sp-line-fill"></div></div>
+            <div class="sp-step" data-home-diet-step="2"><div class="sp-ball">2</div><div class="sp-label">Choose a plan</div></div>
         </div>
 
-        <div class="stepper-wrap">
+        <div class="diet-card home-diet-card">
+            <div id="homeDietQuestionStep">
+                <div class="step-head">
+                    <h3>Tell us about your child</h3>
+                    <p>Answer the Basic nutrition questions so the plan can reflect your child's needs.</p>
+                </div>
 
-            <!-- Stepper Progress -->
-            <div class="stepper-progress">
-                <div class="sp-step active" id="sp1">
-                    <div class="sp-ball">1</div>
-                    <div class="sp-label">Child Info</div>
-                </div>
-                <div class="sp-line">
-                    <div class="sp-line-fill" id="line1"></div>
-                </div>
-                <div class="sp-step" id="sp2">
-                    <div class="sp-ball">2</div>
-                    <div class="sp-label">Health Goals</div>
-                </div>
-                <div class="sp-line">
-                    <div class="sp-line-fill" id="line2"></div>
-                </div>
-                <div class="sp-step" id="sp3">
-                    <div class="sp-ball">3</div>
-                    <div class="sp-label">Diet Type</div>
-                </div>
-                <div class="sp-line">
-                    <div class="sp-line-fill" id="line3"></div>
-                </div>
-                <div class="sp-step" id="sp4">
-                    <div class="sp-ball">4</div>
-                    <div class="sp-label">Your Plan</div>
-                </div>
+                @if ($basicDietQuestions->isNotEmpty())
+                    <form id="homeDietQuestionnaire" method="post" onsubmit="event.preventDefault(); return false;" novalidate>
+                        @csrf
+                        @foreach ($basicDietQuestions->groupBy('section') as $section => $questions)
+                            <fieldset class="home-diet-question-section">
+                                <legend>{{ $section ?: 'About your child' }}</legend>
+                                <div class="home-diet-question-grid">
+                                    @foreach ($questions as $question)
+                                        @php
+                                            $type = strtolower((string) $question->answer_type);
+                                            $isMulti = str_contains($type, 'multi');
+                                            $isChoice = str_contains($type, 'choice') || $isMulti;
+                                            $isHeight = str_contains(strtolower((string) $question->question), 'height');
+                                            $isWeight = str_contains(strtolower((string) $question->question), 'weight');
+                                            $isMeasurement = $isHeight || $isWeight;
+                                            $isOptional = $question->is_optional || $isMeasurement;
+                                            $options = preg_split('/\s+\/\s+/', (string) $question->options_scale, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+                                            $options = array_values(array_filter($options, fn ($option) => trim($option) !== '—'));
+                                            $inputType = str_contains($type, 'date') ? 'date' : (str_contains($type, 'number') ? 'number' : 'text');
+                                            $conditionalVegan = str_contains(strtolower((string) $question->only_ask_if), 'vegan');
+                                        @endphp
+                                        <div class="home-diet-question {{ $isMulti ? 'home-diet-question-wide' : '' }}" data-home-diet-question="{{ $question->id }}" @if ($conditionalVegan) data-hide-for-vegan @endif>
+                                            <label class="home-diet-question-label" @if ($isChoice) id="question-label-{{ $question->id }}" @endif>
+                                                {{ $question->question }}
+                                                @if ($isOptional)<span class="home-diet-optional">Optional</span>@endif
+                                            </label>
+
+                                            @if ($isHeight)
+                                                <div class="home-diet-measurement-help">Choose a height or enter it manually.</div>
+                                                <div class="home-diet-height-row" data-home-height-control="{{ $question->id }}">
+                                                    <select class="home-diet-cycle" aria-label="Height" data-home-height-select>
+                                                        <option value="">Select height</option>
+                                                    </select>
+                                                    <select class="home-diet-cycle" aria-label="Height unit" data-home-height-unit>
+                                                        <option value="ft">ft / in</option>
+                                                        <option value="cm">cm</option>
+                                                    </select>
+                                                </div>
+                                                <div class="home-diet-height-custom" data-home-height-custom hidden>
+                                                    <div data-home-height-custom-cm>
+                                                        <input type="number" min="30" max="250" step="1" placeholder="e.g. 173" aria-label="Height in centimeters" data-home-height-cm>
+                                                    </div>
+                                                    <div class="home-diet-height-ftin" data-home-height-custom-ftin hidden>
+                                                        <label>Feet<input type="number" min="0" max="8" step="1" placeholder="5" data-home-height-ft></label>
+                                                        <label>Inches<input type="number" min="0" max="11" step="1" placeholder="7" data-home-height-in></label>
+                                                    </div>
+                                                    <button type="button" class="home-diet-height-apply" data-home-height-apply>Apply</button>
+                                                </div>
+                                                <input type="hidden" name="q_{{ $question->id }}" data-home-height-answer>
+                                                <p class="home-diet-height-suggestion" data-home-height-suggestion hidden></p>
+                                            @elseif ($isWeight)
+                                                <div class="home-diet-measurement-help">Enter weight in kilograms.</div>
+                                                <div class="home-diet-weight-wrap">
+                                                    <input type="number" name="q_{{ $question->id }}" step="any" min="0" placeholder="e.g. 22" data-home-height-weight>
+                                                    <span>kg</span>
+                                                </div>
+                                            @elseif ($isChoice && count($options))
+                                                <div class="home-diet-options" role="group" @if ($isMulti) aria-labelledby="question-label-{{ $question->id }}" @else aria-labelledby="question-label-{{ $question->id }}" @endif data-answer-group="{{ $question->id }}" data-multiple="{{ $isMulti ? 'true' : 'false' }}" data-required="{{ $question->is_optional ? 'false' : 'true' }}">
+                                                    @foreach ($options as $option)
+                                                        <label class="home-diet-option">
+                                                            <input type="{{ $isMulti ? 'checkbox' : 'radio' }}" name="q_{{ $question->id }}{{ $isMulti ? '[]' : '' }}" value="{{ trim($option) }}" @if (! $question->is_optional && ! $isMulti) required @endif>
+                                                            <span>{{ $question->question === 'How often falls ill' ? str_replace(' yr', ' year', trim($option)) : trim($option) }}</span>
+                                                        </label>
+                                                    @endforeach
+                                                </div>
+                                            @elseif (str_contains($type, 'yes/no'))
+                                                <textarea name="q_{{ $question->id }}" rows="3" placeholder="{{ $question->options_scale ?: 'Add details if applicable' }}" @if (! $isOptional) required @endif></textarea>
+                                            @else
+                                                <input type="{{ $inputType }}" name="q_{{ $question->id }}" placeholder="{{ $inputType === 'number' ? $question->options_scale : '' }}" @if ($inputType === 'number') step="any" min="0" @endif @if (! $isOptional) required @endif>
+                                            @endif
+                                            <small class="home-diet-field-error" aria-live="polite"></small>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </fieldset>
+                        @endforeach
+
+                        <div class="home-diet-message" id="homeDietMessage" role="alert" hidden></div>
+                        <div class="step-nav home-diet-nav">
+                            <span>Only the questions marked optional may be left blank.</span>
+                            <button type="button" id="homeDietShowPlans" class="btn-next" onclick="if (!document.getElementById('homeDietQuestionnaire').dataset.enhanced) { document.getElementById('homeDietQuestionStep').hidden = true; document.getElementById('homeDietPlansStep').hidden = false; }">See available plans <span aria-hidden="true">→</span></button>
+                        </div>
+                    </form>
+                @else
+                    <p class="home-diet-empty">The Basic questionnaire is temporarily unavailable. Please try again later.</p>
+                @endif
             </div>
 
-            <!-- Diet Card -->
-            <div class="diet-card">
-
-                <!-- STEP 1 -->
-                <div class="step-panel active" id="panel1">
-                    <div class="step-head">
-                        <span class="step-emoji"></span>
-                        <h3>Tell us about your child</h3>
-                        <p>Select age, gender, and optional body measurements for a more accurate plan.</p>
-                    </div>
-
-                    <div style="margin-bottom:24px">
-                        <div style="font-family:'Fredoka One',cursive;font-size:1rem;color:var(--dk);margin-bottom:14px">
-                            Age Group
-                        </div>
-                        <div class="age-grid" id="ageGrid">
-                            <div class="age-card" data-age="2-3" onclick="dcSelectAge(this)">
-                                <span class="age-emoji"><img src="{{ asset('img/girl.png') }}" alt=""></span>
-                                <span class="age-range">2–3 yrs</span>
-                                <span class="age-label">Toddler</span>
-                            </div>
-                            <div class="age-card" data-age="4-6" onclick="dcSelectAge(this)">
-                                <span class="age-emoji"><img src="{{ asset('img/b1.png') }}" alt=""></span>
-                                <span class="age-range">4–6 yrs</span>
-                                <span class="age-label">Pre-School</span>
-                            </div>
-                            <div class="age-card" data-age="7-9" onclick="dcSelectAge(this)">
-                                <span class="age-emoji"><img src="{{ asset('img/b2.png') }}" alt=""></span>
-                                <span class="age-range">7–9 yrs</span>
-                                <span class="age-label">Primary School</span>
-                            </div>
-                            <div class="age-card" data-age="10-12" onclick="dcSelectAge(this)">
-                                <span class="age-emoji"><img src="{{ asset('img/g1.png') }}" alt=""></span>
-                                <span class="age-range">10–12 yrs</span>
-                                <span class="age-label">Middle School</span>
-                            </div>
-                            <div class="age-card" data-age="13-14" onclick="dcSelectAge(this)">
-                                <span class="age-emoji"><img src="{{ asset('img/b4.png') }}" alt=""></span>
-                                <span class="age-range">13–14 yrs</span>
-                                <span class="age-label">Teen</span>
-                            </div>
-                        </div>
-                        <div class="selection-error" id="ageError">⚠️ Please select an age group to continue.</div>
-                    </div>
-
-                    <div style="margin-bottom:24px">
-                        <div style="font-family:'Fredoka One',cursive;font-size:1rem;color:var(--dk);margin-bottom:14px">
-                            Gender
-                        </div>
-                        <div class="gender-row" id="genderRow">
-                            <div class="gender-card" data-gender="boy" onclick="dcSelectGender(this)">
-                                <span class="gender-emoji"><img src="{{ asset('img/boy.png') }}" alt=""></span>
-                                <div class="gender-name">Boy</div>
-                            </div>
-                            <div class="gender-card" data-gender="girl" onclick="dcSelectGender(this)">
-                                <span class="gender-emoji"><img src="{{ asset('img/girl.png') }}" alt=""></span>
-                                <div class="gender-name">Girl</div>
-                            </div>
-                            <!-- <div class="gender-card" data-gender="other" onclick="dcSelectGender(this)">
-                                                                                                                                                                                    <span class="gender-emoji"><img src="{{ asset('img/boyn.png') }}" alt=""></span>
-                                                                                                                                                                                    <div class="gender-name">Prefer not to say</div>
-                                                                                                                                                                                </div> -->
-                        </div>
-                        <div class="selection-error" id="genderError">⚠️ Please select a gender to continue.</div>
-                    </div>
-
-                    <!-- NEW: Height & Weight -->
-                    <div>
-                        <div style="font-family:'Fredoka One',cursive;font-size:1rem;color:var(--dk);margin-bottom:6px">
-                            Body Measurements
-                            <span
-                                style="font-size:.72rem;font-family:'Nunito',sans-serif;font-weight:700;color:#aaa;margin-left:6px">(Optional
-                                — improves accuracy)</span>
-                        </div>
-                        <div class="hw-row">
-                            <div class="hw-group">
-                                <label>Height (cm)</label>
-                                <input type="number" id="heightInput" placeholder="e.g. 115" min="50" max="200">
-                            </div>
-                            <div class="hw-group">
-                                <label>Weight (kg)</label>
-                                <input type="number" id="weightInput" placeholder="e.g. 22" min="5" max="100">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="step-nav">
-                        <div></div>
-                        <button class="btn-next" onclick="dcGoStep(2)">Continue → Health Goals</button>
-                    </div>
+            <div id="homeDietPlansStep" hidden>
+                <div class="step-head">
+                    <h3>Choose the plan that works for you</h3>
+                    <p>Your answers are ready. Review current plan pricing and select a billing period to continue.</p>
                 </div>
 
-                <!-- STEP 2 -->
-                <div class="step-panel" id="panel2">
-                    <div class="step-head">
-                        <span class="step-emoji">🎯</span>
-                        <h3>What are your goals for your child?</h3>
-                        <p>Select all that apply — we'll personalize your diet chart accordingly.</p>
+                @if ($dietPlans->isNotEmpty())
+                    <div class="home-diet-billing-toggle" role="group" aria-label="Billing period">
+                        <button type="button" class="is-selected" data-home-billing-cycle="monthly" aria-pressed="true">Monthly</button>
+                        <button type="button" data-home-billing-cycle="quarterly" aria-pressed="false">Quarterly</button>
+                        <button type="button" data-home-billing-cycle="annually" aria-pressed="false">Annually</button>
                     </div>
-                    <div class="problem-grid" id="problemGrid">
-                        <div class="prob-tag" data-prob="immunity" onclick="dcToggleProb(this)"><span
-                                class="prob-icon">🛡️</span>
-                            Boost Immunity</div>
-                        <div class="prob-tag" data-prob="growth" onclick="dcToggleProb(this)"><span
-                                class="prob-icon">📏</span>
-                            Height & Growth</div>
-                        <div class="prob-tag" data-prob="brain" onclick="dcToggleProb(this)"><span
-                                class="prob-icon">🧠</span> Brain
-                            & Focus</div>
-                        <div class="prob-tag" data-prob="weight" onclick="dcToggleProb(this)"><span
-                                class="prob-icon">⚖️</span>
-                            Healthy Weight</div>
-                        <div class="prob-tag" data-prob="energy" onclick="dcToggleProb(this)"><span
-                                class="prob-icon">⚡</span> More
-                            Energy</div>
-                        <div class="prob-tag" data-prob="sleep" onclick="dcToggleProb(this)"><span
-                                class="prob-icon">😴</span>
-                            Better Sleep</div>
-                        <div class="prob-tag" data-prob="digestion" onclick="dcToggleProb(this)"><span
-                                class="prob-icon"></span>
-                            Gut & Digestion</div>
-                        <div class="prob-tag" data-prob="bones" onclick="dcToggleProb(this)"><span
-                                class="prob-icon">💪</span>
-                            Strong Bones</div>
-                        <div class="prob-tag" data-prob="mood" onclick="dcToggleProb(this)"><span
-                                class="prob-icon">😊</span> Mood &
-                            Calm</div>
-                        <div class="prob-tag" data-prob="skin" onclick="dcToggleProb(this)"><span class="prob-icon">✨</span>
-                            Skin &
-                            Hair</div>
-                        <div class="prob-tag" data-prob="appetite" onclick="dcToggleProb(this)"><span
-                                class="prob-icon">🍽️</span>
-                            Picky Eater Fix</div>
-                        <div class="prob-tag" data-prob="exam" onclick="dcToggleProb(this)"><span
-                                class="prob-icon">📚</span> Exam
-                            Performance</div>
-                    </div>
-                    <div class="selection-error" id="probError">⚠️ Please select at least one health goal.</div>
-                    <div class="step-nav">
-                        <button class="btn-back" onclick="dcGoStep(1)">← Back</button>
-                        <button class="btn-next" onclick="dcGoStep(3)">Next → Diet Preferences</button>
-                    </div>
-                </div>
-
-                <!-- STEP 3 -->
-                <div class="step-panel" id="panel3">
-                    <div class="step-head">
-                        <span class="step-emoji"></span>
-                        <h3>Any food preferences or allergies?</h3>
-                        <p>This helps us build a plan your family will actually love and follow.</p>
-                    </div>
-                    <div style="margin-bottom:24px">
-                        <div style="font-family:'Fredoka One',cursive;font-size:1rem;color:var(--dk);margin-bottom:14px">
-                            Diet Type
-                        </div>
-                        <div class="diet-pref-row" id="dietPrefRow">
-                            <div class="dpref" data-pref="vegetarian" onclick="dcSelectPref(this)"> Vegetarian</div>
-                            <div class="dpref" data-pref="vegan" onclick="dcSelectPref(this)">🌱 Vegan</div>
-                            <div class="dpref" data-pref="eggetarian" onclick="dcSelectPref(this)">🥚 Eggetarian</div>
-                            <div class="dpref" data-pref="non-veg" onclick="dcSelectPref(this)">🍗 Non-Veg</div>
-                        </div>
-                        <div class="selection-error" id="prefError">⚠️ Please select a diet preference.</div>
-                    </div>
-                    <div>
-                        <div style="font-family:'Fredoka One',cursive;font-size:1rem;color:var(--dk);margin-bottom:8px">
-                            Known Allergies <span
-                                style="font-weight:400;font-size:.8rem;font-family:'DM Sans',sans-serif;color:#aaa">(Optional)</span>
-                        </div>
-                        <div class="allergy-row" id="allergyRow">
-                            <div class="atag" data-allergy="dairy" onclick="dcToggleAllergy(this)">🥛 Dairy</div>
-                            <div class="atag" data-allergy="gluten" onclick="dcToggleAllergy(this)">🌾 Gluten</div>
-                            <div class="atag" data-allergy="nuts" onclick="dcToggleAllergy(this)">🥜 Nuts</div>
-                            <div class="atag" data-allergy="soy" onclick="dcToggleAllergy(this)">🫘 Soy</div>
-                            <div class="atag" data-allergy="eggs" onclick="dcToggleAllergy(this)">🥚 Eggs</div>
-                            <div class="atag" data-allergy="none" onclick="dcToggleAllergy(this)">✅ No Allergies</div>
-                        </div>
-                    </div>
-                    <div class="step-nav">
-                        <button class="btn-back" onclick="dcGoStep(2)">← Back</button>
-                        <button class="btn-generate" onclick="dcGenerateChart()">✨ Generate My Diet Chart</button>
-                    </div>
-                </div>
-
-                <!-- Loading -->
-                <div class="loading-state" id="loadingState">
-                    <div class="loader-ring"></div>
-                    <h3>Crafting Your Child's Plan </h3>
-                    <p>Our Ayurvedic nutritionists are personalizing this just for you…</p>
-                    <div class="loading-facts">
-                        <span class="lfact">✅ FSSAI Certified Recipes</span>
-                        <span class="lfact">👩‍⚕️ Pediatrician Approved</span>
-                        <span class="lfact"> Ayurveda-Backed</span>
-                    </div>
-                </div>
-
-                <!-- Result -->
-                <div class="result-state" id="resultState">
-
-                    <!-- Hero result card -->
-                    <div class="result-hero">
-                        <div class="result-badge">Personalized Diet Chart</div>
-                        <h3 id="resultTitle">Your Child's Nutrition Plan</h3>
-                        <p id="resultDesc"></p>
-                        <div id="bmiRow"></div>
-                        <div class="result-tags" id="resultTags"></div>
-                        <div style="margin-top:14px">
-                            <span class="free-preview-badge">🎁 Free Preview: Day 1 & Day 2</span>
-                        </div>
-                    </div>
-
-                    <!-- Day 1 -->
-                    <div id="day1Section">
-                        <div
-                            style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-                            <div style="font-family:'Fredoka One',cursive;font-size:1.2rem;color:var(--dk)">Daily Meal Plan
-                            </div>
-                        </div>
-                        <div class="day-pill">📅 Day 1 — Monday</div>
-                        <div class="meal-plan-grid" id="mealGrid1"></div>
-                    </div>
-
-                    <!-- Day 2 -->
-                    <div id="day2Section">
-                        <div class="day-pill"
-                            style="background:linear-gradient(135deg,var(--sk),#0088bb);box-shadow:0 4px 14px rgba(0,191,255,.28)">
-                            📅
-                            Day 2 — Tuesday</div>
-                        <div class="meal-plan-grid" id="mealGrid2"></div>
-                    </div>
-
-                    <!-- Nutrients -->
-                    <div class="nutrients-section">
-                        <div class="nutrients-title">Daily Nutrition Targets</div>
-                        <div id="nutrientBars"></div>
-                    </div>
-
-                    <!-- Product recommendation -->
-                    <div class="product-rec" id="productRec"></div>
-
-                    <!-- Parent tips -->
-                    <div style="font-family:'Fredoka One',cursive;font-size:1.2rem;color:var(--dk);margin-bottom:16px">💡
-                        Parent
-                        Tips</div>
-                    <div class="tips-grid" id="tipsGrid"></div>
-
-                    <!-- ═══ LOCK BANNER — 7-day plan ═══ -->
-                    <div class="lock-banner" id="lockBanner">
-                        <span class="lock-icon-lg">🔒</span>
-                        <div class="lock-title">Unlock the Full 7-Day Plan</div>
-                        <div class="lock-sub">Get Day 3–7 personalized meal plans, weekly grocery list, supplement stack,
-                            and a
-                            downloadable PDF chart.</div>
-
-                        <div class="plan-cards-grid">
-                            <div class="plan-card" id="planBasic" onclick="dcSelectPlan('basic')">
-                                <div class="plan-name">7-Day Plan</div>
-                                <div class="plan-price">₹99 <span>/ one-time</span></div>
-                                <div class="plan-features">
-                                    <div class="pf">Full 7-day meal plan</div>
-                                    <div class="pf">PDF download</div>
-                                    <div class="pf">Email delivery</div>
+                    <div class="home-diet-plan-grid">
+                        @foreach ($dietPlans as $plan)
+                            @php
+                                $features = is_array($plan->features) ? $plan->features : [];
+                                $tierIcons = ['🥉', '🥈', '🥇', '🏆'];
+                                $isPopular = strtolower((string) $plan->slug) === 'plus';
+                            @endphp
+                            <article class="home-diet-plan-card {{ $isPopular ? 'is-popular' : '' }}"
+                                data-monthly-price="{{ $plan->monthly_price ?? '' }}"
+                                data-quarterly-price="{{ $plan->quarterly_price ?? '' }}"
+                                data-annually-price="{{ $plan->annual_price ?? '' }}">
+                                @if ($isPopular)
+                                    <span class="home-diet-popular-badge">★ Popular</span>
+                                @endif
+                                <div class="home-diet-plan-icon" aria-hidden="true">{{ $tierIcons[$loop->index % count($tierIcons)] }}</div>
+                                <h4>{{ $plan->name }}</h4>
+                                <div class="home-diet-plan-price" data-plan-price>
+                                    @if ($plan->monthly_price !== null)
+                                        ₹{{ number_format((float) $plan->monthly_price) }}
+                                    @else
+                                        Not available
+                                    @endif
                                 </div>
-                            </div>
-                            <div class="plan-card active" id="planPro" onclick="dcSelectPlan('pro')">
-                                <span class="plan-pop-badge">⭐ Most Popular</span>
-                                <div class="plan-name">Monthly Subscription</div>
-                                <div class="plan-price">₹199 <span>/ month</span></div>
-                                <div class="plan-features">
-                                    <div class="pf">New plan every month</div>
-                                    <div class="pf">PDF downloads</div>
-                                    <div class="pf">Progress tracker</div>
-                                    <div class="pf">Priority support</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <button class="btn-subscribe" onclick="dcOpenModal()">Subscribe & Unlock Full Plan →</button>
+                                <p class="home-diet-plan-period" data-plan-period>
+                                    Per month
+                                </p>
+                                @if (count($features))
+                                    <ul>
+                                        @foreach ($features as $feature)
+                                            <li>{{ is_array($feature) ? ($feature['name'] ?? $feature['title'] ?? '') : $feature }}</li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                                <button type="button" class="btn-next home-diet-buy" data-plan="{{ $plan->slug }}" @disabled($plan->monthly_price === null)>Continue to checkout</button>
+                            </article>
+                        @endforeach
                     </div>
+                @else
+                    <p class="home-diet-empty">Plans are temporarily unavailable. Please try again later.</p>
+                @endif
 
-                    <!-- Success banner (shown after payment) -->
-                    <div class="success-banner" id="successBanner">
-                        <div style="font-size:3rem;margin-bottom:12px">🎉</div>
-                        <h3>Payment Successful! Your PDF is Ready.</h3>
-                        <p>The complete 7-day plan has been sent to your email. You can also download it directly below.</p>
-                        <button class="btn-generate" onclick="dcDownload()">⬇ Download PDF Chart</button>
-                    </div>
+                <div class="home-diet-message" id="homeDietCheckoutMessage" role="alert" hidden></div>
+                <div class="step-nav home-diet-nav home-diet-plan-footer">
+                    <button type="button" class="btn-back" id="homeDietBack" onclick="if (!document.getElementById('homeDietQuestionnaire').dataset.enhanced) { document.getElementById('homeDietPlansStep').hidden = true; document.getElementById('homeDietQuestionStep').hidden = false; document.getElementById('homeDietQuestionStep').scrollIntoView({ behavior: 'smooth', block: 'start' }); }">← Edit answers</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
 
-                    <div class="result-actions">
-                        <button class="btn-restart" onclick="dcRestart()">↩ Make Another Plan</button>
-                    </div>
-
-                </div><!-- /result-state -->
-            </div><!-- /diet-card -->
-        </div><!-- /stepper-wrap -->
-    </section>
+@push('scripts')
+    <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
+    <script>
+        window.nutribuddyConfig = {
+            paymentCreateRoute: @json(route('diet.payment.create')),
+            paymentVerifyRoute: @json(route('diet.payment.verify')),
+            mealPlanRoute: @json(route('meal-plan')),
+            csrfToken: @json(csrf_token()),
+            cashfreeEnv: @json(\App\Services\Payments\CashfreePaymentService::resolveEnvironment()),
+            defaultPaymentGateway: 'cashfree'
+        };
+        window.homeDietIsLoggedIn = @json(auth()->check());
+    </script>
+    <script src="{{ asset('assets/js/pages/diet-chart-payment.js') }}?v={{ filemtime(public_path('assets/js/pages/diet-chart-payment.js')) }}"></script>
+    <script src="{{ asset('js/home-diet-questionnaire.js') }}?v={{ filemtime(public_path('js/home-diet-questionnaire.js')) }}&flow=4"></script>
+@endpush

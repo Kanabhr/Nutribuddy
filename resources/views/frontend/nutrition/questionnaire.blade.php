@@ -2,7 +2,7 @@
 @section('title', 'NutriBuddy — Personalize Your Plan')
 
 @section('content')
-<link rel="stylesheet" href="{{ asset('css/questionnaire.css') }}">
+<link rel="stylesheet" href="{{ asset('css/questionnaire.css') }}?v={{ filemtime(public_path('css/questionnaire.css')) }}">
 
 <style>
     /* ============================================================
@@ -215,36 +215,6 @@
         box-shadow: 0 4px 14px rgba(34, 197, 94, .30);
     }
 
-    /* Suggested range */
-    .qz-h-suggest {
-        display: flex;
-        flex-direction: column;
-        gap: 3px;
-        font-size: .8rem;
-        font-weight: 600;
-        color: #7c3aed;
-        background: #f6f0ff;
-        border-radius: 12px;
-        padding: 11px 16px;
-        line-height: 1.4;
-        width: 100%;
-        box-sizing: border-box;
-    }
-    .qz-h-suggest[hidden] { display: none !important; }
-    .qz-h-suggest .qz-h-suggest-label {
-        font-size: .68rem;
-        font-weight: 700;
-        color: #a094b8;
-        text-transform: uppercase;
-        letter-spacing: .5px;
-    }
-    .qz-h-suggest strong {
-        color: #5b21b6;
-        font-weight: 800;
-        font-size: .95rem;
-        line-height: 1.3;
-    }
-
     /* Warning */
     .qz-h-warn {
         display: none;
@@ -445,7 +415,8 @@
                     $isName    = str_contains($ql, 'name');
                     $isAgeQ    = str_contains($ql, 'age') && $q->answer_type === 'Choice';
                     $isGenderQ = str_contains($ql, 'gender') || str_contains($ql, 'sex');
-                    $isMulti   = $q->answer_type === 'Multi';
+                    $isMulti   = $q->answer_type === 'Multi'
+                        || (str_contains($ql, 'region') && str_contains($ql, 'cuisine'));
                 @endphp
 
                 <div class="qz-question-block" data-qid="{{ $q->id }}">
@@ -511,11 +482,6 @@
                                             onclick="qzApplyCustomHeight('{{ $q->id }}')">Apply</button>
                                 </div>
 
-                                <div class="qz-h-suggest" id="h_suggest_{{ $q->id }}" hidden>
-                                    <span class="qz-h-suggest-label">Suggested height range</span>
-                                    <strong id="h_suggest_val_{{ $q->id }}"></strong>
-                                </div>
-
                                 <div class="qz-h-warn" id="h_warn_{{ $q->id }}"></div>
 
                                 <input type="hidden" class="qz-form-field" data-qid="{{ $q->id }}" id="h_hid_{{ $q->id }}">
@@ -534,8 +500,7 @@
                                            class="qz-w-input qz-form-field qz-weight-input"
                                            data-qid="{{ $q->id }}"
                                            id="w_val_{{ $q->id }}"
-                                           placeholder="e.g. 22"
-                                           oninput="qzHeightWeightChanged()">
+                                           placeholder="e.g. 22">
                                     <span class="qz-w-suffix">kg</span>
                                 </div>
                             </div>
@@ -591,7 +556,7 @@
                                 <div class="qz-choice-chip"
                                      data-val="{{ $opt }}"
                                      onclick="qzSelectChip(this,'choiceRow_{{ $q->id }}','{{ $q->id }}',{{ $isMulti ? 'true' : 'false' }})">
-                                    {{ $opt }}
+                                    {{ $q->question === 'How often falls ill' ? str_replace(' yr', ' year', $opt) : $opt }}
                                 </div>
                                 @endforeach
                             </div>
@@ -655,10 +620,6 @@
                                             onclick="qzApplyCustomHeight('{{ $q->id }}')">Apply</button>
                                 </div>
 
-                                <div class="qz-h-suggest" id="h_suggest_{{ $q->id }}" hidden>
-                                    <span class="qz-h-suggest-label">Suggested height range</span>
-                                    <strong id="h_suggest_val_{{ $q->id }}"></strong>
-                                </div>
                                 <div class="qz-h-warn" id="h_warn_{{ $q->id }}"></div>
                                 <input type="hidden" class="qz-form-field" data-qid="{{ $q->id }}" id="h_hid_{{ $q->id }}" required>
                             </div>
@@ -676,8 +637,7 @@
                                            data-qid="{{ $q->id }}"
                                            id="w_val_{{ $q->id }}"
                                            placeholder="e.g. 22"
-                                           required
-                                           oninput="qzHeightWeightChanged()">
+                                           required>
                                     <span class="qz-w-suffix">kg</span>
                                 </div>
                             </div>
@@ -750,11 +710,12 @@
                 out.push({ label: cm + ' cm', cm: cm });
             }
         } else {
-            for (let cm = HEIGHT_MIN_CM; cm <= HEIGHT_MAX_CM; cm++) {
-                const totalIn = Math.round(cm / 2.54);
+            const minInches = Math.ceil(HEIGHT_MIN_CM / 2.54);
+            const maxInches = Math.floor(HEIGHT_MAX_CM / 2.54);
+            for (let totalIn = minInches; totalIn <= maxInches; totalIn++) {
                 const ft = Math.floor(totalIn / 12);
                 const inch = totalIn % 12;
-                out.push({ label: ft + "'" + inch + '"', cm: cm });
+                out.push({ label: ft + "'" + inch + '"', cm: Math.round(totalIn * 2.54) });
             }
         }
         return out;
@@ -833,8 +794,6 @@
                     : document.getElementById('h_custom_ft_' + qid);
                 if (first) first.focus();
             }, 30);
-
-            qzRenderHeightSuggestion(qid);
             return;
         }
 
@@ -849,7 +808,6 @@
         if (isNaN(cm) || val === '') {
             state.valueCm = null;
             if (hidEl) hidEl.value = '';
-            qzRenderHeightSuggestion(qid);
             return;
         }
 
@@ -867,8 +825,6 @@
             const inch = totalIn % 12;
             hidEl.value = ft + 'ft ' + inch + 'in (' + cm + 'cm)';
         }
-
-        qzRenderHeightSuggestion(qid);
     }
 
     // ---------- read manual fields ----------
@@ -962,8 +918,6 @@
                 applyBtn.textContent = 'Apply';
             }, 2400);
         }
-
-        qzRenderHeightSuggestion(qid);
     }
 
     // ---------- live update while typing (optional) ----------
@@ -995,83 +949,6 @@
                 if (hidEl) hidEl.value = ft + 'ft ' + inch + 'in (' + state.valueCm + 'cm)';
             }
         }
-
-        qzRenderHeightSuggestion(qid);
-    }
-
-    // ---------- weight + suggestion ----------
-    function qzGetCurrentWeightKg() {
-        const inputs = document.querySelectorAll('.qz-weight-input');
-        for (let i = 0; i < inputs.length; i++) {
-            const v = parseFloat(inputs[i].value);
-            if (!isNaN(v) && v > 0) return v;
-        }
-        return null;
-    }
-
-    function qzComputeSuggestedRange() {
-        const w = qzGetCurrentWeightKg();
-        if (!w || w <= 0) return null;
-
-        const BMI_MIN = 13.5;
-        const BMI_MAX = 24.0;
-
-        let minCm = Math.round(Math.sqrt(w / BMI_MAX) * 100);
-        let maxCm = Math.round(Math.sqrt(w / BMI_MIN) * 100);
-
-        minCm = Math.max(HEIGHT_MIN_CM, minCm - 3);
-        maxCm = Math.min(HEIGHT_MAX_CM, maxCm + 3);
-
-        return { min: minCm, max: maxCm };
-    }
-
-    function qzRenderHeightSuggestion(qid) {
-        const suggestEl = document.getElementById('h_suggest_' + qid);
-        const suggestValEl = document.getElementById('h_suggest_val_' + qid);
-        const warnEl = document.getElementById('h_warn_' + qid);
-        if (!suggestEl || !warnEl) return;
-
-        const range = qzComputeSuggestedRange();
-        const state = qzHeightState[qid];
-
-        if (!range) {
-            suggestEl.hidden = true;
-            if (warnEl && !warnEl.classList.contains('success')) {
-                warnEl.classList.remove('show');
-                warnEl.textContent = '';
-            }
-            return;
-        }
-
-        suggestEl.hidden = false;
-
-        let label;
-        if (state.mode === 'cm') {
-            label = range.min + ' cm – ' + range.max + ' cm';
-        } else {
-            const rMin = Math.round(range.min / 2.54);
-            const rMax = Math.round(range.max / 2.54);
-            const minF = Math.floor(rMin / 12), minI = rMin % 12;
-            const maxF = Math.floor(rMax / 12), maxI = rMax % 12;
-            label = minF + "'" + minI + '" – ' + maxF + "'" + maxI + '"';
-        }
-        if (suggestValEl) suggestValEl.textContent = label;
-
-        // Only show warning if not currently showing success message
-        if (!warnEl.classList.contains('success')) {
-            warnEl.classList.remove('show');
-            warnEl.textContent = '';
-            if (state.valueCm != null && (state.valueCm < range.min || state.valueCm > range.max)) {
-                warnEl.textContent = 'Please check your height. It is outside the suggested range for the details entered.';
-                warnEl.classList.add('show');
-            }
-        }
-    }
-
-    function qzHeightWeightChanged() {
-        Object.keys(qzHeightState).forEach(function (qid) {
-            qzRenderHeightSuggestion(qid);
-        });
     }
 
     // ---------- init ----------
@@ -1080,7 +957,6 @@
             const qid = hidEl.id.replace('h_hid_', '');
             qzHeightState[qid] = { mode: 'ft', valueCm: null, customActive: false };
             qzRenderHeightDropdown(qid);
-            qzRenderHeightSuggestion(qid);
         });
 
         // Enter key in custom inputs = click Apply

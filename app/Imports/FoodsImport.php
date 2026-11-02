@@ -3,130 +3,126 @@
 namespace App\Imports;
 
 use App\Models\Food;
-use Maatwebsite\Excel\Concerns\ToModel;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
-use Maatwebsite\Excel\Concerns\SkipsOnError;
-use Maatwebsite\Excel\Concerns\SkipsErrors;
-use Maatwebsite\Excel\Concerns\SkipsOnFailure;
-use Maatwebsite\Excel\Concerns\SkipsFailures;
 
-class FoodsImport implements ToModel, WithHeadingRow, SkipsOnError, SkipsOnFailure
+class FoodsImport implements ToCollection, WithChunkReading, WithHeadingRow
 {
-    use SkipsErrors, SkipsFailures;
+    public int $imported = 0;
 
-    public $imported = 0;
-    public $skipped = 0;
-    public $failedRows = [];
-    public $existingIds = [];
+    public int $skipped = 0;
 
-    public function model(array $row)
+    /** @var list<array<string, string>> */
+    public array $failedRows = [];
+
+    /** @var array<string, true> */
+    private array $seenDishIds = [];
+
+    public function collection(Collection $rows): void
     {
-        $dishId   = trim($row['dish_id'] ?? '');
-        $dishName = trim($row['dish_name'] ?? '');
+        $prepared = [];
+        $dishIds = [];
 
-        // Empty row skip
-        if (empty($dishId) && empty($dishName)) {
-            $this->skipped++;
-            return null;
-        }
+        foreach ($rows as $row) {
+            $row = is_array($row) ? $row : $row->toArray();
+            $dishId = trim((string) ($row['dish_id'] ?? ''));
+            $dishName = trim((string) ($row['dish_name'] ?? ''));
 
-        // dish_id blank ho to fail karo
-        if (empty($dishId)) {
-            $this->failedRows[] = [
-                'dish_id'     => '(blank)',
-                'dish_name'   => $dishName,
-                'food_group'  => $row['food_group'] ?? '',
-                'slot'        => $row['slot'] ?? '',
-                'diet_type'   => $row['diet_type'] ?? '',
-                'is_veg'      => $row['is_veg'] ?? '',
-                'region'      => $row['region'] ?? '',
-                'energy_kcal' => $row['energy_kcal'] ?? '',
-                'reason'      => 'dish_id is required',
-            ];
-            return null;
-        }
+            if ($dishId === '' && $dishName === '') {
+                $this->skipped++;
 
-        $data = [
-            'dish_id'     => $dishId,
-            'dish_name'   => $dishName ?: null,
-            'food_group'  => $row['food_group'] ?? null,
-            'slot'        => $row['slot'] ?? null,
-            'diet_type'   => $row['diet_type'] ?? null,
-            'is_veg'      => $row['is_veg'] ?? null,
-            'region'      => $row['region'] ?? null,
-            'energy_kcal' => $row['energy_kcal'] ?? null,
-        ];
-
-        try {
-            $existsInDb  = Food::where('dish_id', $dishId)->exists();
-            $existsInCsv = in_array($dishId, $this->existingIds);
-
-            if ($existsInDb || $existsInCsv) {
-                $this->failedRows[] = [
-                    'dish_id'     => $dishId,
-                    'dish_name'   => $dishName,
-                    'food_group'  => $row['food_group'] ?? '',
-                    'slot'        => $row['slot'] ?? '',
-                    'diet_type'   => $row['diet_type'] ?? '',
-                    'is_veg'      => $row['is_veg'] ?? '',
-                    'region'      => $row['region'] ?? '',
-                    'energy_kcal' => $row['energy_kcal'] ?? '',
-                    'reason'      => $existsInDb
-                        ? 'Duplicate dish_id (already in database)'
-                        : 'Duplicate dish_id (repeated in file)',
-                ];
-                return null;
+                continue;
             }
 
-            $this->existingIds[] = $dishId;
-
-            $this->imported++;
-            return new Food($data);
-        } catch (\Exception $e) {
-            $this->failedRows[] = [
-                'dish_id'     => $dishId,
-                'dish_name'   => $dishName,
-                'food_group'  => $row['food_group'] ?? '',
-                'slot'        => $row['slot'] ?? '',
-                'diet_type'   => $row['diet_type'] ?? '',
-                'is_veg'      => $row['is_veg'] ?? '',
-                'region'      => $row['region'] ?? '',
-                'energy_kcal' => $row['energy_kcal'] ?? '',
-                'reason'      => $e->getMessage(),
+            $data = [
+                'dish_id' => $dishId,
+                'dish_name' => $dishName !== '' ? $dishName : null,
+                'food_group' => $row['food_group'] ?? null,
+                'slot' => $row['slot'] ?? null,
+                'diet_type' => $row['diet_type'] ?? null,
+                'is_veg' => $row['is_veg'] ?? null,
+                'region' => $row['region'] ?? null,
+                'energy_kcal' => $row['energy_kcal'] ?? null,
             ];
-            return null;
+
+            if ($dishId === '') {
+                $this->failedRows[] = $this->failedRow($data, 'dish_id is required');
+
+                continue;
+            }
+
+            $prepared[] = $data;
+            $dishIds[] = $dishId;
+        }
+
+        if ($prepared === []) {
+            return;
+        }
+
+        $existingIds = array_fill_keys(
+            Food::query()->whereIn('dish_id', array_values(array_unique($dishIds)))->pluck('dish_id')->all(),
+            true,
+        );
+        $insertable = [];
+
+        foreach ($prepared as $data) {
+            $dishId = $data['dish_id'];
+            if (isset($existingIds[$dishId]) || isset($this->seenDishIds[$dishId])) {
+                $reason = isset($existingIds[$dishId])
+                    ? 'Duplicate dish_id (already in database)'
+                    : 'Duplicate dish_id (repeated in file)';
+                $this->failedRows[] = $this->failedRow($data, $reason);
+
+                continue;
+            }
+
+            $this->seenDishIds[$dishId] = true;
+            $insertable[] = $data;
+        }
+
+        if ($insertable === []) {
+            return;
+        }
+
+        $timestamp = now();
+        $insertRows = array_map(fn (array $row) => $row + [
+            'created_at' => $timestamp,
+            'updated_at' => $timestamp,
+        ], $insertable);
+
+        try {
+            DB::table((new Food)->getTable())->insert($insertRows);
+            $this->imported += count($insertRows);
+        } catch (\Throwable) {
+            // Retry individually only on a failed batch so one malformed row does not discard valid rows.
+            foreach ($insertable as $data) {
+                try {
+                    Food::query()->create($data);
+                    $this->imported++;
+                } catch (\Throwable $exception) {
+                    $this->failedRows[] = $this->failedRow($data, $exception->getMessage());
+                }
+            }
         }
     }
 
-    public function onFailure(\Maatwebsite\Excel\Validators\Failure ...$failures)
+    public function chunkSize(): int
     {
-        foreach ($failures as $failure) {
-            $this->failedRows[] = [
-                'dish_id'     => $failure->values()['dish_id'] ?? '',
-                'dish_name'   => $failure->values()['dish_name'] ?? '',
-                'food_group'  => $failure->values()['food_group'] ?? '',
-                'slot'        => $failure->values()['slot'] ?? '',
-                'diet_type'   => $failure->values()['diet_type'] ?? '',
-                'is_veg'      => $failure->values()['is_veg'] ?? '',
-                'region'      => $failure->values()['region'] ?? '',
-                'energy_kcal' => $failure->values()['energy_kcal'] ?? '',
-                'reason'      => implode(', ', $failure->errors()),
-            ];
-        }
+        return 500;
     }
 
-    public function onError(\Throwable $e)
+    /** @param array<string, mixed> $data @return array<string, string> */
+    private function failedRow(array $data, string $reason): array
     {
-        $this->failedRows[] = [
-            'dish_id'     => '',
-            'dish_name'   => '',
-            'food_group'  => '',
-            'slot'        => '',
-            'diet_type'   => '',
-            'is_veg'      => '',
-            'region'      => '',
-            'energy_kcal' => '',
-            'reason'      => $e->getMessage(),
+        return [
+            'dish_id' => (string) ($data['dish_id'] ?: '(blank)'),
+            'dish_name' => (string) ($data['dish_name'] ?? ''),
+            'food_group' => (string) ($data['food_group'] ?? ''),
+            'slot' => (string) ($data['slot'] ?? ''),
+            'reason' => $reason,
         ];
     }
 }

@@ -17,8 +17,28 @@ class AccessControlController extends Controller
 
     public function index()
     {
-        $roles = Role::where('guard_name', 'admin')->with('permissions')->get();
-        $users = User::has('roles')->with('roles')->get();
+        $actor = auth('admin')->user();
+        $canViewUsers = $actor->can('view users') || $actor->can('manage users');
+        $canManageUsers = $actor->can('manage users');
+        $canViewRoles = $actor->can('view roles') || $actor->can('manage roles');
+        $canManageRoles = $actor->can('manage roles');
+
+        // Role options are also needed when someone can manage users but cannot
+        // browse the role matrix. Keep this small reference list unpaginated.
+        $roles = ($canViewRoles || $canManageUsers)
+            ? Role::query()->where('guard_name', 'admin')->orderBy('name')->get(['id', 'name'])
+            : collect();
+        $roleRows = $canViewRoles
+            ? Role::query()->where('guard_name', 'admin')->with('permissions')->orderBy('name')->paginate(25, ['*'], 'roles_page')
+            : collect();
+        $users = $canViewUsers
+            ? User::query()
+                ->where('role', 'admin')
+                ->whereHas('roles', fn ($query) => $query->where('guard_name', 'admin'))
+                ->with(['roles' => fn ($query) => $query->where('guard_name', 'admin')->orderBy('name')])
+                ->orderBy('id')
+                ->paginate(25, ['id', 'name', 'email', 'is_active'], 'users_page')
+            : collect();
         
         $modules = [
             'dashboard',
@@ -37,7 +57,7 @@ class AccessControlController extends Controller
             'roles'
         ];
 
-        return view('admin.access.index', compact('roles', 'users', 'modules'));
+        return view('admin.access.index', compact('roles', 'roleRows', 'users', 'modules', 'canViewUsers', 'canManageUsers', 'canViewRoles', 'canManageRoles'));
     }
 
     public function storeRole(StoreRoleRequest $request)
@@ -49,6 +69,8 @@ class AccessControlController extends Controller
 
     public function updateRole(UpdateRoleRequest $request, Role $role)
     {
+        abort_unless($role->guard_name === 'admin', 404);
+
         if ($role->name === 'Super Admin') {
             return response()->json(['success' => false, 'message' => 'Cannot edit the Super Admin role.'], 403);
         }
@@ -60,6 +82,8 @@ class AccessControlController extends Controller
 
     public function destroyRole(Role $role)
     {
+        abort_unless($role->guard_name === 'admin', 404);
+
         if ($role->name === 'Super Admin') {
             return response()->json(['success' => false, 'message' => 'Cannot delete the Super Admin role.'], 403);
         }
@@ -80,6 +104,8 @@ class AccessControlController extends Controller
 
     public function updateUser(UpdateAdminUserRequest $request, User $admin)
     {
+        abort_unless($this->isManagedAdmin($admin), 404);
+
         $this->accessControl->updateAdmin($admin, $request->validated());
 
         return response()->json(['success' => true, 'message' => 'User updated successfully.']);
@@ -87,6 +113,8 @@ class AccessControlController extends Controller
 
     public function destroyUser(User $admin)
     {
+        abort_unless($this->isManagedAdmin($admin), 404);
+
         if ($admin->id === auth('admin')->id()) {
             return response()->json(['success' => false, 'message' => 'Cannot delete yourself.'], 403);
         }
@@ -94,5 +122,10 @@ class AccessControlController extends Controller
         $admin->delete();
 
         return response()->json(['success' => true, 'message' => 'User deleted successfully.']);
+    }
+
+    private function isManagedAdmin(User $user): bool
+    {
+        return $user->role === 'admin' && $user->roles()->where('guard_name', 'admin')->exists();
     }
 }

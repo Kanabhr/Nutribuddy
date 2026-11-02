@@ -1,11 +1,11 @@
 document.addEventListener('DOMContentLoaded', function () {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('success') === 'true') {
-        document.getElementById('resultState').style.display = 'block';
-        document.getElementById('lockBanner').style.display = 'none';
-        document.getElementById('successBanner').style.display = 'block';
-        document.getElementById('panel3').classList.remove('active');
-        document.getElementById('diet-chart').scrollIntoView({ behavior: 'smooth' });
+        document.getElementById('resultState')?.style && (document.getElementById('resultState').style.display = 'block');
+        document.getElementById('lockBanner')?.style && (document.getElementById('lockBanner').style.display = 'none');
+        document.getElementById('successBanner')?.style && (document.getElementById('successBanner').style.display = 'block');
+        document.getElementById('panel3')?.classList.remove('active');
+        document.getElementById('diet-chart')?.scrollIntoView({ behavior: 'smooth' });
         window.history.replaceState({}, document.title, window.location.pathname);
     }
 
@@ -49,16 +49,16 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-window.startDietCheckout = async function (planSlug, btn) {
+window.startDietCheckout = async function (planSlug, btn, childId = null, selectedCycle = null) {
     const originalText = btn.innerText;
     btn.innerText = 'Processing...';
     btn.disabled = true;
 
     const gatewayEl = document.querySelector('input[name="diet_gateway"]:checked');
-    const gateway = gatewayEl ? gatewayEl.value : 'razorpay'; // fallback
+    const gateway = gatewayEl ? gatewayEl.value : (window.nutribuddyConfig.defaultPaymentGateway || 'razorpay');
     
     const activeCycleBtn = document.querySelector('.billing-btn.active');
-    const cycle = activeCycleBtn ? activeCycleBtn.dataset.cycle : 'monthly';
+    const cycle = selectedCycle || (activeCycleBtn ? activeCycleBtn.dataset.cycle : 'monthly');
 
     try {
         // 1. Create Order
@@ -68,7 +68,7 @@ window.startDietCheckout = async function (planSlug, btn) {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': window.nutribuddyConfig.csrfToken
             },
-            body: JSON.stringify({ plan_slug: planSlug, gateway: gateway, cycle: cycle })
+            body: JSON.stringify({ plan_slug: planSlug, gateway: gateway, cycle: cycle, ...(childId ? { child_id: childId } : {}) })
         });
 
         const createData = await createResponse.json();
@@ -90,8 +90,12 @@ window.startDietCheckout = async function (planSlug, btn) {
             } else {
                 alert('Free plan activated successfully!');
             }
-            document.getElementById('lockBanner').style.display = 'none';
-            document.getElementById('successBanner').style.display = 'block';
+            if (childId && window.nutribuddyConfig.mealPlanRoute) {
+                window.location.href = `${window.nutribuddyConfig.mealPlanRoute}?child_id=${encodeURIComponent(childId)}`;
+                return;
+            }
+            document.getElementById('lockBanner')?.style && (document.getElementById('lockBanner').style.display = 'none');
+            document.getElementById('successBanner')?.style && (document.getElementById('successBanner').style.display = 'block');
             btn.innerText = originalText;
             btn.disabled = false;
             return;
@@ -101,7 +105,7 @@ window.startDietCheckout = async function (planSlug, btn) {
             // Cashfree Checkout
             btn.innerText = 'Opening Cashfree...';
             const cashfree = Cashfree({
-                mode: window.nutribuddyConfig.cashfreeEnv
+                mode: createData.mode || window.nutribuddyConfig.cashfreeEnv || 'sandbox'
             });
 
             cashfree.checkout({
@@ -143,8 +147,12 @@ window.startDietCheckout = async function (planSlug, btn) {
                         } else {
                             alert('Payment successful! Your subscription is active.');
                         }
-                        document.getElementById('lockBanner').style.display = 'none';
-                        document.getElementById('successBanner').style.display = 'block';
+                        if (childId && window.nutribuddyConfig.mealPlanRoute) {
+                            window.location.href = `${window.nutribuddyConfig.mealPlanRoute}?child_id=${encodeURIComponent(childId)}`;
+                            return;
+                        }
+                        document.getElementById('lockBanner')?.style && (document.getElementById('lockBanner').style.display = 'none');
+                        document.getElementById('successBanner')?.style && (document.getElementById('successBanner').style.display = 'block');
                     } else {
                         if (typeof nbToast === 'function') {
                             nbToast('Payment verification failed: ' + (verifyData.message || 'Unknown error'), 'error');

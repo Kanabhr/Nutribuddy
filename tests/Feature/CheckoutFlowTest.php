@@ -10,6 +10,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\TaxRate;
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -17,6 +18,34 @@ use Tests\TestCase;
 class CheckoutFlowTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Cache::forget('india_states_cities_data_v2');
+    }
+
+    public function test_checkout_renders_states_without_embedding_the_city_catalog(): void
+    {
+        $this->get(route('checkout.index'))
+            ->assertOk()
+            ->assertSee('Andaman and Nicobar Islands')
+            ->assertSee('stateField')
+            ->assertDontSee('citiesByState')
+            ->assertDontSee('allCities');
+    }
+
+    public function test_checkout_city_endpoint_returns_cities_for_a_valid_state(): void
+    {
+        $this->getJson(route('checkout.cities', ['stateCode' => '01']))
+            ->assertOk()
+            ->assertJsonPath('cities.0', 'Aberdeen');
+
+        $this->getJson(route('checkout.cities', ['stateCode' => 'unknown']))
+            ->assertNotFound()
+            ->assertExactJson(['cities' => []]);
+    }
 
     public function test_user_can_place_cod_order_and_token_prevents_duplicate_orders(): void
     {

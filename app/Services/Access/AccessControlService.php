@@ -25,6 +25,7 @@ class AccessControlService
     {
         DB::transaction(function () use ($role, $name, $permissions): void {
             $role = Role::query()->whereKey($role->id)->lockForUpdate()->firstOrFail();
+            abort_unless($role->guard_name === 'admin', 404);
             $role->update(['name' => $name]);
             $this->rolePermissions->sync($role, $permissions);
         });
@@ -54,6 +55,7 @@ class AccessControlService
     {
         DB::transaction(function () use ($admin, $data): void {
             $admin = User::query()->whereKey($admin->id)->lockForUpdate()->firstOrFail();
+            abort_unless($admin->role === 'admin' && $admin->roles()->where('guard_name', 'admin')->exists(), 404);
             $attributes = [
                 'name' => $data['name'],
                 'email' => $data['email'],

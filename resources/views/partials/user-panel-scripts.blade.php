@@ -1,8 +1,14 @@
 <script>
     function toggleSidebar() {
-        document.getElementById('sidebar').classList.toggle('open');
+        const sidebar = document.getElementById('sidebar');
+        if (!sidebar) return;
+
+        const isOpen = sidebar.classList.toggle('open');
+        document.querySelectorAll('[aria-controls="sidebar"]').forEach(button => {
+            button.setAttribute('aria-expanded', String(isOpen));
+        });
         if (document.getElementById('overlay')) {
-            document.getElementById('overlay').classList.toggle('show');
+            document.getElementById('overlay').classList.toggle('show', isOpen);
         }
     }
 
@@ -10,6 +16,9 @@
         if (document.getElementById('sidebar')) {
             document.getElementById('sidebar').classList.remove('open');
         }
+        document.querySelectorAll('[aria-controls="sidebar"]').forEach(button => {
+            button.setAttribute('aria-expanded', 'false');
+        });
         if (document.getElementById('overlay')) {
             document.getElementById('overlay').classList.remove('show');
         }
@@ -29,4 +38,12 @@
             if (group) group.hidden = expanded;
         });
     });
+
+    const mobileNavTrigger = document.querySelector('[data-user-panel-nav-trigger]');
+    if (mobileNavTrigger) {
+        if (!document.querySelector('.ud-panel-content .sidebar-toggle')) {
+            mobileNavTrigger.classList.add('is-visible');
+        }
+        mobileNavTrigger.addEventListener('click', toggleSidebar);
+    }
 </script>

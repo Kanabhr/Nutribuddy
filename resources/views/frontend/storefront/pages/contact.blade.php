@@ -47,7 +47,7 @@
                 <div class="contact-info-icon">🗺️</div>
                 <div class="contact-info-details">
                     <h3>Visit Us</h3>
-                    <p>42, Wellness Tower, Bengaluru – 560001, Karnataka, India</p>
+                    <p>Office No. - 313, Pehel Lakeview, Beside Tragad Underpass, Near Vaishno Devi Circle, Ahmedabad, Gujarat - 382501</p>
                 </div>
             </div>
         </div>

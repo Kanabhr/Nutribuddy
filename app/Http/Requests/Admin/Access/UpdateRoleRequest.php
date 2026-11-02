@@ -16,10 +16,14 @@ class UpdateRoleRequest extends FormRequest
     public function rules(): array
     {
         $role = $this->route('role');
+        $modules = ['dashboard', 'analytics', 'diet chart', 'products', 'orders', 'customers', 'promotions', 'loyalty', 'moderation', 'administration', 'content', 'assessment', 'users', 'roles'];
 
         return [
-            'name' => ['required', 'string', Rule::unique('roles', 'name')->ignore($role instanceof Role ? $role->id : null)],
-            'permissions' => ['array'],
+            'name' => ['required', 'string', 'max:100', Rule::unique('roles', 'name')->where('guard_name', 'admin')->ignore($role instanceof Role ? $role->id : null)],
+            'permissions' => ['sometimes', 'array:' . implode(',', $modules)],
+            'permissions.*' => ['array:view,manage'],
+            'permissions.*.view' => ['sometimes', Rule::in(['1'])],
+            'permissions.*.manage' => ['sometimes', Rule::in(['1'])],
         ];
     }
 }

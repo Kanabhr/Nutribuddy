@@ -7,6 +7,7 @@ use App\Models\Nutrition\Child;
 use App\Models\Nutrition\ChildAssessment;
 use App\Models\Nutrition\DeficiencyRule;
 use App\Models\Nutrition\DietPlan;
+use App\Models\Nutrition\QuestionnaireAnswer;
 use App\Models\NutritionLead;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
@@ -128,6 +129,61 @@ class DietChartPipelineRegressionTest extends TestCase
         $this->assertSame('vegan', $assessment->diet_type);
         $this->assertSame('nuts', $assessment->allergies);
         $this->assertSame('South India', $assessment->region);
+    }
+
+    public function test_region_cuisine_question_accepts_and_normalizes_multiple_regions(): void
+    {
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+        $questions = [
+            1 => ['Child name', 'Text', null, false],
+            2 => ['Date of birth', 'Date', null, false],
+            3 => ['Sex', 'Choice', 'Boy / Girl', false],
+            4 => ['Current weight', 'Number (kg)', null, false],
+            5 => ['Current height', 'Number (cm)', null, true],
+            6 => ['Diet type', 'Choice', 'Veg / Vegan / Non-Veg / Eggetarian / Jain', false],
+            7 => ['Allergies & intolerances', 'Multi', 'Dairy / Nuts / Gluten / Egg / None', false],
+            8 => ['Region / cuisine liked', 'Choice', 'North / West / East / South / No preference', false],
+        ];
+        foreach ($questions as $order => [$label, $type, $options, $optional]) {
+            DB::table('questionnaire_questions')->where('id', $order)->update([
+                'question' => $label,
+                'model' => '1 Basic',
+                'section' => 'Food Frame',
+                'answer_type' => $type,
+                'options_scale' => $options,
+                'only_ask_if' => 'always',
+                'is_optional' => $optional,
+            ]);
+        }
+
+        $parent = User::factory()->create();
+        $this->actingAs($parent)->postJson(route('api.nutrition.questionnaire.submit'), [
+            'plan_slug' => 'basic',
+            'q_1' => 'Mira',
+            'q_2' => '2018-04-12',
+            'q_3' => 'Girl',
+            'q_4' => 21,
+            'q_6' => 'Veg',
+            'q_7' => ['None'],
+            'q_8' => ['North', 'South'],
+        ])->assertOk();
+
+        $assessment = ChildAssessment::query()->firstOrFail();
+        $this->assertSame('North, South', $assessment->region);
+        $this->assertSame(['North', 'South'], QuestionnaireAnswer::query()
+            ->where('child_assessment_id', $assessment->id)
+            ->where('question_id', 8)
+            ->firstOrFail()
+            ->answer_value);
+
+        $this->actingAs($parent)->postJson(route('api.nutrition.questionnaire.submit'), [
+            'plan_slug' => 'basic',
+            'q_8' => ['No preference', 'North'],
+        ])->assertUnprocessable()->assertJsonValidationErrors('q_8');
+
+        $profile = app(ChildProfileService::class)->normalize($assessment, [8 => ['West', 'South']]);
+        $this->assertSame('West, South', $profile['region']);
+        $this->assertSame('West, South', $assessment->fresh()->region);
     }
 
     public function test_visible_signs_are_normalized_and_create_repeat_safe_clinical_flags(): void

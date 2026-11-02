@@ -13,14 +13,17 @@ class ProductController extends Controller
     {
         $perPage = min(max((int) $request->integer('per_page', 24), 12), 48);
 
-        $catalogMeta = Cache::remember('storefront.product_catalog_meta.v2', now()->addMinutes(10), function () {
+        $catalogMeta = Cache::remember('storefront.product_catalog_meta.v3', now()->addMinutes(10), function () {
             $products = Product::query()
                 ->where('is_active', true)
                 ->with([
                     'category:id,name,slug,deleted_at',
                     'taxRate:id,rate,show_in_checkout',
-                    'variants' => fn ($query) => $query->where('is_active', true)->orderBy('position')->orderBy('id'),
-                    'variants.product.taxRate',
+                    'variants' => fn ($query) => $query
+                        ->select(['id', 'product_id', 'price', 'compare_at_price', 'is_default', 'is_active', 'position'])
+                        ->where('is_active', true)
+                        ->orderBy('position')
+                        ->orderBy('id'),
                 ])
                 ->select(['id', 'category_id', 'base_price', 'tax_rate_id', 'is_variant_enabled'])
                 ->get();
@@ -35,9 +38,13 @@ class ProductController extends Controller
                 ->sortBy('name')
                 ->values();
 
+            // Calculate prices using the same logic as cards: default variant price
             $prices = $products->map(function ($item) {
-                $variant = $item->variants->firstWhere('is_default', true) ?: $item->variants->first();
-                return (float) ($variant?->display_price ?? $item->display_price);
+                if ($item->is_variant_enabled && $item->variants->isNotEmpty()) {
+                    $variant = $item->variants->firstWhere('is_default', true) ?: $item->variants->first();
+                    return (float) ($variant?->display_price ?? $item->display_price);
+                }
+                return (float) $item->display_price;
             });
 
             return [
@@ -77,9 +84,12 @@ class ProductController extends Controller
                 'category:id,name,slug,deleted_at',
                 'images:id,product_id,image_path,is_primary,sort_order',
                 'taxRate:id,rate,show_in_checkout',
-                'variants.inventory',
-                'variants.product.taxRate',
-                'variants' => fn ($query) => $query->where('is_active', true)->orderBy('position')->orderBy('id'),
+                'variants' => fn ($query) => $query
+                    ->select(['id', 'product_id', 'name', 'sku', 'attributes', 'price', 'compare_at_price', 'is_default', 'is_active', 'position', 'image_path'])
+                    ->where('is_active', true)
+                    ->with(['inventory:id,product_variant_id,stock_qty,track_stock,is_in_stock'])
+                    ->orderBy('position')
+                    ->orderBy('id'),
             ])
             ->withCount(['reviews' => fn ($query) => $query->where('is_active', true)])
             ->withAvg(['reviews' => fn ($query) => $query->where('is_active', true)], 'rating')

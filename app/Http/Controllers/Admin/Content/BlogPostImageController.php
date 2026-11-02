@@ -5,22 +5,23 @@ namespace App\Http\Controllers\Admin\Content;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Content\UploadBlogPostImageRequest;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class BlogPostImageController extends Controller
 {
     public function upload(UploadBlogPostImageRequest $request)
     {
         if ($request->hasFile('upload')) {
-            $originName = $request->file('upload')->getClientOriginalName();
-            $fileName = pathinfo($originName, PATHINFO_FILENAME);
             $extension = $request->file('upload')->getClientOriginalExtension();
-            $fileName = $fileName . '_' . time() . '.' . $extension;
-            $request->file('upload')->storeAs('public/blog-images', $fileName);
+            $fileName = Str::uuid() . '.' . strtolower($extension);
+            $path = $request->file('upload')->storeAs('blog-images', $fileName, 'public');
+
+            abort_unless($path, 500, 'The uploaded image could not be saved.');
 
             return response()->json([
                 'uploaded' => 1,
                 'fileName' => $fileName,
-                'url' => Storage::url('blog-images/' . $fileName),
+                'url' => Storage::disk('public')->url($path),
             ]);
         }
 

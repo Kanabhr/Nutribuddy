@@ -16,19 +16,17 @@
         cartPageUrl: @json(route('cart.page')),
         citiesUrlTemplate: @json(route('checkout.cities', ['stateCode' => '__STATE__'])),
         states: @json($states),
-        citiesByState: @json($stateCityMap),
-        allCities: @json($allCities),
         api: {
             cartUrl: '/user/cart',
             cartUpdateTemplate: @json(route('user.cart.items.update', ['itemId' => '__ITEM__'])),
             addressesUrl: '/user/addresses',
             checkoutSummaryUrl: '/user/checkout/summary',
             placeOrderUrl: '/user/checkout/place-order',
+            sendCodOtpUrl: '/user/checkout/cod/send-otp',
             csrfTokenUrl: @json(route('csrf.token')),
-            sendOtpUrl: @json(route('frontend.sendOtp')),
-            verifyOtpUrl: @json(route('frontend.verifyOtp'))
         },
-        cashfreeMode: @json(config('services.cashfree.env') === 'production' ? 'production' : 'sandbox')
+        codOtpEnabled: @json(\App\Models\Setting::get('cod_otp_enabled', '1') === '1'),
+        cashfreeMode: @json(\App\Services\Payments\CashfreePaymentService::resolveEnvironment())
     };
 </script>
 
@@ -222,9 +220,9 @@
                 </div>
                 <div class="card-body">
                     @php
-                        $cashfreeEnabled = \App\Models\Setting::get('cashfree_enabled', '0') === '1';
-                        $razorpayEnabled = \App\Models\Setting::get('razorpay_enabled', '0') === '1';
-                        $codEnabled      = \App\Models\Setting::get('cod_enabled', '0') === '1';
+                        $cashfreeEnabled = \App\Models\Setting::get('cashfree_enabled', config('services.cashfree.app_id') ? '1' : '0') === '1';
+                        $razorpayEnabled = \App\Models\Setting::get('razorpay_enabled', config('services.razorpay.key_id') ? '1' : '0') === '1';
+                        $codEnabled      = \App\Models\Setting::get('cod_enabled', '1') === '1';
 
                         $defaultMethod = 'cashfree';
                         if (!$cashfreeEnabled) {
@@ -393,138 +391,184 @@
     </main>
 
     <!-- ══════════════════════════════
-                     PHONE / OTP MODAL
-                ══════════════════════════════ -->
-    <div class="checkout-modal-overlay" id="otpModal">
-        <div class="otp-modal">
-
-            <!-- Header -->
-            <div class="om-header">
-                <button class="om-close" onclick="closeOtpModal()">✕</button>
-                <div class="om-lock-icon">👋</div>
-                <h2>Login / Sign Up</h2>
-                <p>Enter your mobile number to continue with your order</p>
+         COD OTP VERIFICATION MODAL
+    ══════════════════════════════ -->
+    <div class="cod-otp-overlay" id="codOtpOverlay" style="display: none;">
+        <div class="cod-otp-backdrop" onclick="closeCodOtpModal()"></div>
+        <div class="cod-otp-card">
+            <button type="button" class="cod-otp-close" onclick="closeCodOtpModal()" aria-label="Close">&times;</button>
+            <div class="cod-otp-icon">📦</div>
+            <h3 class="cod-otp-title">Confirm Cash on Delivery</h3>
+            <p class="cod-otp-subtitle">
+                Please enter the 6-digit verification code sent to <strong id="codOtpMaskedPhone">your phone</strong> to confirm your order.
+            </p>
+            
+            <div class="cod-otp-input-wrap">
+                <input type="text" id="codOtpInput" class="cod-otp-input" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="• • • • • •" autocomplete="one-time-code">
             </div>
+            <div class="cod-otp-error" id="codOtpError" style="display: none;"></div>
 
-            <!-- Body -->
-            <div class="om-body">
+            <button type="button" class="cod-otp-submit-btn" id="codOtpSubmitBtn" onclick="submitCodOtp()">
+                Verify & Place Order
+            </button>
 
-                <!-- STEP A: Phone Number -->
-                <div class="om-step active" id="stepPhone">
-                    @php
-                        $phoneLoginEnabled = \App\Models\Setting::get('phone_login_enabled', '1') === '1';
-                    @endphp
-
-                    @if($phoneLoginEnabled)
-                    <div class="om-label">📱 Mobile Number</div>
-                    <div class="phone-input-wrap">
-                        <div class="phone-prefix">🇮🇳 +91</div>
-                        <input type="tel" id="phoneInput" maxlength="10" inputmode="numeric" pattern="[0-9]*" autocomplete="tel"
-                            placeholder="Enter 10-digit number" oninput="this.value=this.value.replace(/\D/g,'').slice(0,10)">
-                    </div>
-                    <div id="phoneError"
-                        style="font-size:.78rem;color:var(--or);margin-top:8px;font-family:'Nunito',sans-serif;font-weight:700;display:none">
-                    </div>
-
-                    <!-- Pre-filled hint -->
-                    <div style="display:flex;align-items:center;gap:6px;margin-top:12px;padding:10px 14px;background:var(--pkl);border-radius:10px;cursor:pointer"
-                        onclick="useSavedPhone()">
-                        <span style="font-size:1rem">👩</span>
-                        <div style="flex:1">
-                            <div style="font-family:'Nunito',sans-serif;font-weight:800;font-size:.78rem;color:var(--pkd)">
-                                Use saved number</div>
-                            <div style="font-size:.74rem;color:var(--pkd);opacity:.8">
-                                {{ auth()->user()?->phone ? '+91 ' . auth()->user()->phone : 'Use your login mobile number' }}
-                            </div>
-                        </div>
-                        <span style="font-size:.75rem;color:var(--pkd);font-weight:700">Tap →</span>
-                    </div>
-
-                    <button class="send-otp-btn" id="sendOtpBtn" onclick="sendOtp()">
-                        Send OTP →
-                    </button>
-
-                    <div style="text-align:center;margin-top:12px;font-size:.76rem;color:var(--text-light)">
-                        OTP will be sent via SMS to your mobile number
-                    </div>
-                    @endif
-
-                    {{-- Google Login Integration --}}
-                    @if(\App\Models\Setting::get('google_login_enabled', '0') === '1')
-                        @if($phoneLoginEnabled)
-                        <div style="display: flex; align-items: center; gap: 12px; margin: 20px 0 10px;">
-                            <hr style="flex: 1; border-color: #e2e8f0; margin: 0;">
-                            <span style="font-size: 0.8rem; color: #94a3b8; font-weight: 600;">OR</span>
-                            <hr style="flex: 1; border-color: #e2e8f0; margin: 0;">
-                        </div>
-                        @endif
-                        <a href="{{ route('frontend.google.redirect', ['redirect' => route('checkout.index')]) }}"
-                           style="display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; padding: 14px 20px; border: 2px solid #e2e8f0; border-radius: 16px; background: #fff; color: #374151; font-weight: 700; font-size: 0.95rem; text-decoration: none; transition: 0.2s; margin-top: 12px; box-sizing: border-box;"
-                           onmouseover="this.style.borderColor='#4285F4'; this.style.background='#f8f9ff';"
-                           onmouseout="this.style.borderColor='#e2e8f0'; this.style.background='#fff';">
-                            <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                            </svg>
-                            Continue with Google
-                        </a>
-                    @endif
-
-                    @if(!$phoneLoginEnabled && \App\Models\Setting::get('google_login_enabled', '0') !== '1')
-                        <div style="text-align: center; padding: 20px; color: #94a3b8;">
-                            <iconify-icon icon="solar:lock-bold" style="font-size: 2.5rem; display: block; margin-bottom: 8px;"></iconify-icon>
-                            <p style="margin: 0; font-size: 0.9rem;">Login is currently unavailable. Please contact support.</p>
-                        </div>
-                    @endif
-                </div>
-
-                <!-- STEP B: OTP Verification -->
-                <div class="om-step" id="stepOtp">
-                    <div class="otp-sent-info">
-                        <span style="font-size:1.1rem">✅</span>
-                        <div>OTP sent to <strong id="sentToNum">+91 98765 43210</strong>. Valid for <strong>10
-                                minutes</strong>.</div>
-                    </div>
-
-                    <div class="om-label" style="justify-content:center">Enter 6-digit OTP</div>
-
-                    <div class="otp-boxes">
-                        <input class="otp-box" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" id="otp1" oninput="otpInput(this,null,'otp2')"
-                            onkeydown="otpKeydown(event,this,null,'otp2')">
-                        <input class="otp-box" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]*" id="otp2" oninput="otpInput(this,'otp1','otp3')"
-                            onkeydown="otpKeydown(event,this,'otp1','otp3')">
-                        <input class="otp-box" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]*" id="otp3" oninput="otpInput(this,'otp2','otp4')"
-                            onkeydown="otpKeydown(event,this,'otp2','otp4')">
-                        <input class="otp-box" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]*" id="otp4" oninput="otpInput(this,'otp3','otp5')"
-                            onkeydown="otpKeydown(event,this,'otp3','otp5')">
-                        <input class="otp-box" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]*" id="otp5" oninput="otpInput(this,'otp4','otp6')"
-                            onkeydown="otpKeydown(event,this,'otp4','otp6')">
-                        <input class="otp-box" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]*" id="otp6" oninput="otpInput(this,'otp5',null)"
-                            onkeydown="otpKeydown(event,this,'otp5',null)">
-                    </div>
-
-                    <div class="otp-error" id="otpError">❌ Incorrect OTP. Please try again.</div>
-
-                    <div class="otp-timer" id="otpTimerText">
-                        Resend OTP in <strong id="timerCount">30s</strong>
-                    </div>
-
-                    <button class="verify-otp-btn" id="verifyOtpBtn" onclick="verifyOtp()">
-                        ✅ Verify & Place Order
-                    </button>
-
-                    <div class="change-phone-link">
-                        Wrong number? <span onclick="backToPhone()">Change mobile number</span>
-                    </div>
-                </div>
-
+            <div class="cod-otp-resend-wrap">
+                <span id="codOtpResendTimer">Resend code in <strong id="codOtpCountdown">30</strong>s</span>
+                <button type="button" id="codOtpResendBtn" class="cod-otp-resend-btn" style="display: none;" onclick="resendCodOtp()">Resend Code</button>
             </div>
         </div>
     </div>
 
-    <!-- ══ SUCCESS OVERLAY ══ -->
+    <style>
+        .cod-otp-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .cod-otp-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(6, 60, 54, 0.45);
+            backdrop-filter: blur(4px);
+        }
+        .cod-otp-card {
+            position: relative;
+            background: #ffffff;
+            border-radius: 20px;
+            max-width: 420px;
+            width: 100%;
+            padding: 32px 28px;
+            text-align: center;
+            box-shadow: 0 20px 45px rgba(6, 60, 54, 0.18);
+            border: 1px solid rgba(6, 60, 54, 0.08);
+            animation: codModalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            z-index: 1;
+        }
+        @keyframes codModalPop {
+            from { opacity: 0; transform: scale(0.92) translateY(8px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .cod-otp-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: #f1f5f9;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            font-size: 20px;
+            line-height: 1;
+            color: #64748b;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s, color 0.15s;
+        }
+        .cod-otp-close:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+        .cod-otp-icon {
+            font-size: 40px;
+            margin-bottom: 12px;
+        }
+        .cod-otp-title {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #063c36;
+            margin-bottom: 8px;
+            letter-spacing: -0.3px;
+        }
+        .cod-otp-subtitle {
+            font-size: 0.9rem;
+            color: #64748b;
+            margin-bottom: 24px;
+            line-height: 1.45;
+        }
+        .cod-otp-subtitle strong {
+            color: #063c36;
+        }
+        .cod-otp-input-wrap {
+            margin-bottom: 12px;
+        }
+        .cod-otp-input {
+            width: 100%;
+            height: 52px;
+            text-align: center;
+            font-size: 1.6rem;
+            font-weight: 800;
+            letter-spacing: 12px;
+            color: #063c36;
+            background: #f8fafc;
+            border: 2px solid #cbd5e1;
+            border-radius: 12px;
+            outline: none;
+            transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+            box-sizing: border-box;
+            padding-left: 12px;
+        }
+        .cod-otp-input:focus {
+            border-color: #00b37e;
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(0, 179, 126, 0.15);
+        }
+        .cod-otp-error {
+            color: #dc2626;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 14px;
+            line-height: 1.35;
+        }
+        .cod-otp-submit-btn {
+            width: 100%;
+            height: 48px;
+            background: linear-gradient(135deg, #00b37e, #047857);
+            color: #ffffff;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(0, 179, 126, 0.28);
+            transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+        }
+        .cod-otp-submit-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(0, 179, 126, 0.35);
+        }
+        .cod-otp-submit-btn:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .cod-otp-resend-wrap {
+            margin-top: 16px;
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+        .cod-otp-resend-btn {
+            background: none;
+            border: none;
+            color: #00b37e;
+            font-weight: 700;
+            cursor: pointer;
+            padding: 0;
+            text-decoration: underline;
+        }
+        .cod-otp-resend-btn:hover {
+            color: #047857;
+        }
+    </style>
+
+    <!-- ══════════════════════════════
+                     PHONE / OTP MODAL
+                ══════════════════════════════ -->
     <div class="success-overlay" id="successOverlay">
         <div class="success-box">
             <span class="success-icon">🎉</span>

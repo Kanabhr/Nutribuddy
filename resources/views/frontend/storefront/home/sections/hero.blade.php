@@ -32,7 +32,7 @@
 
                         <!-- Right Text Card -->
                         <div class="text-card">
-                            <div class="label">Improves<br>Memory</div>
+                            <div class="label">Sharper <br>Focus</div>
                         </div>
 
                     </div>
@@ -45,7 +45,7 @@
 
                         <!-- Right Text Card -->
                         <div class="text-card">
-                            <div class="label"> Builds<br>Immunity</div>
+                            <div class="label"> Better <br>Memory</div>
                         </div>
 
                     </div>
@@ -53,12 +53,13 @@
 
                         <!-- Left Icon Circle -->
                         <div class="icon-circle">
-                            <img src="{{ asset('img/b-4.png') }}" alt="">
+                            <img src="{{ asset('img/brahmi.png') }}" alt="">
                         </div>
 
                         <!-- Right Text Card -->
                         <div class="text-card">
-                            <div class="label"> Stronger<br>Bones</div>
+                            <div class="label">  Brahmi<br>Powered
+</div>
                         </div>
 
                     </div>
@@ -71,7 +72,7 @@
 
                         <!-- Right Text Card -->
                         <div class="text-card">
-                            <div class="label"> Uplifts<br>Mood</div>
+                            <div class="label"> Calm <br>Learning</div>
                         </div>
 
                     </div>
@@ -84,7 +85,8 @@
 
                         <!-- Right Text Card -->
                         <div class="text-card">
-                            <div class="label"> Better<br>Sleep</div>
+                            <div class="label"> Healthy <br>Brain Growth
+</div>
                         </div>
 
                     </div>
@@ -135,7 +137,8 @@
 
                         <!-- Right Text Card -->
                         <div class="text-card">
-                            <div class="label">Calm<br> Focus</div>
+                            <div class="label">Kids<br>  Love It
+</div>
                         </div>
 
                     </div>
@@ -143,12 +146,13 @@
 
                         <!-- Left Icon Circle -->
                         <div class="icon-circle">
-                            <img src="{{ asset('img/c3.png') }}" alt="">
+                            <img src="{{ asset('img/bb2.png') }}" alt="">
                         </div>
 
                         <!-- Right Text Card -->
                         <div class="text-card">
-                            <div class="label"> Better<br> Grades</div>
+                            <div class="label">  Cold<br>  Season Care
+</div>
                         </div>
 
                     </div>
@@ -156,12 +160,12 @@
 
                         <!-- Left Icon Circle -->
                         <div class="icon-circle">
-                            <img src="{{ asset('img/c5.png') }}" alt="">
+                            <img src="{{ asset('img/im.png') }}" alt="">
                         </div>
 
                         <!-- Right Text Card -->
                         <div class="text-card">
-                            <div class="label"> Creativity <br>+</div>
+                            <div class="label">  Immune <br>Support</div>
                         </div>
 
                     </div>
@@ -169,12 +173,13 @@
 
                         <!-- Left Icon Circle -->
                         <div class="icon-circle">
-                            <img src="{{ asset('img/c2.png') }}" alt="">
+                            <img src="{{ asset('img/lemon.png') }}" alt="">
                         </div>
 
                         <!-- Right Text Card -->
                         <div class="text-card">
-                            <div class="label"> Memory<br>Up 30%</div>
+                            <div class="label"> Ginger <br>Lemon Taste
+</div>
                         </div>
 
                     </div>
@@ -182,22 +187,16 @@
 
                         <!-- Left Icon Circle -->
                         <div class="icon-circle">
-                            <img src="{{ asset('img/c1.png') }}" alt="">
+                            <img src="{{ asset('img/btn-3.png') }}" alt="">
                         </div>
 
                         <!-- Right Text Card -->
                         <div class="text-card">
-                            <div class="label"> Calm<br>Focus</div>
+                            <div class="label"> Ayurvedic<br>Herbs</div>
                         </div>
 
                     </div>
-                    <!-- <div class="bb bb1" style="border-color:var(--skl)">🎯 Laser Focus</div>
-                                                                                                                                                                    <div class="bb bb2" style="border-color:var(--skl)">📚 Better Grades</div>
-                                                                                                                                                                    <div class="bb bb3" style="border-color:var(--mnl)">💡 Creativity+</div>
-                                                                                                                                                                    <div class="bb bb4" style="border-color:var(--skl)">🧠 Memory Up 38%</div>
-                                                                                                                                                                    <div class="bb bb5" style="border-color:var(--pul)">😌 Calm Focus</div> -->
-                    <!-- <span class="fg fg1">🐟</span><span class="fg fg2">🧠</span><span class="fg fg3">⭐</span><span
-                                                                                                                                                                        class="fg fg4">💙</span><span class="fg fg5">✨</span><span class="fg fg6">🌊</span> -->
+                
                     <div class="jar-wrap">
 
                         <div class="jar-body1">
@@ -238,12 +237,12 @@
 
                         <!-- Left Icon Circle -->
                         <div class="icon-circle">
-                            <img src="{{ asset('img/b-4.png') }}" alt="">
+                            <img src="{{ asset('img/every.png') }}" alt="">
                         </div>
 
                         <!-- Right Text Card -->
                         <div class="text-card">
-                            <div class="label">Deep<br> Sleep</div>
+                            <div class="label">Daily <br> Immunity</div>
                         </div>
 
                     </div>
@@ -251,12 +250,12 @@
 
                         <!-- Left Icon Circle -->
                         <div class="icon-circle">
-                            <img src="{{ asset('img/bb2.png') }}" alt="">
+                            <img src="{{ asset('img/bread3.png') }}" alt="">
                         </div>
 
                         <!-- Right Text Card -->
                         <div class="text-card">
-                            <div class="label"> Calm<br> Mood</div>
+                            <div class="label"> 12+ Essential <br> Vitamins</div>
                         </div>
 
                     </div>
@@ -264,12 +263,12 @@
 
                         <!-- Left Icon Circle -->
                         <div class="icon-circle">
-                            <img src="{{ asset('img/bb3.png') }}" alt="">
+                            <img src="{{ asset('img/hh1.png') }}" alt="">
                         </div>
 
                         <!-- Right Text Card -->
                         <div class="text-card">
-                            <div class="label">Better<br> Nights</div>
+                            <div class="label">Healthy <br> Growth</div>
                         </div>
 
                     </div>
@@ -277,12 +276,12 @@
 
                         <!-- Left Icon Circle -->
                         <div class="icon-circle">
-                            <img src="{{ asset('img/bb4.png') }}" alt="">
+                            <img src="{{ asset('img/about-boy.png') }}" alt="">
                         </div>
 
                         <!-- Right Text Card -->
                         <div class="text-card">
-                            <div class="label"> Wake Up<br> Fresh</div>
+                            <div class="label">  Everyday <br> Energy</div>
                         </div>
 
                     </div>
@@ -290,22 +289,16 @@
 
                         <!-- Left Icon Circle -->
                         <div class="icon-circle">
-                            <img src="{{ asset('img/b-6.png') }}" alt="">
+                            <img src="{{ asset('img/manggo.png') }}" alt="">
                         </div>
 
                         <!-- Right Text Card -->
                         <div class="text-card">
-                            <div class="label"> Less<br>Anxiety</div>
+                            <div class="label"> Tasty Mango<br>Flavour</div>
                         </div>
 
                     </div>
-                    <!-- <div class="bb bb1" style="border-color:var(--yel)">😴 Deep Sleep</div>
-                                                                                                                                                                    <div class="bb bb2" style="border-color:var(--orl)">😌 Calm Mood</div>
-                                                                                                                                                                    <div class="bb bb3" style="border-color:var(--yel)">🌙 Better Nights</div>
-                                                                                                                                                                    <div class="bb bb4" style="border-color:var(--mnl)">🌞 Wake Up Fresh</div>
-                                                                                                                                                                    <div class="bb bb5" style="border-color:var(--orl)">🦋 Less Anxiety</div> -->
-                    <!-- <span class="fg fg1">🌙</span><span class="fg fg2">🌸</span><span class="fg fg3">⭐</span><span
-                                                                                                                                                                        class="fg fg4">🍯</span><span class="fg fg5">✨</span><span class="fg fg6">💫</span> -->
+                 
                     <div class="jar-wrap">
 
                         <div class="jar-body1">
@@ -344,33 +337,34 @@
             <div class="slide-visual">
                 <div class="gummy-showcase fourth-showcase">
                     <div class="benefit-card bb1">
-                        <div class="icon-circle"><img src="{{ asset('img/btn-1.png') }}" alt=""></div>
+                        <div class="icon-circle"><img src="{{ asset('img/23.png') }}" alt=""></div>
                         <div class="text-card">
-                            <div class="label">Balanced<br>Meals</div>
+                            <div class="label">Personalized <br>Nutrition</div>
                         </div>
                     </div>
                     <div class="benefit-card bb2">
                         <div class="icon-circle"><img src="{{ asset('img/bread2.png') }}" alt=""></div>
                         <div class="text-card">
-                            <div class="label">Healthy<br>Growth</div>
+                            <div class="label">Custom <br>Diet Plan
+</div>
                         </div>
                     </div>
                     <div class="benefit-card bb3">
                         <div class="icon-circle"><img src="{{ asset('img/bb1.png') }}" alt=""></div>
                         <div class="text-card">
-                            <div class="label">Active<br>Every Day</div>
+                            <div class="label">Growth <br> Tracking</div>
                         </div>
                     </div>
                     <div class="benefit-card bb4">
-                        <div class="icon-circle"><img src="{{ asset('img/bb4.png') }}" alt=""></div>
+                        <div class="icon-circle"><img src="{{ asset('img/first-addcart.png') }}" alt=""></div>
                         <div class="text-card">
-                            <div class="label">Right<br>Portions</div>
+                            <div class="label">Expert <br>Guided</div>
                         </div>
                     </div>
                     <div class="benefit-card bb5">
-                        <div class="icon-circle"><img src="{{ asset('img/bread1.png') }}" alt=""></div>
+                        <div class="icon-circle"><img src="{{ asset('img/btn-1.png') }}" alt=""></div>
                         <div class="text-card">
-                            <div class="label">Better<br>Habits</div>
+                            <div class="label">Balanced <br>Meals</div>
                         </div>
                     </div>
                     <div class="jar-wrap fourth-jar-wrap">

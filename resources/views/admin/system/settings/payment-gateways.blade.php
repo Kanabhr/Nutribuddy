@@ -91,8 +91,19 @@
 
                 <div class="card-body p-24 bg-white d-flex flex-column justify-content-between">
                     <div class="mb-24">
+                        <div class="mb-20 p-16 rounded-3" style="background-color: #f8fafc; border: 1px solid #e2e8f0;">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <label for="cod_otp_enabled" class="form-label mb-1 fw-bold" style="color: #063c36; font-size: 0.95rem; cursor: pointer;">Require OTP Verification</label>
+                                    <p class="mb-0 text-muted" style="font-size: 0.85rem;">Sends a 6-digit verification code to the customer's phone before confirming a COD order to prevent RTO & fake orders.</p>
+                                </div>
+                                <div class="form-check form-switch p-0 m-0 ms-3 d-flex align-items-center">
+                                    <input class="form-check-input m-0" type="checkbox" role="switch" name="cod_otp_enabled" value="1" id="cod_otp_enabled" {{ ($settings['cod_otp_enabled'] ?? '1') == '1' ? 'checked' : '' }} style="width: 42px; height: 21px; cursor: pointer;">
+                                </div>
+                            </div>
+                        </div>
                         <p class="mb-0" style="color: #626c72; line-height: 1.5; font-size: 0.95rem;">
-                            <strong style="color: #063c36;">Note:</strong> Enable this option to allow customers to pay cash on delivery. No additional configuration needed.
+                            <strong style="color: #063c36;">Note:</strong> Enable this option to allow customers to pay cash on delivery. When OTP verification is enabled, customers must verify their phone number via OTP to place a COD order.
                         </p>
                     </div>
                     <button type="submit" class="btn w-100 py-12 text-white border-0" style="background-color: #063c36; border-radius: 8px; font-weight: 600; font-size: 0.95rem; transition: background-color 0.2s;">Save Changes</button>

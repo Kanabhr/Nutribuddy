@@ -36,18 +36,23 @@
                                 </td>
                                 <td>
                                     <div class="d-flex flex-column">
-                                        <a href="{{ route('admin.ecommerce.orders.show', $return->order_id) }}" class="text-md fw-bold text-primary-600 hover-text-primary-700">#{{ $return->order->order_number }}</a>
-                                        <small class="text-secondary-light">Order Items: {{ $return->order->items_count }}</small>
+                                        <a href="{{ $return->order_id ? route('admin.ecommerce.orders.show', $return->order_id) : '#' }}" class="text-md fw-bold text-primary-600 hover-text-primary-700">#{{ $return->order?->order_number ?? 'N/A' }}</a>
+                                        <small class="text-secondary-light">Order Items: {{ $return->order?->items_count ?? $return->order?->items?->count() ?? 0 }}</small>
                                     </div>
                                 </td>
                                 <td>
+                                    @php
+                                        $customerName = $return->order?->user?->name ?? $return->order?->customer_name ?? 'Guest Customer';
+                                        $customerEmail = $return->order?->user?->email ?? $return->order?->customer_email ?? 'N/A';
+                                        $avatarInitial = strtoupper(substr(trim($customerName), 0, 1) ?: 'C');
+                                    @endphp
                                     <div class="d-flex align-items-center gap-2">
                                         <div class="w-32-px h-32-px radius-circle bg-primary-100 d-flex align-items-center justify-content-center text-primary-600 fw-bold text-xs">
-                                            {{ substr($return->order->user->name, 0, 1) }}
+                                            {{ $avatarInitial }}
                                         </div>
                                         <div class="d-flex flex-column">
-                                            <h6 class="text-sm mb-0 fw-medium">{{ $return->order->user->name }}</h6>
-                                            <span class="text-xs text-secondary-light">{{ $return->order->user->email }}</span>
+                                            <h6 class="text-sm mb-0 fw-medium">{{ $customerName }}</h6>
+                                            <span class="text-xs text-secondary-light">{{ $customerEmail }}</span>
                                         </div>
                                     </div>
                                 </td>

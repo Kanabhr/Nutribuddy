@@ -69,7 +69,7 @@ Diet charts are generated using a multi-stage pipeline across both **Determinist
    - Enforce repeat gap (`repeat_gap_days` from `FoodMaster`, default: 3 days).
    - Penalize candidate score by -20 if dish was served within its repeat threshold to guarantee weekly variety.
 3. **Regional & Preference Affinity:**
-   - Add positive scoring weights when `food->region` matches the child's profile or high `kid_accept_1_5` rating.
+   - Add a +5 scoring bonus when `food->region` matches any selected region in the child's profile, and up to +5 for high `kid_accept_1_5` rating.
 
 ---
 

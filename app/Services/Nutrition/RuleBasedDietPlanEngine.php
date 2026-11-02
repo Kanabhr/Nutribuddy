@@ -95,7 +95,8 @@ class RuleBasedDietPlanEngine
             $score = min(30, $nutrition * 2.5);
             $reasons = ['meal_slot_match', 'diet_match', 'allergy_safe'];
 
-            if (($profile['region'] ?? 'No preference') === $food->region) {
+            $preferredRegions = preg_split('/\s*,\s*/', (string) ($profile['region'] ?? 'No preference')) ?: [];
+            if (collect($preferredRegions)->contains(fn ($region) => strtolower($region) === strtolower((string) $food->region))) {
                 $score += 5;
                 $reasons[] = 'region_match';
             }

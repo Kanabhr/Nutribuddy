@@ -76,6 +76,63 @@ class AccessControlRegressionTest extends TestCase
         $this->assertDatabaseMissing('users', ['email' => 'invalid-role@example.test']);
     }
 
+    public function test_user_manager_cannot_update_or_delete_a_customer_account(): void
+    {
+        $manager = $this->adminWithUserManagementPermission();
+        $customer = User::factory()->create(['role' => 'user']);
+        Role::create(['name' => 'Operations Manager', 'guard_name' => 'admin']);
+
+        $this->actingAs($manager, 'admin')
+            ->putJson(route('admin.access-control.users.update', $customer), [
+                'name' => 'Changed Customer',
+                'email' => $customer->email,
+                'role' => 'Operations Manager',
+                'status' => '1',
+            ])
+            ->assertNotFound();
+
+        $this->deleteJson(route('admin.access-control.users.destroy', $customer))->assertNotFound();
+        $this->assertDatabaseHas('users', ['id' => $customer->id, 'role' => 'user', 'name' => $customer->name]);
+    }
+
+    public function test_role_manager_cannot_update_or_delete_a_role_from_another_guard(): void
+    {
+        Permission::create(['name' => 'manage roles', 'guard_name' => 'admin']);
+        $managerRole = Role::create(['name' => 'Role Manager', 'guard_name' => 'admin']);
+        $managerRole->givePermissionTo('manage roles');
+        $manager = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $manager->assignRole($managerRole);
+        $webRole = Role::create(['name' => 'Customer Role', 'guard_name' => 'web']);
+
+        $this->actingAs($manager, 'admin')
+            ->putJson(route('admin.access-control.roles.update', $webRole), [
+                'name' => 'Renamed Customer Role',
+                'permissions' => [],
+            ])
+            ->assertNotFound();
+
+        $this->deleteJson(route('admin.access-control.roles.destroy', $webRole))->assertNotFound();
+        $this->assertDatabaseHas('roles', ['id' => $webRole->id, 'name' => 'Customer Role', 'guard_name' => 'web']);
+    }
+
+    public function test_access_control_directory_is_scoped_and_paginated(): void
+    {
+        $admin = $this->adminWithUserManagementPermission();
+        $customer = User::factory()->create(['role' => 'user']);
+        $adminRole = Role::where('name', 'User Manager')->firstOrFail();
+        foreach (range(1, 26) as $number) {
+            $listedAdmin = User::factory()->create(['role' => 'admin']);
+            $listedAdmin->assignRole($adminRole);
+        }
+
+        $response = $this->actingAs($admin, 'admin')->get(route('admin.access-control.index'));
+
+        $response->assertOk()
+            ->assertSee($admin->email)
+            ->assertDontSee($customer->email)
+            ->assertSee('users_page=');
+    }
+
     public function test_deactivated_admin_cannot_login_or_keep_an_admin_session(): void
     {
         $admin = User::factory()->create([

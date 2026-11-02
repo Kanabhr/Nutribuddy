@@ -19,9 +19,14 @@ class FoodDataRequest extends FormRequest
             'draw' => ['nullable', 'integer', 'min:0'],
             'start' => ['nullable', 'integer', 'min:0'],
             'length' => ['nullable', 'integer', 'min:1', 'max:100'],
-            'order.0.column' => ['nullable', 'integer', 'between:0,7'],
+            'order.0.column' => ['nullable', 'integer', 'between:0,8'],
             'order.0.dir' => ['nullable', Rule::in(['asc', 'desc'])],
             'search.value' => ['nullable', 'string', 'max:255'],
+            'food_group' => ['nullable', 'string', 'max:100'],
+            'slot' => ['nullable', 'string', 'max:100'],
+            'diet_type' => ['nullable', 'string', 'max:100'],
+            'is_veg' => ['nullable', 'string', 'max:20'],
+            'region' => ['nullable', 'string', 'max:100'],
         ];
     }
 }

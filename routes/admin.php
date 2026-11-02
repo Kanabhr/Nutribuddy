@@ -26,6 +26,7 @@ Route::middleware(['auth:admin', 'permission:view dashboard|manage dashboard,adm
 
     Route::middleware('permission:view analytics|manage analytics,admin')->group(function () {
         Route::get('/admin/analytics', 'analytics')->name('admin.analytics');
+        Route::get('/admin/analytics/table/{table}', 'analyticsTable')->name('admin.analytics.table');
     });
 });
 
@@ -268,22 +269,26 @@ Route::prefix('admin/nutrition')->name('admin.nutrition.')->middleware('auth:adm
     });
     Route::middleware('permission:view diet chart|manage diet chart,admin')->group(function () {
         Route::resource('questions', \App\Http\Controllers\Admin\Nutrition\QuestionnaireAdminController::class)->only(['index', 'show']);
+        Route::get('diet-subscriptions/data', [\App\Http\Controllers\Admin\Nutrition\DietSubscriptionController::class, 'data'])->name('diet-subscriptions.data');
         Route::resource('diet-subscriptions', \App\Http\Controllers\Admin\Nutrition\DietSubscriptionController::class)->only(['index', 'show']);
         Route::get('foods/data', [\App\Http\Controllers\Admin\Nutrition\FoodController::class, 'data'])->name('foods.data');
         Route::get('foods', [\App\Http\Controllers\Admin\Nutrition\FoodController::class, 'index'])->name('foods.index');
+        Route::get('foods/{id}', [\App\Http\Controllers\Admin\Nutrition\FoodController::class, 'show'])->whereNumber('id')->name('foods.show');
         Route::get('diet-rules', [\App\Http\Controllers\Admin\Nutrition\DietRuleController::class, 'index'])->name('diet-rules.index');
     });
     
     Route::middleware('permission:manage diet chart,admin')->group(function () {
-        Route::resource('questions', \App\Http\Controllers\Admin\Nutrition\QuestionnaireAdminController::class)->except(['index', 'show']);
+        Route::resource('questions', \App\Http\Controllers\Admin\Nutrition\QuestionnaireAdminController::class)->except(['index', 'show', 'destroy']);
         Route::resource('diet-subscriptions', \App\Http\Controllers\Admin\Nutrition\DietSubscriptionController::class)->except(['index', 'show']);
         Route::get('leads', [\App\Http\Controllers\Admin\Nutrition\NutritionLeadController::class, 'index'])->name('leads.index');
+        Route::get('leads/data', [\App\Http\Controllers\Admin\Nutrition\NutritionLeadController::class, 'data'])->name('leads.data');
         Route::delete('foods/{food}', [\App\Http\Controllers\Admin\Nutrition\FoodController::class, 'destroy'])->name('foods.destroy');
         Route::post('foods/bulk-upload', [\App\Http\Controllers\Admin\Nutrition\FoodController::class, 'bulkUploadStore'])->name('foods.bulk-upload.store'); // ← NEW
         Route::patch('leads/{lead}/assign', [\App\Http\Controllers\Admin\Nutrition\NutritionLeadController::class, 'assign'])->name('leads.assign');
         Route::patch('leads/bulk-assign', [\App\Http\Controllers\Admin\Nutrition\NutritionLeadController::class, 'bulkAssign'])->name('leads.bulk-assign');
 
         Route::get('my-leads', [\App\Http\Controllers\Admin\Nutrition\NutritionistQueueController::class, 'index'])->name('lead-queue.index');
+        Route::get('my-leads/data', [\App\Http\Controllers\Admin\Nutrition\NutritionistQueueController::class, 'data'])->name('lead-queue.data');
         Route::get('my-leads/{lead}', [\App\Http\Controllers\Admin\Nutrition\NutritionistQueueController::class, 'show'])->name('lead-queue.show');
         Route::post('my-leads/{lead}/generate', [\App\Http\Controllers\Admin\Nutrition\NutritionistQueueController::class, 'generate'])->name('lead-queue.generate');
         Route::patch('my-leads/{lead}/diet-plans/{dietPlan}', [\App\Http\Controllers\Admin\Nutrition\NutritionistQueueController::class, 'update'])->name('lead-queue.update');

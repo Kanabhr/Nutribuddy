@@ -527,7 +527,7 @@
                             'shortName' => $ing->short_heading,
                             'cat' => \Illuminate\Support\Str::slug($ing->category->name ?? 'general'),
                             'catLabel' => $ing->category->name ?? 'General',
-                            'image' => $ing->icon_path
+                            'image' => $ing->icon_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($ing->icon_path)
                                 ? asset('storage/' . $ing->icon_path)
                                 : asset('img/gradient1.webp'),
                             'latin' => $ing->dosage_heading_one ?? '',

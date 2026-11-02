@@ -1,24 +1,28 @@
-# Nutribuddy Agent Rules Index
+# .agent – Payment Gateway Testing Kit (Cashfree + Razorpay)
 
-This folder contains modular rules that guide AI assistants operating within the Nutribuddy repository.
+Drop this folder in your repo root. Point your AI coding agent (Claude Code, Cursor, Windsurf, etc.) at it.
 
-## Rule Files
+```
+.agent/
+├── README.md
+├── prompts/
+│   └── payment-gateway-e2e-testing.md   # The master prompt – paste/reference this to start
+├── rules/                                # Always-on rules the agent must obey
+│   ├── 00-general.md
+│   ├── 01-security.md
+│   ├── 02-webhooks.md
+│   ├── 03-idempotency-and-state.md
+│   ├── 04-e2e-testing.md
+│   ├── 05-razorpay.md
+│   ├── 06-cashfree.md
+│   └── 07-cod-otp-verification.md
+└── checklists/
+    └── go-live-checklist.md
+```
 
-1. [architecture-services.md](file:///e:/website-project/Nutribuddy/.agent/rules/architecture-services.md)
-   - Service layer segregation, keeping controllers thin, form requests, and type-hinting.
-2. [database-eloquent.md](file:///e:/website-project/Nutribuddy/.agent/rules/database-eloquent.md)
-   - Null safety on dates/relationships (e.g. `diffForHumans`), eager loading (`with(...)`) to prevent N+1 queries, safe migration guidelines.
-3. [frontend-blade.md](file:///e:/website-project/Nutribuddy/.agent/rules/frontend-blade.md)
-   - View separation (`admin/` vs `frontend/`), modern aesthetics and styling conventions, responsive layout expectations.
-4. [diet-chart-generation.md](file:///e:/website-project/Nutribuddy/.agent/rules/diet-chart-generation.md)
-   - Rules, algorithms, pipelines, safety constraints (allergies/diet types), and data persistence for both rule-based and AI diet chart generation.
-5. [scalable-architecture-2m.md](file:///e:/website-project/Nutribuddy/.agent/rules/scalable-architecture-2m.md)
-   - Comprehensive blueprint for scaling Nutribuddy to 2M+ users: bottlenecks, clean modular directory structure, Redis caching, async queues, DB indexes, and controller refactoring.
-6. [environment-tooling.md](file:///e:/website-project/Nutribuddy/.agent/rules/environment-tooling.md)
-   - Windows PowerShell standards, non-interactive artisan commands, cache clearing, and code integrity guidelines.
-7. [controller-optimization-and-refactor.md](file:///e:/website-project/Nutribuddy/.agent/rules/controller-optimization-and-refactor.md)
-   - Zero-breakage invariants, domain directory organization, thin controller (150-line rule), form requests, and regression testing standards.
-8. [critical-domain-review.md](file:///e:/website-project/Nutribuddy/.agent/rules/critical-domain-review.md)
-   - Review and regression standards for Products/checkout/coins, Nutrition/diet charts, Assessments, subscription lifecycle/renewals, and customer/admin authentication, sessions, tokens, and permissions.
-9. [frontend-assets.md](file:///e:/website-project/Nutribuddy/.agent/rules/frontend-assets.md)
-   - CSS/JavaScript asset layout, Blade loading contracts, safe DOM updates, browser/server boundaries, and frontend verification.
+## How to use
+1. Tell the agent: "Read every file in `.agent/rules/` first, then execute `.agent/prompts/payment-gateway-e2e-testing.md`."
+2. Fill the `PROJECT CONTEXT` block at the top of the prompt (stack, routes, env names).
+3. Run against **sandbox / test mode only**. Use `checklists/go-live-checklist.md` before switching to live keys.
+
+> Gateway APIs change. Rules marked **(verify)** should be checked against the current Razorpay / Cashfree docs before go-live.

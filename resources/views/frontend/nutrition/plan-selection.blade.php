@@ -10,55 +10,35 @@
 
 @section('content')
     <main>
-        <section class="diet-page-hero">
-            <div class="diet-page-hero-inner">
-                <div class="diet-hero-copy">
-                    <div class="diet-page-breadcrumb">
-                        <a href="{{ route('home') }}">Home</a>
-                        <span>/</span>
-                        <span>Personalized Diet Chart</span>
+        <section class="diet-editorial-hero">
+            <div class="diet-editorial-inner">
+                <div class="diet-editorial-copy">
+                    <div class="diet-editorial-eyebrow"><span>✦</span> Nutrition for every little milestone</div>
+                    <span class="diet-editorial-offer">Free for Every Parent</span>
+                    <h1>Get Your Child's <em>Personalized Diet Chart</em></h1>
+                    <p>Answer a few simple questions and get a nutrition plan shaped around your child's age, goals, diet preference, and daily routine.</p>
+                    <div class="diet-editorial-highlights" aria-label="Plan highlights">
+                        <span>🥗 Age-aware meals</span>
+                        <span>🌏 Regional choices</span>
+                        <span>💜 Made for kids</span>
                     </div>
-                    <span class="diet-page-hero-badge">Free for Every Parent</span>
-                    <h1 class="diet-page-hero-title">Get Your Child's Personalized Diet Chart</h1>
-                    <p class="diet-page-hero-sub">Answer a few simple questions and get a nutrition plan shaped around your
-                        child's age, goals, diet preference, and daily routine.</p>
-                    <div class="diet-hero-actions">
+                    <div class="diet-editorial-actions">
                         <a class="diet-hero-btn" href="#pricing">View Plans</a>
                         <a class="diet-hero-link" href="{{ route('product') }}">Shop Wellness Gummies</a>
                     </div>
                 </div>
-
-                <div class="diet-hero-visual" aria-hidden="true">
-                    <div class="diet-visual-top">
-                        <div class="diet-visual-icon">🥣</div>
-                        <div>
-                            <div class="diet-visual-title">Smart Meal Planner</div>
-                            <div class="diet-visual-sub">2-day preview now, full 7-day plan after unlock</div>
-                        </div>
+                <div class="diet-editorial-collage">
+                    <div class="diet-editorial-spark diet-editorial-spark-one">✦</div>
+                    <div class="diet-editorial-spark diet-editorial-spark-two">✳</div>
+                    <figure class="diet-editorial-photo">
+                        <img src="{{ asset('img/mommi.jpeg') }}" alt="A mother sharing a playful moment with her child">
+                        <figcaption>A little care goes a long way</figcaption>
+                    </figure>
+                    <img class="diet-editorial-kid" src="{{ asset('img/kid.png') }}" alt="" aria-hidden="true">
+                    <div class="diet-editorial-note diet-editorial-note-plan">
+                        <span>🥣</span><div><strong>Smart Meal Planner</strong><small>2-day preview · full 7-day plan after unlock</small></div>
                     </div>
-                    <div class="diet-visual-list">
-                        <div class="diet-visual-item">
-                            <div class="diet-visual-dot">1</div>
-                            <div class="diet-visual-copy">
-                                <strong>Child profile</strong>
-                                <span>Age, gender, height and weight for better personalization.</span>
-                            </div>
-                        </div>
-                        <div class="diet-visual-item">
-                            <div class="diet-visual-dot">2</div>
-                            <div class="diet-visual-copy">
-                                <strong>Health goals</strong>
-                                <span>Focus on immunity, growth, digestion, sleep or picky eating.</span>
-                            </div>
-                        </div>
-                        <div class="diet-visual-item">
-                            <div class="diet-visual-dot">3</div>
-                            <div class="diet-visual-copy">
-                                <strong>Meal plan</strong>
-                                <span>Daily meals, nutrition targets, tips and supplement suggestions.</span>
-                            </div>
-                        </div>
-                    </div>
+                    <div class="diet-editorial-note diet-editorial-note-love"><span>💚</span> Made for growing kids</div>
                 </div>
             </div>
         </section>
@@ -87,114 +67,68 @@
             </div>
         </div>
         <!-- HOW IT WORKS -->
-        <section class="how" id="how">
-            <div class="text-center">
-                <div class="section-label">Simple Process</div>
-                <div class="section-title">How KidzNourish Works</div>
-                <div class="section-sub">From onboarding to daily meal tips — everything is automated and science-backed.
+        <section class="diet-how-section" id="how">
+            <div class="diet-how-heading">
+                <div class="diet-how-intro">
+                    <div class="diet-how-kicker"><span></span> A little more personal at every step</div>
+                    <h2>Good nutrition grows <em>with them.</em></h2>
+                    <p>Four thoughtful steps turn your child's everyday routine into a plan that can keep up as they grow.</p>
+                </div>
+                <div class="diet-how-promise">
+                    <span class="diet-how-promise-icon">🌱</span>
+                    <div><strong>Made around real family life</strong><span>Indian foods, your preferences, your child's pace.</span></div>
+                    <div class="diet-how-promise-time"><strong>~3 min</strong><span>to get started</span></div>
                 </div>
             </div>
-            <div class="steps">
-                <div class="step">
-                    <div class="step-num" style="background:#e8f5e9;color:var(--green)">1</div>
-                    <div class="step-icon">📝</div>
-                    <h3>Build Your Child's Profile</h3>
-                    <p>Enter age, weight, height, food preferences, allergies, and your zone of India. Takes under 3
-                        minutes.</p>
-                </div>
-                <div class="step-arrow">→</div>
-                <div class="step">
-                    <div class="step-num" style="background:#fff3e0;color:var(--orange)">2</div>
-                    <div class="step-icon">🧬</div>
-                    <h3>AI + Science Creates the Plan</h3>
-                    <p>Our algorithm combines paediatric nutrition science, regional food data, and growth milestones to
-                        craft a personalised plan.</p>
-                </div>
-                <div class="step-arrow">→</div>
-                <div class="step">
-                    <div class="step-num" style="background:#f3e5f5;color:var(--purple)">3</div>
-                    <div class="step-icon">📲</div>
-                    <h3>Receive Daily Tips & Plans</h3>
-                    <p>Get daily WhatsApp/app nudges, weekly meal plans, and monthly growth-nutrition reports — all
-                        personalized.</p>
-                </div>
-                <div class="step-arrow">→</div>
-                <div class="step">
-                    <div class="step-num" style="background:#e3f2fd;color:var(--blue)">4</div>
-                    <div class="step-icon">📈</div>
-                    <h3>Track Growth & Adjust</h3>
-                    <p>Log your child's growth monthly. Our system auto-adjusts the plan as they grow — from toddler to
-                        teen.</p>
-                </div>
+            <div class="diet-how-steps">
+                <article class="diet-how-step diet-how-step-profile">
+                    <div class="diet-how-step-top"><span class="diet-how-number">01</span><span class="diet-how-icon">📝</span></div>
+                    <div class="diet-how-step-label">START WITH THE BASICS</div>
+                    <h3>Build your child's profile</h3>
+                    <p>Share age, growth details, food preferences, allergies, and region. It takes under 3 minutes.</p>
+                    <span class="diet-how-step-note">Your family, understood</span>
+                </article>
+                <article class="diet-how-step diet-how-step-plan">
+                    <div class="diet-how-step-top"><span class="diet-how-number">02</span><span class="diet-how-icon">🧬</span></div>
+                    <div class="diet-how-step-label">SCIENCE MEETS YOUR ROUTINE</div>
+                    <h3>A plan shaped for them</h3>
+                    <p>Nutrition guidance, regional foods, and growth milestones come together in a personalised plan.</p>
+                    <span class="diet-how-step-note">Thoughtful, not one-size-fits-all</span>
+                </article>
+                <article class="diet-how-step diet-how-step-daily">
+                    <div class="diet-how-step-top"><span class="diet-how-number">03</span><span class="diet-how-icon">📲</span></div>
+                    <div class="diet-how-step-label">SMALL WINS, EVERY DAY</div>
+                    <h3>Meals and tips that help</h3>
+                    <p>Get weekly meal plans, daily nudges, and practical nutrition tips made for your child.</p>
+                    <span class="diet-how-step-note">Easy to bring into real life</span>
+                </article>
+                <article class="diet-how-step diet-how-step-grow">
+                    <div class="diet-how-step-top"><span class="diet-how-number">04</span><span class="diet-how-icon">📈</span></div>
+                    <div class="diet-how-step-label">KEEP PACE WITH GROWTH</div>
+                    <h3>Adjust as they grow</h3>
+                    <p>Log growth over time and keep their nutrition plan in step with each new milestone.</p>
+                    <span class="diet-how-step-note">Support for the next stage</span>
+                </article>
             </div>
         </section>
         <!-- UNIQUE FEATURES -->
-        <section id="features">
-            <div class="text-center">
-                <div class="section-label">What Sets Us Apart</div>
-                <div class="section-title">Features You Won't Find Anywhere Else</div>
-                <div class="section-sub">We built KidzNourish specifically for Indian children and Indian kitchens.</div>
+        <section id="features" class="diet-feature-section">
+            <header class="diet-feature-heading">
+                <div class="diet-feature-kicker">Made for growing kids</div>
+                <h2>Nutrition that fits <em>real life.</em></h2>
+                <p>Personalized for your child's growth, tastes, and everyday routine.</p>
+            </header>
+            <div class="diet-feature-grid">
+                <article class="diet-feature-item fc-1"><span class="diet-feature-icon">&#127760;</span><div><h3>Regional foods</h3><p>Familiar ingredients from your part of India.</p></div></article>
+                <article class="diet-feature-item fc-2"><span class="diet-feature-icon">&#128202;</span><div><h3>Growth tracking</h3><p>Keep height and weight trends in view.</p></div></article>
+                <article class="diet-feature-item fc-3"><span class="diet-feature-icon">&#127783;</span><div><h3>Seasonal meals</h3><p>Bring seasonal ingredients into the plan.</p></div></article>
+                <article class="diet-feature-item fc-4"><span class="diet-feature-icon">&#127890;</span><div><h3>Lunchbox ideas</h3><p>Plan varied meals for school days.</p></div></article>
+                <article class="diet-feature-item fc-5"><span class="diet-feature-icon">&#9888;&#65039;</span><div><h3>Symptom awareness</h3><p>Record concerns to discuss with a professional.</p></div></article>
+                <article class="diet-feature-item fc-6"><span class="diet-feature-icon">&#129463;</span><div><h3>Expert reviewed</h3><p>Plans reviewed by pediatric nutrition professionals.</p></div></article>
+                <article class="diet-feature-item fc-7"><span class="diet-feature-icon">&#128242;</span><div><h3>Daily meal tips</h3><p>Quick ideas and recipes for parents.</p></div></article>
+                <article class="diet-feature-item fc-8"><span class="diet-feature-icon">&#129366;</span><div><h3>Taste-friendly swaps</h3><p>Alternatives for foods your child avoids.</p></div></article>
             </div>
-            <div class="features-grid">
-                <div class="feature-card fc-1">
-                    <div class="feature-icon">🗺️</div>
-                    <h3>Zone-Smart™ Algorithm</h3>
-                    <p>Recommendations use foods actually available and culturally accepted in your region — dal in the
-                        North, rice in the South, fish in the East, bajra in the West.</p>
-                    <span class="tag">🏆 Unique to KidzNourish</span>
-                </div>
-                <div class="feature-card fc-2">
-                    <div class="feature-icon">📊</div>
-                    <h3>Growth Percentile Tracker</h3>
-                    <p>Plot your child's height & weight on WHO/IAP growth charts. The plan automatically recalibrates when
-                        your child hits a new growth milestone.</p>
-                    <span class="tag">Science-Based</span>
-                </div>
-                <div class="feature-card fc-3">
-                    <div class="feature-icon">🌦️</div>
-                    <h3>Seasonal Sync</h3>
-                    <p>Summer plans are cooling (watermelon, cucumber, lassi). Winter plans are warming (methi, gur, til).
-                        Every season, your child's plan changes automatically.</p>
-                    <span class="tag">Ayurveda Inspired</span>
-                </div>
-                <div class="feature-card fc-4">
-                    <div class="feature-icon">🎒</div>
-                    <h3>Lunchbox Planner</h3>
-                    <p>Every school-age child gets a weekly lunchbox schedule — nutritionally balanced, zero repetition, and
-                        actually kid-friendly.</p>
-                    <span class="tag">School-Ready</span>
-                </div>
-                <div class="feature-card fc-5">
-                    <div class="feature-icon">⚠️</div>
-                    <h3>Deficiency Alert System</h3>
-                    <p>Parents log symptoms (pale gums, poor focus, frequent colds). Our system flags likely deficiencies
-                        and adjusts the diet immediately — no lab test needed.</p>
-                    <span class="tag">Early Warning</span>
-                </div>
-                <div class="feature-card fc-6">
-                    <div class="feature-icon">👩‍⚕️</div>
-                    <h3>Pediatrician-Reviewed Plans</h3>
-                    <p>Every plan template is reviewed by AIIMS-trained pediatric nutritionists. You're not getting generic
-                        internet advice — you're getting clinical-grade guidance.</p>
-                    <span class="tag">Medical Grade</span>
-                </div>
-                <div class="feature-card fc-7">
-                    <div class="feature-icon">📲</div>
-                    <h3>Daily Parent Nudges</h3>
-                    <p>Every morning, a WhatsApp message tells you exactly what to give your child today, why it matters,
-                        and a quick recipe — in under 30 seconds to read.</p>
-                    <span class="tag">Daily Habit</span>
-                </div>
-                <div class="feature-card fc-8">
-                    <div class="feature-icon">🥄</div>
-                    <h3>Taste Profile Engine</h3>
-                    <p>Kids hate bitter gourd? Love curd? We know. The engine suggests nutritionally equivalent swaps so
-                        your child gets the nutrients without the dinnertime battles.</p>
-                    <span class="tag">Picky-Eater Friendly</span>
-                </div>
-            </div>
-        </section>
-        <!-- INDIA ZONES -->
+        </section>        <!-- INDIA ZONES -->
         <section class="zones-section" id="zones">
             <div class="text-center">
                 <div class="section-label">Regional Intelligence</div>
@@ -374,7 +308,6 @@
                 @endif
             </div>
 
-            <p class="pricing-note">🔒 7-day free trial · No credit card required · Cancel anytime</p>
         </section>
         @if(false)
             <section class="diet-section" id="diet-chart">
@@ -847,7 +780,7 @@
             paymentCreateRoute: '{{ route("diet.payment.create") }}',
             paymentVerifyRoute: '{{ route("diet.payment.verify") }}',
             csrfToken: '{{ csrf_token() }}',
-            cashfreeEnv: '{{ config("services.cashfree.env") === "production" ? "production" : "sandbox" }}',
+            cashfreeEnv: '{{ \App\Services\Payments\CashfreePaymentService::resolveEnvironment() }}',
             razorpayKey: '{{ config("services.razorpay.key_id") }}'
         };
     </script>

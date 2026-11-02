@@ -31,7 +31,7 @@
                         @foreach ($ingredients as $ingredient)
                             <tr>
                                 <td>
-                                    <img src="{{ $ingredient->icon_path ? asset('storage/' . $ingredient->icon_path) : asset('assets/images/logo-icon.png') }}" alt="icon" class="w-48-px h-48-px radius-8 border object-fit-cover">
+                                    <img src="{{ $ingredient->icon_path ? asset('storage/' . $ingredient->icon_path) : asset('assets/images/logo-icon.png') }}" alt="icon" class="w-48-px h-48-px radius-8 border object-fit-cover" onerror="this.onerror=null;this.src='{{ asset('assets/images/logo-icon.png') }}';">
                                 </td>
                                 <td class="fw-semibold">{{ $ingredient->main_heading }}</td>
                                 <td>{{ $ingredient->short_heading }}</td>

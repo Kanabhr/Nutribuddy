@@ -38,6 +38,17 @@ class AppServiceProvider extends ServiceProvider
         \App\Models\Order::observe(\App\Observers\OrderObserver::class);
         \App\Models\OrderItem::observe(\App\Observers\OrderItemObserver::class);
 
+        if (! app()->environment('testing') && ! app()->runningInConsole() && config('services.cashfree.app_id')) {
+            try {
+                \App\Services\Payments\CashfreePaymentService::bootCheck();
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::critical('Cashfree configuration error: ' . $e->getMessage());
+                if (config('app.debug')) {
+                    throw $e;
+                }
+            }
+        }
+
         RateLimiter::for('admin-login', function (Request $request) {
             $email = Str::lower(trim((string) $request->input('email')));
 
@@ -118,8 +129,9 @@ class AppServiceProvider extends ServiceProvider
         });
 
         View::composer('components.navbar', function ($view) {
-            $notifications = \Illuminate\Notifications\DatabaseNotification::orderBy('created_at', 'desc')->take(5)->get();
-            $unreadCount = \Illuminate\Notifications\DatabaseNotification::whereNull('read_at')->count();
+            $admin = auth('admin')->user();
+            $notifications = $admin?->notifications()->latest()->limit(5)->get() ?? collect();
+            $unreadCount = $admin?->unreadNotifications()->count() ?? 0;
             $view->with([
                 'navbarNotifications' => $notifications,
                 'unreadNotificationsCount' => $unreadCount

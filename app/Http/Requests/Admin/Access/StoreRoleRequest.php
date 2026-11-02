@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin\Access;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreRoleRequest extends FormRequest
 {
@@ -13,6 +14,14 @@ class StoreRoleRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['name' => ['required', 'string', 'unique:roles,name'], 'permissions' => ['array']];
+        $modules = ['dashboard', 'analytics', 'diet chart', 'products', 'orders', 'customers', 'promotions', 'loyalty', 'moderation', 'administration', 'content', 'assessment', 'users', 'roles'];
+
+        return [
+            'name' => ['required', 'string', 'max:100', Rule::unique('roles', 'name')->where('guard_name', 'admin')],
+            'permissions' => ['sometimes', 'array:' . implode(',', $modules)],
+            'permissions.*' => ['array:view,manage'],
+            'permissions.*.view' => ['sometimes', Rule::in(['1'])],
+            'permissions.*.manage' => ['sometimes', Rule::in(['1'])],
+        ];
     }
 }

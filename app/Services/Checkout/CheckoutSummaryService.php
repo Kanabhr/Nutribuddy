@@ -30,8 +30,20 @@ class CheckoutSummaryService
         // This makes coin redemption fully automatic without relying on client-sent values.
         $coinsToRedeem = (int) $user->coins_balance;
 
+        $shippingState = null;
+        if (!empty($validated['address_id'])) {
+            $shippingState = \App\Models\CustomerAddress::where('user_id', $user->id)
+                ->where('id', $validated['address_id'])
+                ->value('state');
+        } elseif (!empty($validated['shipping_state'])) {
+            $shippingState = (string) $validated['shipping_state'];
+        } else {
+            $shippingState = \App\Models\CustomerAddress::where('user_id', $user->id)
+                ->where('is_default_shipping', true)
+                ->value('state') ?? \App\Models\CustomerAddress::where('user_id', $user->id)->latest()->value('state');
+        }
 
-        $pricing = $this->pricingService->calculate($cart->items, $coupon, $coinsToRedeem);
+        $pricing = $this->pricingService->calculate($cart->items, $coupon, $coinsToRedeem, $shippingState);
         $this->assertCouponMinimum($coupon, (float) $pricing['subtotal']);
 
         return [
@@ -43,14 +55,14 @@ class CheckoutSummaryService
         ];
     }
 
-    public function forGuest(array $items, ?string $couponCode = null): array
+    public function forGuest(array $items, ?string $couponCode = null, ?string $shippingState = null): array
     {
         $coupon = $this->resolveCoupon($couponCode, auth()->id());
         $cartItems = $this->guestCartItems($items);
 
         abort_if($cartItems->isEmpty(), 422, 'Cart is empty.');
 
-        $pricing = $this->pricingService->calculate($cartItems, $coupon);
+        $pricing = $this->pricingService->calculate($cartItems, $coupon, 0, $shippingState);
         $this->assertCouponMinimum($coupon, (float) $pricing['subtotal']);
 
         return [

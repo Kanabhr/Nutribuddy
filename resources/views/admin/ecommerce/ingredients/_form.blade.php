@@ -25,7 +25,7 @@
                     <label class="form-label">Image / Icon</label>
                     <input type="file" name="icon" class="form-control" accept="image/*">
                     @if ($isEdit && $ingredient->icon_path)
-                        <img src="{{ asset('storage/' . $ingredient->icon_path) }}" alt="icon" class="mt-12 w-80-px h-80-px radius-8 border object-fit-cover">
+                        <img src="{{ asset('storage/' . $ingredient->icon_path) }}" alt="icon" class="mt-12 w-80-px h-80-px radius-8 border object-fit-cover" onerror="this.onerror=null;this.src='{{ asset('assets/images/logo-icon.png') }}';">
                     @endif
                 </div>
 

@@ -19,6 +19,8 @@ class RolePermissionSeeder extends Seeder
 
         // Create basic permissions based on the sidebar sections
         $permissions = [
+            'view dashboard',
+            'manage dashboard',
             'view analytics',
             'manage diet chart',
             'manage products',
@@ -45,21 +47,13 @@ class RolePermissionSeeder extends Seeder
         $editorRole = Role::firstOrCreate(['name' => 'Editor', 'guard_name' => 'admin']);
         $editorRole->syncPermissions(['manage products', 'manage content', 'manage orders']);
 
-        // Assign 'Super Admin' role to user ID 1
-        $user = User::find(1);
-        if ($user) {
-            $user->assignRole($superAdminRole);
-        } else {
-            // Optional: Create a default admin user if one doesn't exist
-            // This is just a fallback to ensure we don't lock ourselves out
-            $admin = User::firstOrCreate([
-                'email' => 'admin@nutribuddy.com',
-            ], [
-                'name' => 'Admin',
-                'password' => bcrypt('password'),
-                'is_active' => true,
-            ]);
-            $admin->assignRole($superAdminRole);
+        // Assign the seeded Super Admin role by its stable account identity, not by row order.
+        $admin = User::where('email', 'admin@nutribuddy.com')
+            ->where('role', 'admin')
+            ->first();
+
+        if ($admin) {
+            $admin->syncRoles([$superAdminRole]);
         }
     }
 }

@@ -2,6 +2,9 @@
 @php
     $title = 'Invoice #INV-' . $order->order_number;
     $subTitle = 'Ecommerce / Invoices / INV-' . $order->order_number;
+    $displayInvoiceNo = $order->invoice_number ?: ('#INV-' . $order->order_number);
+    $title = 'Invoice ' . $displayInvoiceNo;
+    $subTitle = 'Ecommerce / Invoices / ' . $displayInvoiceNo;
 @endphp
 
 
@@ -79,12 +82,13 @@
     }
 
     .inv-wrap .inv-company-logo img {
-        height: 46px !important;
+        height: auto !important;
+        max-height: 80px !important;
+        max-width: 280px !important;
         width: auto !important;
         object-fit: contain !important;
         display: block !important;
         margin-bottom: 12px !important;
-        max-width: 180px !important;
     }
 
     .inv-wrap .inv-company-name {
@@ -591,28 +595,65 @@
             <div class="inv-body">
 
                 {{-- ══ HEADER ══ --}}
+                @php
+                    $sideSectionLogo = \App\Models\Setting::get('side_section_logo');
+                    $sideSectionLogoExists = $sideSectionLogo && \Illuminate\Support\Facades\Storage::disk('public')->exists($sideSectionLogo);
+                    $logoUrl = $sideSectionLogoExists
+                        ? asset('storage/' . $sideSectionLogo)
+                        : asset('assets/images/logo.png');
+
+                    $companyName = \App\Models\Setting::get('company_name') ?: \App\Models\Setting::get('site_name', 'NutriBuddy');
+                    $companyAddress = \App\Models\Setting::get('address', '');
+                    $companyPhone = \App\Models\Setting::get('contact_phone', '');
+                    $companyEmail = \App\Models\Setting::get('contact_email', '');
+                    $companyWebsite = \App\Models\Setting::get('website_url') ?: config('app.url', 'www.nutribuddy.in');
+                    $companyGst = \App\Models\Setting::get('gst_number', '');
+                    $companyPan = \App\Models\Setting::get('pan_number', '');
+                    $companyCin = \App\Models\Setting::get('cin_number', '');
+
+                    $sellerState = \App\Models\Setting::get('store_state', 'Gujarat');
+                    $customerState = $order->shipping_state ?: ($order->billing_state ?: 'Gujarat');
+                    $isIntraState = \App\Services\PricingService::isSameState($customerState, $sellerState);
+                @endphp
                 <div class="inv-header">
 
                     <div class="inv-company-left">
                         <div class="inv-company-logo">
-                            <img src="{{ asset('assets/images/logo.png') }}" alt="{{ config('company.name') }}">
+                            <img src="{{ $logoUrl }}" alt="{{ $companyName }}" style="max-height: 80px; max-width: 280px; width: auto; height: auto; object-fit: contain;">
                         </div>
-                        <div class="inv-company-name">{{ config('company.name') }}</div>
+                        <div class="inv-company-name">{{ $companyName }}</div>
                         <div class="inv-company-meta">
-                            <span>{{ config('company.address') }}, {{ config('company.city') }}</span>
-                            <span>📞 {{ config('company.phone') }} &nbsp; ✉️ {{ config('company.email') }}</span>
-                            <span>🌐 {{ config('company.website') }}</span>
+                            @if($companyAddress)
+                                <span>{{ $companyAddress }}</span>
+                            @endif
+                            <span>State: <strong>{{ $sellerState }}</strong> &nbsp;|&nbsp; Country: India</span>
+                            <span>
+                                @if($companyPhone) 📞 {{ $companyPhone }} @endif
+                                @if($companyEmail) &nbsp; ✉️ {{ $companyEmail }} @endif
+                            </span>
+                            @if($companyWebsite)
+                                <span>🌐 {{ $companyWebsite }}</span>
+                            @endif
                         </div>
-                        <div class="inv-legal-tags">
-                            <span class="inv-legal-tag">GSTIN: {{ config('company.gst') }}</span>
-                            <span class="inv-legal-tag">PAN: {{ config('company.pan') }}</span>
-                            <span class="inv-legal-tag">CIN: {{ config('company.cin') }}</span>
-                        </div>
+                        @if($companyGst || $companyPan || $companyCin)
+                            <div class="inv-legal-tags">
+                                @if($companyGst)
+                                    <span class="inv-legal-tag">GSTIN: {{ $companyGst }}</span>
+                                @endif
+                                @if($companyPan)
+                                    <span class="inv-legal-tag">PAN: {{ $companyPan }}</span>
+                                @endif
+                                @if($companyCin)
+                                    <span class="inv-legal-tag">CIN: {{ $companyCin }}</span>
+                                @endif
+                            </div>
+                        @endif
                     </div>
 
                     <div class="inv-title-block">
-                        <div class="inv-word">INVOICE</div>
+                        <div class="inv-word">TAX INVOICE</div>
                         <div class="inv-num">#INV-{{ $order->order_number }}</div>
+                        <div class="inv-num">{{ $order->invoice_number ?: ('#INV-' . $order->order_number) }}</div>
                         <div class="inv-date">
                             Issued:
                             {{ optional($order->placed_at)->format('d M Y') ?? $order->created_at->format('d M Y') }}
@@ -667,17 +708,19 @@
                     <table class="inv-table">
                         <thead>
                             <tr>
-                                <th style="width:45%">Product Description</th>
-                                <th class="c" style="width:10%">Qty</th>
-                                <th class="r" style="width:15%">Unit Price</th>
-                                <th class="r" style="width:15%">GST</th>
-                                <th class="r" style="width:15%">Amount</th>
+                                <th style="width:38%">Product Description</th>
+                                <th class="c" style="width:12%">HSN/SAC</th>
+                                <th class="c" style="width:8%">Qty</th>
+                                <th class="r" style="width:14%">Unit Price</th>
+                                <th class="r" style="width:14%">GST</th>
+                                <th class="r" style="width:14%">Amount</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach($order->items as $item)
                                 @php
                                     $vName = $item->item_snapshot['variant_name'] ?? ($item->productVariant?->name ?? null);
+                                    $hsn = $item->item_snapshot['hsn_code'] ?? ($item->product?->hsn_code ?? '210690');
                                     $variant = $item->productVariant;
                                     $product = $item->product;
                                     $taxRate = $item->tax_percent;
@@ -715,6 +758,7 @@
                                             </div>
                                         @endif
                                     </td>
+                                    <td class="c" style="font-family: monospace; font-size: 11px; color: #4b5563;">{{ $hsn }}</td>
                                     <td class="c inv-qty">{{ $item->quantity }}</td>
                                     <td class="r">₹{{ number_format($item->unit_price, 2) }}</td>
                                     <td class="r">
@@ -729,35 +773,39 @@
                 </div>
 
                 @php
-                    $sellerState = 'Karnataka';
-                    $customerState = $order->shipping_state;
-                    $isIntraState = strtolower(trim($sellerState)) === strtolower(trim($customerState));
-
                     $taxSummary = [];
                     foreach($order->items as $item) {
                         $rate = (float) $item->tax_percent;
-                        $taxableValue = $item->unit_price * $item->quantity;
-                        $taxAmount = $item->tax_amount;
+                        $hsn = $item->item_snapshot['hsn_code'] ?? ($item->product?->hsn_code ?? '210690');
+                        $taxableValue = (float) $item->unit_price * (int) $item->quantity;
+                        $taxAmount = (float) $item->tax_amount;
 
-                        if (!isset($taxSummary[$rate])) {
-                            $taxSummary[$rate] = [
+                        $key = $hsn . '_' . $rate;
+                        if (!isset($taxSummary[$key])) {
+                            $taxSummary[$key] = [
+                                'hsn' => $hsn,
                                 'rate' => $rate,
-                                'taxable_value' => 0,
-                                'tax_amount' => 0,
+                                'taxable_value' => 0.0,
+                                'tax_amount' => 0.0,
                             ];
                         }
-                        $taxSummary[$rate]['taxable_value'] += $taxableValue;
-                        $taxSummary[$rate]['tax_amount'] += $taxAmount;
+                        $taxSummary[$key]['taxable_value'] += $taxableValue;
+                        $taxSummary[$key]['tax_amount'] += $taxAmount;
                     }
                     ksort($taxSummary);
+                    $totalTaxable = collect($taxSummary)->sum('taxable_value');
+                    $totalTax = collect($taxSummary)->sum('tax_amount');
                 @endphp
 
                 {{-- ══ TAX SUMMARY TABLE ══ --}}
                 <div style="margin-bottom: 30px;">
+                    <div style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 6px;">
+                        GST Tax Breakdown (Supplier State: {{ $sellerState }} &rarr; Place of Supply: {{ $customerState }})
+                    </div>
                     <table class="inv-tax-table">
                         <thead>
                             <tr>
-                                <th>GST Rate</th>
+                                <th>HSN / SAC</th>
                                 <th>Taxable Value</th>
                                 @if($isIntraState)
                                     <th>CGST Rate</th>
@@ -774,7 +822,7 @@
                         <tbody>
                             @foreach($taxSummary as $summary)
                                 <tr>
-                                    <td>{{ number_format($summary['rate'], 2) }}%</td>
+                                    <td style="font-family: monospace;">{{ $summary['hsn'] }}</td>
                                     <td>₹{{ number_format($summary['taxable_value'], 2) }}</td>
                                     @if($isIntraState)
                                         <td>{{ number_format($summary['rate'] / 2, 2) }}%</td>
@@ -785,22 +833,22 @@
                                         <td>{{ number_format($summary['rate'], 2) }}%</td>
                                         <td>₹{{ number_format($summary['tax_amount'], 2) }}</td>
                                     @endif
-                                    <td>₹{{ number_format($summary['tax_amount'], 2) }}</td>
+                                    <td style="font-weight: 600;">₹{{ number_format($summary['tax_amount'], 2) }}</td>
                                 </tr>
                             @endforeach
                             <tr class="total-row">
                                 <td>Total</td>
-                                <td>₹{{ number_format(collect($taxSummary)->sum('taxable_value'), 2) }}</td>
+                                <td>₹{{ number_format($totalTaxable, 2) }}</td>
                                 @if($isIntraState)
                                     <td></td>
-                                    <td>₹{{ number_format(collect($taxSummary)->sum('tax_amount') / 2, 2) }}</td>
+                                    <td>₹{{ number_format($totalTax / 2, 2) }}</td>
                                     <td></td>
-                                    <td>₹{{ number_format(collect($taxSummary)->sum('tax_amount') / 2, 2) }}</td>
+                                    <td>₹{{ number_format($totalTax / 2, 2) }}</td>
                                 @else
                                     <td></td>
-                                    <td>₹{{ number_format(collect($taxSummary)->sum('tax_amount'), 2) }}</td>
+                                    <td>₹{{ number_format($totalTax, 2) }}</td>
                                 @endif
-                                <td>₹{{ number_format(collect($taxSummary)->sum('tax_amount'), 2) }}</td>
+                                <td>₹{{ number_format($totalTax, 2) }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -849,10 +897,21 @@
                             </div>
                         @endif
 
-                        <div class="inv-total-line">
-                            <span class="tl-label">GST / Tax</span>
-                            <span class="tl-value">₹{{ number_format($totalOriginalGst, 2) }}</span>
-                        </div>
+                        @if($isIntraState)
+                            <div class="inv-total-line">
+                                <span class="tl-label">CGST (Central Tax)</span>
+                                <span class="tl-value">₹{{ number_format($totalTax / 2, 2) }}</span>
+                            </div>
+                            <div class="inv-total-line">
+                                <span class="tl-label">SGST (State Tax)</span>
+                                <span class="tl-value">₹{{ number_format($totalTax / 2, 2) }}</span>
+                            </div>
+                        @else
+                            <div class="inv-total-line">
+                                <span class="tl-label">IGST (Integrated Tax)</span>
+                                <span class="tl-value">₹{{ number_format($totalTax, 2) }}</span>
+                            </div>
+                        @endif
 
                         <div class="inv-total-line">
                             <span class="tl-label">Shipping</span>
@@ -868,17 +927,25 @@
 
                 {{-- ══ FOOTER ══ --}}
                 <div class="inv-footer">
-                    <div><strong>{{ config('company.name') }}</strong></div>
-                    <div>
-                        GSTIN: {{ config('company.gst') }} &nbsp;·&nbsp;
-                        PAN: {{ config('company.pan') }} &nbsp;·&nbsp;
-                        CIN: {{ config('company.cin') }}
-                    </div>
-                    <div>
-                        {{ config('company.email') }} &nbsp;·&nbsp;
-                        {{ config('company.phone') }} &nbsp;·&nbsp;
-                        {{ config('company.website') }}
-                    </div>
+                    <div><strong>{{ $companyName }}</strong></div>
+                    @php
+                        $footerLegals = array_filter([
+                            $companyGst ? 'GSTIN: ' . $companyGst : null,
+                            $companyPan ? 'PAN: ' . $companyPan : null,
+                            $companyCin ? 'CIN: ' . $companyCin : null,
+                        ]);
+                        $footerContacts = array_filter([
+                            $companyEmail ?: null,
+                            $companyPhone ?: null,
+                            $companyWebsite ?: null,
+                        ]);
+                    @endphp
+                    @if(!empty($footerLegals))
+                        <div>{{ implode(' &nbsp;·&nbsp; ', $footerLegals) }}</div>
+                    @endif
+                    @if(!empty($footerContacts))
+                        <div>{{ implode(' &nbsp;·&nbsp; ', $footerContacts) }}</div>
+                    @endif
                     <div style="margin-top:8px !important; font-size:10px !important;">
                         This is a computer-generated invoice and does not require a physical signature.
                     </div>

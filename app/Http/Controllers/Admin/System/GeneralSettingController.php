@@ -16,15 +16,22 @@ class GeneralSettingController extends Controller
     {
         $settings = [
             'site_name' => Setting::get('site_name', 'NutriBuddy'),
+            'company_name' => Setting::get('company_name', Setting::get('site_name', 'NutriBuddy Kids Pvt. Ltd.')),
             'meta_description' => Setting::get('meta_description', 'Your Health Partner - Premium Nutrition & Wellness Store'),
             'meta_keywords' => Setting::get('meta_keywords', 'nutrition, wellness, health, supplements'),
             'contact_email' => Setting::get('contact_email', 'admin@nutribuddy.com'),
             'contact_phone' => Setting::get('contact_phone', '+91 9876543210'),
             'address' => Setting::get('address', '123 Health St, Wellness City'),
-            'gst_number' => Setting::get('gst_number', 'Not Specified'),
+            'website_url' => Setting::get('website_url', config('app.url', 'https://nutribuddy.in')),
+            'gst_number' => Setting::get('gst_number', ''),
+            'pan_number' => Setting::get('pan_number', ''),
+            'cin_number' => Setting::get('cin_number', ''),
+            'store_state' => Setting::get('store_state', 'Gujarat'),
         ];
 
-        return view('admin.system.settings.general', compact('settings'));
+        $states = app(\App\Services\Checkout\StateCityService::class)->checkoutStates();
+
+        return view('admin.system.settings.general', compact('settings', 'states'));
     }
 
     public function update(UpdateGeneralSettingsRequest $request): RedirectResponse
@@ -41,11 +48,12 @@ class GeneralSettingController extends Controller
     public function paymentGateways(): View
     {
         $settings = [
-            'razorpay_enabled' => Setting::get('razorpay_enabled', '0'),
+            'razorpay_enabled' => Setting::get('razorpay_enabled', config('services.razorpay.key_id') ? '1' : '0'),
             'razorpay_env' => Setting::get('razorpay_env', 'sandbox'),
-            'cashfree_enabled' => Setting::get('cashfree_enabled', '0'),
-            'cashfree_env' => Setting::get('cashfree_env', 'sandbox'),
-            'cod_enabled' => Setting::get('cod_enabled', '0'),
+            'cashfree_enabled' => Setting::get('cashfree_enabled', config('services.cashfree.app_id') ? '1' : '0'),
+            'cashfree_env' => Setting::get('cashfree_env', \App\Services\Payments\CashfreePaymentService::resolveEnvironment()),
+            'cod_enabled' => Setting::get('cod_enabled', '1'),
+            'cod_otp_enabled' => Setting::get('cod_otp_enabled', '1'),
         ];
 
         return view('admin.system.settings.payment-gateways', compact('settings'));
@@ -63,6 +71,7 @@ class GeneralSettingController extends Controller
             Setting::set('cashfree_env', $validated['cashfree_env'], 'payment');
         } elseif ($request->has('gateway') && $request->input('gateway') === 'cod') {
             Setting::set('cod_enabled', $request->has('cod_enabled') ? '1' : '0', 'payment');
+            Setting::set('cod_otp_enabled', $request->has('cod_otp_enabled') ? '1' : '0', 'payment');
         } else {
             // General bulk update
             Setting::set('razorpay_enabled', $request->has('razorpay_enabled') ? '1' : '0', 'payment');
@@ -70,6 +79,7 @@ class GeneralSettingController extends Controller
             Setting::set('cashfree_enabled', $request->has('cashfree_enabled') ? '1' : '0', 'payment');
             Setting::set('cashfree_env', $request->input('cashfree_env', 'sandbox'), 'payment');
             Setting::set('cod_enabled', $request->has('cod_enabled') ? '1' : '0', 'payment');
+            Setting::set('cod_otp_enabled', $request->has('cod_otp_enabled') ? '1' : '0', 'payment');
         }
 
         return back()->with('success', 'Payment gateway settings updated successfully.');

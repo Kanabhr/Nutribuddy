@@ -175,9 +175,23 @@ class ChildProfileService
 
     private function region(mixed $value): string
     {
-        return match (strtolower($this->text($value))) {
-            'north' => 'North', 'south' => 'South', 'east' => 'East', 'west' => 'West', default => 'No preference',
-        };
+        $values = is_array($value) ? $value : preg_split('/[,|]/', (string) $value);
+        $regions = collect($values)->map(function ($region) {
+            return match (strtolower(trim((string) $region))) {
+                'north', 'north india' => 'North',
+                'west', 'west india' => 'West',
+                'east', 'east india' => 'East',
+                'south', 'south india' => 'South',
+                'no preference', 'pan india', 'none' => 'No preference',
+                default => null,
+            };
+        })->filter()->unique()->values();
+
+        if ($regions->isEmpty() || $regions->contains('No preference')) {
+            return 'No preference';
+        }
+
+        return $regions->implode(', ');
     }
 
     private function mealPattern(mixed $value): string

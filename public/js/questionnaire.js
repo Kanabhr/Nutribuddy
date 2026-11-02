@@ -13,8 +13,19 @@ function qzSelectCard(el, gridId, qid, isMulti) {
 
 function qzSelectChip(el, rowId, qid, isMulti) {
     const row = document.getElementById(rowId);
-    if (!isMulti) row.querySelectorAll('.qz-choice-chip').forEach(c => c.classList.remove('selected'));
-    el.classList.toggle('selected');
+    const wasSelected = el.classList.contains('selected');
+    if (!isMulti) {
+        row.querySelectorAll('.qz-choice-chip').forEach(c => c.classList.remove('selected'));
+    } else if (el.dataset.val.trim().toLowerCase() === 'no preference') {
+        row.querySelectorAll('.qz-choice-chip').forEach(c => c.classList.remove('selected'));
+    } else {
+        row.querySelectorAll('.qz-choice-chip[data-val="No preference"]').forEach(c => c.classList.remove('selected'));
+    }
+    if (isMulti && el.dataset.val.trim().toLowerCase() === 'no preference' && wasSelected) {
+        el.classList.remove('selected');
+    } else {
+        el.classList.toggle('selected');
+    }
     const vals = [...row.querySelectorAll('.qz-choice-chip.selected')].map(c => c.dataset.val);
     const hid = document.getElementById('hidChip_' + qid);
     if (hid) { hid.value = vals.join(','); hideErr(qid); }
@@ -65,7 +76,7 @@ function qzCollect() {
         if (!f.dataset.qid) return;
         const key = 'q_' + f.dataset.qid;
         if (f.type === 'hidden' && f.value.includes(',')) {
-            data[key + '[]'] = f.value.split(',');
+            data[key] = f.value.split(',').map(value => value.trim()).filter(Boolean);
         } else {
             data[key] = f.value;
         }

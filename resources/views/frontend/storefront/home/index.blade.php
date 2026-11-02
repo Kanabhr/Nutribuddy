@@ -69,7 +69,7 @@
             <p class="quiz-p">Take our 2-minute wellness quiz and get a FREE personalized diet chart crafted by certified
                 Ayurvedic nutritionists. No signup needed.</p>
         </div>
-        <button class="quiz-btn">Start Free Quiz →</button>
+        <a href="{{ route('user.assessment.index') }}" class="quiz-btn" style="text-decoration: none; display: inline-block; text-align: center;">Start Free Quiz →</a>
     </div>
 
 

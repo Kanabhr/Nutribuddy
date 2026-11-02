@@ -66,6 +66,8 @@ class ActivateDietSubscription
                         'expires_at' => $expiresAt,
                     ]);
                     app(NutritionLeadService::class)->createForSubscription($subscription);
+                    app(\App\Services\Nutrition\DietLifecycleNotificationService::class)
+                        ->subscriptionActivated($subscription);
 
                     Log::info('Activated Diet Subscription for order: ' . $order->id);
                 }

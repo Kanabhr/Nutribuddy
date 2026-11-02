@@ -114,16 +114,13 @@
                 <div class="plp-grid" id="plpGrid">
                     @foreach ($productsList as $index => $product)
                         @php
-                            $catSlug = $product->category->slug ?? 'pk';
-                            if ($catSlug === 'multivitamins') {
-                                $catSlug = 'pk';
-                            } elseif ($catSlug === 'whey-protein') {
-                                $catSlug = 'sk';
-                            } elseif ($catSlug === 'pre-workout') {
-                                $catSlug = 'pu';
-                            } else {
-                                $catSlug = 'pk';
-                            }
+                            // Map category slug to CSS theme class for card styling
+                            // TODO: Consider moving to a config file or category metadata if more themes are added
+                            $catSlug = match($product->category->slug ?? null) {
+                                'whey-protein' => 'sk',
+                                'pre-workout' => 'pu',
+                                default => 'pk', // Default theme for multivitamins and all other categories
+                            };
 
                             $categoryName = $product->category->name ?? 'Uncategorized';
                             $categoryKey = $product->category->slug ?? \Illuminate\Support\Str::slug($categoryName);
@@ -132,28 +129,8 @@
                                 ->filter(fn($v) => $v->is_active && !empty($v->attributes))
                                 ->values();
 
-                            $variantGroups = [];
-                            foreach ($activeVariants as $variant) {
-                                foreach ($variant->attributes ?? [] as $name => $value) {
-                                    $value = trim((string) $value);
-                                    if ($value === '') {
-                                        continue;
-                                    }
-                                    $variantGroups[$name] ??= [];
-                                    if (!in_array($value, $variantGroups[$name], true)) {
-                                        $variantGroups[$name][] = $value;
-                                    }
-                                }
-                            }
-                            $showInlineVariants = false;
-
                             $selectedVariant =
                                 $activeVariants->firstWhere('is_default', true) ?: $activeVariants->first();
-                            $selectedAttributes = $selectedVariant?->attributes ?? [];
-                            $selectedLabel = collect($selectedAttributes)
-                                ->filter(fn($v) => trim((string) $v) !== '')
-                                ->map(fn($v, $k) => $k . ': ' . $v)
-                                ->implode(' / ');
 
                             $stockQty = (int) ($selectedVariant?->inventory?->stock_qty ?? 0);
                             $trackStock = (bool) ($selectedVariant?->inventory?->track_stock ?? false);
@@ -182,8 +159,8 @@
                             $cardComparePrice =
                                 (float) ($selectedVariant?->display_compare_price ??
                                     ($product->display_compare_price ?? 0));
-                            $reviewCount = $product->reviews->count();
-                            $rating = $reviewCount > 0 ? $product->reviews->avg('rating') : 0;
+                            $reviewCount = $product->reviews_count ?? 0;
+                            $rating = (float) ($product->reviews_avg_rating ?? 0);
                             $fallbackDefaultImage = $product->primaryImage ?: $product->images->first();
                             $fallbackHoverImage =
                                 $product->images->where('id', '!=', $fallbackDefaultImage?->id)->first() ?: $fallbackDefaultImage;
@@ -197,8 +174,7 @@
                             data-price="{{ $cardPrice }}" data-featured="{{ $product->is_featured ? 1 : 0 }}"
                             data-rating="{{ $rating }}" data-name="{{ strtolower($product->name) }}"
                             data-selected-variant-id="{{ $selectedVariant?->id }}"
-                            data-selected-variant-label="{{ $selectedLabel }}"
-                            data-variants='{{ json_encode($frontendVariants, JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) }}'>
+                            data-variants='@json($frontendVariants)'>
 
                             <div class="pc-head pc-head-{{ $catSlug }}">
                                 <a href="{{ route('product.show', $product->slug) }}" class="pc-emoji p-image">
@@ -206,6 +182,11 @@
                                         <img src="{{ asset('storage/' . $defaultImagePath) }}"
                                             alt="{{ $product->name }}" class="default-img" loading="lazy" decoding="async">
                                         <img src="{{ asset('storage/' . $hoverImagePath) }}"
+                                            alt="{{ $product->name }}" class="hover-img" loading="lazy" decoding="async">
+                                    @else
+                                        <img src="{{ asset('img/product2.png') }}"
+                                            alt="{{ $product->name }}" class="default-img" loading="lazy" decoding="async">
+                                        <img src="{{ asset('img/product2.png') }}"
                                             alt="{{ $product->name }}" class="hover-img" loading="lazy" decoding="async">
                                     @endif
                                 </a>
@@ -218,7 +199,7 @@
                             <div class="pc-body">
                                 <a href="{{ route('product.show', $product->slug) }}#reviews" class="pc-stars" style="text-decoration: none;">
                                     @for ($i = 0; $i < 5; $i++)
-                                        {!! $i < $rating ? '&#9733;' : '&#9734;' !!}
+                                        {!! $i < round($rating) ? '&#9733;' : '&#9734;' !!}
                                     @endfor
                                     <span
                                         style="color:#aaa;font-size:.75rem;font-family:'DM Sans',sans-serif">({{ $reviewCount }}
@@ -230,35 +211,6 @@
                                         style="color:inherit;text-decoration:none">{{ $product->name }}</a>
                                 </div>
 
-                                @if ($showInlineVariants && !empty($variantGroups))
-                                    <div class="pc-variant-panel">
-                                        <div class="pc-variant-groups">
-                                            @foreach ($variantGroups as $attributeName => $values)
-                                                <div class="pc-variant-block">
-                                                    <div class="pc-variant-label">{{ $attributeName }}</div>
-                                                    <div class="pc-option-row" data-attribute-group="{{ $attributeName }}">
-                                                        @foreach ($values as $value)
-                                                            <button type="button"
-                                                                class="pc-option-btn {{ ($selectedAttributes[$attributeName] ?? null) === $value ? 'active' : '' }}"
-                                                                data-attribute="{{ $attributeName }}"
-                                                                data-value="{{ $value }}">{{ $value }}</button>
-                                                        @endforeach
-                                                    </div>
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                        <div class="pc-variant-meta">
-                                            <span class="pc-stock-pill {{ $isAvailable ? '' : 'out' }}">
-                                                {{ $isAvailable ? ($trackStock ? $stockQty . ' pcs' : 'Available') : 'Out of stock' }}
-                                            </span>
-                                            <span class="pc-selected-pill"
-                                                title="{{ $selectedLabel ?: 'Product option' }}">
-                                                {{ $selectedLabel ?: 'Product option' }}
-                                            </span>
-                                        </div>
-                                    </div>
-                                @endif
-
                                 <div class="pc-foot">
                                     <div class="pc-price" data-price-label>
                                         &#8377;{{ number_format($cardPrice, 0) }}
@@ -267,7 +219,9 @@
                                         @endif
                                     </div>
                                     <button class="btn-add badd-{{ $catSlug }}" data-id="{{ $product->id }}"
-                                        data-variant-id="{{ $selectedVariant?->id }}">Add to Cart +</button>
+                                        data-variant-id="{{ $selectedVariant?->id }}" @disabled(!$isAvailable)>
+                                        {{ $isAvailable ? 'Add to Cart +' : 'Out of Stock' }}
+                                    </button>
                                 </div>
                             </div>
                         </div>

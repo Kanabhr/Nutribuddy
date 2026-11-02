@@ -1186,6 +1186,10 @@
     .dc-macro-card { padding: 12px 9px; }
     .dc-macro-card strong { font-size: 1.05rem; }
     .dc-section-heading { align-items: flex-start; flex-direction: column; }
+    .dc-week-row { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .dc-week-label { min-width: 0; }
+    .dc-week-track, .dc-week-macros { grid-column: 1; }
+    .dc-week-macros { text-align: left; white-space: normal; }
 }
 
 .nv-food-modal {

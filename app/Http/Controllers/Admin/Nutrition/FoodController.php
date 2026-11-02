@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\Nutrition\FoodDataRequest;
 use App\Models\Food;
 use App\Services\Nutrition\FoodImportService;
 use App\Services\Nutrition\FoodTableDataService;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 
 class FoodController extends Controller
@@ -19,12 +20,24 @@ class FoodController extends Controller
 
     public function index()
     {
-        return view('admin.nutrition.foods.index');
+        return view('admin.nutrition.foods.index', [
+            'foodFilters' => $this->foodTable->filterOptions(),
+            'canManageFoods' => request()->user('admin')?->can('manage diet chart') ?? false,
+        ]);
     }
 
     public function data(FoodDataRequest $request): JsonResponse
     {
         return response()->json($this->foodTable->response($request));
+    }
+
+    public function show(int $id): JsonResponse
+    {
+        $food = Food::query()->findOrFail($id);
+
+        return response()->json([
+            'data' => $food->getAttributes(),
+        ]);
     }
 
     /**
@@ -34,19 +47,28 @@ class FoodController extends Controller
     {
         try {
             $food = Food::findOrFail($id);
+
+            if ($this->foodTable->isReferencedByNutritionHistory((int) $food->id)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This food is used by diet charts or nutrition records and cannot be deleted.',
+                ], 409);
+            }
+
             $food->delete();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Food deleted successfully.',
             ]);
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        } catch (ModelNotFoundException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Food not found.',
             ], 404);
         } catch (\Exception $e) {
             report($e);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete food.',

@@ -593,7 +593,7 @@
         if (addToCartBtn) {
             addToCartBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-                handleAddToCart(pdpProductId || config.productId, this);
+                handleAddToCart(config.productId, this);
             });
         }
         
@@ -601,7 +601,7 @@
         if (buyNowBtn) {
             buyNowBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-                handleBuyNow(pdpProductId || config.productId, this);
+                handleBuyNow(config.productId, this);
             });
         }
 
@@ -1416,9 +1416,9 @@ window.addEventListener("DOMContentLoaded", () => {
     /* ══ ADDRESS ══ */
     const checkoutCitiesUrlTemplate = config.citiesUrlTemplate || '';
     const checkoutStateOptions = Array.isArray(config.states) ? config.states : [];
-    const checkoutCitiesByState = config.citiesByState || {};
-    const checkoutAllCities = Array.isArray(config.allCities) ? config.allCities : [];
+    const checkoutCitiesCache = new Map();
     let checkoutCityOptions = [];
+    let checkoutCitiesRequestId = 0;
 
     function normalizeLookup(value = '') {
         return String(value || '').trim().toLowerCase();
@@ -1470,21 +1470,9 @@ window.addEventListener("DOMContentLoaded", () => {
 
     function matchingCities(query = '') {
         const target = normalizeLookup(query);
-        const localCities = checkoutCityOptions || [];
-        const fallbackCities = checkoutAllCities || [];
-        const citySet = new Map();
+        if (!target) return checkoutCityOptions;
 
-        localCities.forEach(city => citySet.set(normalizeLookup(city), city));
-        fallbackCities.forEach(city => {
-            const key = normalizeLookup(city);
-            if (!citySet.has(key)) citySet.set(key, city);
-        });
-
-        const cities = Array.from(citySet.values());
-
-        if (!target) return cities;
-
-        return cities.filter(city => normalizeLookup(city).includes(target));
+        return checkoutCityOptions.filter(city => normalizeLookup(city).includes(target));
     }
 
     async function selectStateOption(state) {
@@ -1861,15 +1849,20 @@ window.addEventListener("DOMContentLoaded", () => {
         const target = normalizeLookup(city);
         if (!target) return false;
 
-        return (checkoutCityOptions || []).some(option => normalizeLookup(option) === target) ||
-            (checkoutAllCities || []).some(option => normalizeLookup(option) === target);
+        return checkoutCityOptions.some(option => normalizeLookup(option) === target);
     }
 
     async function loadCitiesForState(stateCode, selectedCity = '') {
         const spinner = document.getElementById('citySpinner');
+        const requestId = ++checkoutCitiesRequestId;
 
         if (!stateCode) {
             resetCityDropdown();
+            return;
+        }
+
+        if (checkoutCitiesCache.has(stateCode)) {
+            setCityDropdownOptions(checkoutCitiesCache.get(stateCode), selectedCity);
             return;
         }
 
@@ -1877,22 +1870,28 @@ window.addEventListener("DOMContentLoaded", () => {
         spinner?.classList.add('show');
 
         try {
-            if (Object.prototype.hasOwnProperty.call(checkoutCitiesByState, stateCode)) {
-                setCityDropdownOptions(checkoutCitiesByState[stateCode] || [], selectedCity);
-                return;
-            }
-
             const res = await fetch(checkoutCitiesUrlTemplate.replace('__STATE__', encodeURIComponent(stateCode)), {
                 headers: {
                     'Accept': 'application/json'
                 }
             });
             const payload = await res.json().catch(() => ({}));
-            setCityDropdownOptions(payload.cities || [], selectedCity);
+            if (!res.ok) throw new Error('Unable to load cities');
+
+            const cities = Array.isArray(payload.cities) ? payload.cities : [];
+            checkoutCitiesCache.set(stateCode, cities);
+
+            if (requestId === checkoutCitiesRequestId) {
+                setCityDropdownOptions(cities, selectedCity);
+            }
         } catch (error) {
-            resetCityDropdown('Unable to load cities');
+            if (requestId === checkoutCitiesRequestId) {
+                resetCityDropdown('Unable to load cities');
+            }
         } finally {
-            spinner?.classList.remove('show');
+            if (requestId === checkoutCitiesRequestId) {
+                spinner?.classList.remove('show');
+            }
         }
     }
 
@@ -1931,22 +1930,40 @@ window.addEventListener("DOMContentLoaded", () => {
         loadCitiesForState(code);
     }
 
-    function autoFillCity() {
-        const pin = document.getElementById('newPincode').value;
-        if (pin.length === 6) {
-            const cities = {
-                '560102': 'Bengaluru',
-                '400001': 'Mumbai',
-                '110001': 'Delhi',
-                '600001': 'Chennai',
-                '500001': 'Hyderabad'
-            };
-            if (cities[pin]) {
-                const cityEl = document.getElementById('cityField');
-                if (cityEl && !cityEl.disabled) {
-                    cityEl.value = cities[pin];
-                }
+    async function autoFillCity() {
+        const pinInput = document.getElementById('newPincode');
+        if (!pinInput) return;
+
+        const pin = pinInput.value.trim();
+        if (!/^\d{6}$/.test(pin)) return;
+
+        try {
+            const res = await fetch(`https://api.postalpincode.in/pincode/${encodeURIComponent(pin)}`);
+            if (!res.ok) return;
+
+            const data = await res.json();
+            const offices = data?.[0]?.Status === 'Success' ? data[0].PostOffice : null;
+            if (!Array.isArray(offices) || !offices.length) return;
+
+            const po = offices[0];
+            const matchedState = findStateOption(po.State || '');
+            if (!matchedState) return;
+
+            await selectStateOption(matchedState); // loads the city list
+
+            // Only fill a city that exists in our list, or city validation will fail later
+            const candidates = [po.District, po.Block, po.Name].filter(Boolean);
+            const match = checkoutCityOptions.find(c =>
+                candidates.some(n => normalizeLookup(n) === normalizeLookup(c))
+            );
+
+            const cityEl = document.getElementById('cityField');
+            if (match && cityEl) {
+                cityEl.value = match;
+                closeCheckoutDropdown('cityDropdown');
             }
+        } catch (_) {
+            // ignore postal lookup failures
         }
     }
 
@@ -2399,6 +2416,7 @@ window.addEventListener("DOMContentLoaded", () => {
                 if (payBtn) payBtn.innerHTML = `Pay Securely — ₹${totalWithCod.toLocaleString('en-IN')}`;
                 const pob = document.querySelector('.place-order-btn');
                 if (pob) pob.innerHTML = `Pay Securely — ₹${totalWithCod.toLocaleString('en-IN')}`;
+                syncPlaceBtn();
             } else {
                 throw new Error('Fallback to local calculation');
             }
@@ -2490,36 +2508,20 @@ window.addEventListener("DOMContentLoaded", () => {
         if (placeBtn) placeBtn.innerHTML = btnText;
     }
 
-    function selectUpiApp(e, el) {
-        e.stopPropagation();
-        document.querySelectorAll('.upi-app').forEach(a => a.classList.remove('active'));
-        el.classList.add('active');
-    }
-
-    function verifyUPI() {
-        const id = document.getElementById('upiId').value.trim();
-        const msg = document.getElementById('upiMsg');
-        msg.style.display = 'block';
-        if (id.includes('@')) {
-            msg.textContent = '✅ UPI ID verified successfully!';
-            msg.style.color = 'var(--mn)';
+    function syncPlaceBtn() {
+        const sel = document.querySelector('.pay-method.selected');
+        if (sel) {
+            selectPayMethod(sel, sel.getAttribute('data-method') || 'cashfree');
         } else {
-            msg.textContent = '❌ Invalid UPI ID. Format: name@bank';
-            msg.style.color = 'var(--or)';
+            const formattedTotal = `₹${currentTotal.toLocaleString('en-IN')}`;
+            const payBtn = document.getElementById('paymentPlaceBtn');
+            if (payBtn) payBtn.innerHTML = `Pay Securely — ${formattedTotal}`;
+            const pob = document.querySelector('.place-order-btn');
+            if (pob) pob.innerHTML = `Pay Securely — ${formattedTotal}`;
         }
     }
 
-    function selectEmi(e, el) {
-        e.stopPropagation();
-        document.querySelectorAll('.emi-item').forEach(i => i.classList.remove('active'));
-        el.classList.add('active');
-    }
 
-    function selectWallet(e, el) {
-        e.stopPropagation();
-        document.querySelectorAll('.wallet-item').forEach(w => w.classList.remove('active'));
-        el.classList.add('active');
-    }
 
     async function ensureCheckoutToken(couponCode = null, options = {}) {
         const normalizedCode = typeof couponCode === 'string' ? couponCode.trim().toUpperCase() : '';
@@ -2642,6 +2644,7 @@ window.addEventListener("DOMContentLoaded", () => {
         if (payBtn) payBtn.innerHTML = `Pay Securely — ₹${totalWithCod.toLocaleString('en-IN')}`;
         const pob = document.querySelector('.place-order-btn');
         if (pob) pob.innerHTML = `Pay Securely — ₹${totalWithCod.toLocaleString('en-IN')}`;
+        syncPlaceBtn();
     }
 
     /* ══ COUPON ══ */
@@ -2649,329 +2652,166 @@ window.addEventListener("DOMContentLoaded", () => {
         await refreshCheckoutSummary();
     }
 
-    /* ══ QTY ══ */
-    function updateQty(btn, delta) {
-        const valEl = btn.parentElement.querySelector('.qty-val');
-        let v = parseInt(valEl.textContent) + delta;
-        if (v < 1) v = 1;
-        valEl.textContent = v;
-    }
 
-    /* ══ FORMAT CARD ══ */
-    function formatCard(input) {
-        let v = input.value.replace(/\D/g, '').substring(0, 16);
-        input.value = v.replace(/(.{4})/g, '$1 ').trim();
-    }
 
     document.getElementById('couponInput').addEventListener('keydown', e => {
         if (e.key === 'Enter') applyCoupon();
     });
 
     /* ════════════════════════════════════════
-       OTP MODAL LOGIC
+       COD OTP MODAL & VERIFICATION LOGIC
     ════════════════════════════════════════ */
-    let otpTimer = null;
-    const otpFieldIds = ['otp1', 'otp2', 'otp3', 'otp4', 'otp5', 'otp6'];
+    let codResendInterval = null;
 
+    function closeCodOtpModal() {
+        const overlay = document.getElementById('codOtpOverlay');
+        if (overlay) overlay.style.display = 'none';
+        if (codResendInterval) {
+            clearInterval(codResendInterval);
+            codResendInterval = null;
+        }
+        const btn = document.querySelector('.place-order-btn');
+        if (btn && btn.dataset.originalHtml) {
+            btn.disabled = false;
+            btn.innerHTML = btn.dataset.originalHtml;
+        }
+    }
+
+    function startCodResendTimer(seconds = 30) {
+        if (codResendInterval) clearInterval(codResendInterval);
+        const timerWrap = document.getElementById('codOtpResendTimer');
+        const countEl = document.getElementById('codOtpCountdown');
+        const resendBtn = document.getElementById('codOtpResendBtn');
+
+        if (timerWrap) timerWrap.style.display = 'inline';
+        if (resendBtn) resendBtn.style.display = 'none';
+        if (countEl) countEl.textContent = seconds;
+
+        codResendInterval = setInterval(() => {
+            seconds--;
+            if (countEl) countEl.textContent = seconds;
+            if (seconds <= 0) {
+                clearInterval(codResendInterval);
+                codResendInterval = null;
+                if (timerWrap) timerWrap.style.display = 'none';
+                if (resendBtn) resendBtn.style.display = 'inline';
+            }
+        }, 1000);
+    }
+
+    async function sendCodOtpRequest(addressId) {
+        const errEl = document.getElementById('codOtpError');
+        if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+
+        try {
+            const url = api.sendCodOtpUrl || '/user/checkout/cod/send-otp';
+            const res = await fetchWithCsrfRetry(url, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    ...(api.csrf ? { 'X-CSRF-TOKEN': api.csrf } : {})
+                },
+                body: JSON.stringify({ address_id: Number(addressId) })
+            });
+
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                const msg = data.message || (data.errors ? Object.values(data.errors).flat()[0] : 'Unable to send verification code.');
+                if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
+                if (typeof nbToast === 'function') nbToast(msg, 'error');
+                return false;
+            }
+
+            if (data.phone_masked) {
+                const phoneEl = document.getElementById('codOtpMaskedPhone');
+                if (phoneEl) phoneEl.textContent = data.phone_masked;
+            }
+
+            startCodResendTimer(data.resend_after || 30);
+            if (typeof nbToast === 'function') nbToast(data.message || 'Verification code sent!', 'success');
+            return true;
+        } catch (e) {
+            const msg = 'Network error while sending OTP. Please try again.';
+            if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
+            return false;
+        }
+    }
+
+    async function resendCodOtp() {
+        const addressId = window.__selectedAddressId;
+        const resendBtn = document.getElementById('codOtpResendBtn');
+        if (resendBtn) { resendBtn.disabled = true; resendBtn.textContent = 'Sending...'; }
+        await sendCodOtpRequest(addressId);
+        if (resendBtn) { resendBtn.disabled = false; resendBtn.textContent = 'Resend Code'; }
+    }
+
+    async function submitCodOtp() {
+        const input = document.getElementById('codOtpInput');
+        const errEl = document.getElementById('codOtpError');
+        const submitBtn = document.getElementById('codOtpSubmitBtn');
+        const otpVal = input ? input.value.trim() : '';
+
+        if (!otpVal || otpVal.length < 6) {
+            if (errEl) {
+                errEl.textContent = 'Please enter the complete 6-digit verification code.';
+                errEl.style.display = 'block';
+            }
+            if (input) input.focus();
+            return;
+        }
+
+        if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Verifying...';
+        }
+
+        await placeOrder({ codOtp: otpVal });
+
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Verify & Place Order';
+        }
+    }
+
+    /* ════════════════════════════════════════
+       LOGIN & ORDER PLACEMENT LOGIC
+    ════════════════════════════════════════ */
     function openOtpModal() {
         if (isLoggedIn) {
             placeOrder();
             return;
         }
-        // Reset to phone step
-        showStep('stepPhone');
-        
-        const phoneInput = document.getElementById('phoneInput');
-        if (phoneInput) {
-            phoneInput.value = '';
-            setTimeout(() => phoneInput.focus(), 300);
-        }
-        
-        const phoneError = document.getElementById('phoneError');
-        if (phoneError) {
-            phoneError.style.display = 'none';
-        }
-        
-        const otpError = document.getElementById('otpError');
-        if (otpError) {
-            otpError.classList.remove('show');
-        }
-        
-        clearOtpBoxes();
-        document.getElementById('otpModal').classList.add('show');
-    }
 
-    function closeOtpModal() {
-        document.getElementById('otpModal').classList.remove('show');
-        clearInterval(otpTimer);
-    }
+        openLoginModal(async (data) => {
+            isLoggedIn = true;
+            markLoginStepDone();
+            updateCsrfToken(data.csrf_token || '');
+            await syncPendingCartToServer();
 
-    function showStep(id) {
-        document.querySelectorAll('.om-step').forEach(s => s.classList.remove('active'));
-        document.getElementById(id).classList.add('active');
-    }
-
-    function useSavedPhone() {
-        document.getElementById('phoneInput').value = String(config.phone || '').replace(/\D/g, '').slice(0, 10);
-        document.getElementById('phoneError').style.display = 'none';
-    }
-
-    document.getElementById('phoneInput')?.addEventListener('input', function (e) {
-        this.value = this.value.replace(/\D/g, '').slice(0, 10);
-    });
-
-    async function sendOtp() {
-        const phoneInput = document.getElementById('phoneInput');
-        phoneInput.value = phoneInput.value.replace(/\D/g, '').slice(0, 10);
-        const phone = phoneInput.value.trim();
-        const errEl = document.getElementById('phoneError');
-
-        if (phone.length !== 10) {
-            errEl.textContent = '⚠️ Please enter a valid 10-digit mobile number.';
-            errEl.style.display = 'block';
-            document.getElementById('phoneInput').focus();
-            return;
-        }
-
-        errEl.style.display = 'none';
-
-        const btn = document.getElementById('sendOtpBtn');
-        btn.disabled = true;
-        btn.textContent = 'Sending...';
-
-        const res = await fetchWithCsrfRetry(api.sendOtpUrl, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                phone
-            })
-        });
-
-        const payload = await res.json().catch(() => ({}));
-        btn.disabled = false;
-        btn.textContent = 'Send OTP →';
-
-        if (!res.ok) {
-            errEl.textContent = payload.message || 'Unable to send OTP.';
-            errEl.style.display = 'block';
-            return;
-        }
-
-        document.getElementById('sentToNum').textContent = '+91 ' + phone;
-        showStep('stepOtp');
-        clearOtpBoxes();
-        document.getElementById('otpError').classList.remove('show');
-        startResendTimer();
-        setTimeout(() => document.getElementById('otp1').focus(), 200);
-    }
-
-    function backToPhone() {
-        clearInterval(otpTimer);
-        showStep('stepPhone');
-        setTimeout(() => document.getElementById('phoneInput').focus(), 200);
-    }
-
-    /* OTP box helpers */
-    function clearOtpBoxes() {
-        otpFieldIds.forEach(id => {
-            const el = document.getElementById(id);
-            el.value = '';
-            el.classList.remove('filled');
-        });
-    }
-
-    function otpInput(el, prevId, nextId) {
-        const digits = el.value.replace(/\D/g, '');
-        if (digits.length > 1) {
-            fillOtpFrom(el.id, digits);
-            return;
-        }
-
-        el.value = digits;
-        if (digits) {
-            el.classList.add('filled');
-            if (nextId) {
-                setTimeout(() => document.getElementById(nextId).focus(), 10);
+            const hasAddressReady = await ensureCheckoutAddressReady();
+            const couponInput = document.getElementById('couponInput');
+            if (couponInput && couponInput.value.trim()) {
+                window.__checkoutToken = '';
+                await applyCoupon();
+            } else {
+                await loadCartSummary();
             }
-        } else {
-            el.classList.remove('filled');
-        }
-        const all = otpFieldIds.map(id => document.getElementById(id).value);
-        if (all.every(v => v !== '')) {
-            document.getElementById('otpError').classList.remove('show');
-        }
-    }
 
-    function otpKeydown(e, el, prevId, nextId) {
-        if (e.key.length === 1 && !/^\d$/.test(e.key)) {
-            e.preventDefault();
-            return;
-        }
-        if (e.key === 'Backspace' && !el.value && prevId) {
-            setTimeout(() => document.getElementById(prevId).focus(), 10);
-        }
-        if (e.key === 'Enter') verifyOtp();
-    }
-
-    function fillOtpFrom(startId, value) {
-        const startIndex = Math.max(0, otpFieldIds.indexOf(startId));
-        const digits = String(value || '').replace(/\D/g, '').slice(0, otpFieldIds.length - startIndex);
-
-        digits.split('').forEach((digit, offset) => {
-            const target = document.getElementById(otpFieldIds[startIndex + offset]);
-            if (!target) return;
-            target.value = digit;
-            target.classList.add('filled');
-        });
-
-        const nextIndex = Math.min(startIndex + digits.length, otpFieldIds.length - 1);
-        setTimeout(() => document.getElementById(otpFieldIds[nextIndex])?.focus(), 10);
-        document.getElementById('otpError').classList.remove('show');
-    }
-
-    otpFieldIds.forEach(id => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.addEventListener('paste', event => {
-            event.preventDefault();
-            fillOtpFrom(id, event.clipboardData.getData('text'));
-        });
-    });
-
-    async function verifyOtp() {
-        const entered = otpFieldIds
-            .map(id => document.getElementById(id).value)
-            .join('');
-
-        if (entered.length < otpFieldIds.length) {
-            document.getElementById('otpError').textContent = '⚠️ Please enter all 6 digits.';
-            document.getElementById('otpError').classList.add('show');
-            return;
-        }
-
-        const btn = document.getElementById('verifyOtpBtn');
-
-        document.getElementById('otpError').classList.remove('show');
-        btn.textContent = '⏳ Verifying…';
-        btn.disabled = true;
-        btn.style.background = 'linear-gradient(135deg,var(--mn),#00a870)';
-
-        const phone = document.getElementById('phoneInput').value.trim();
-        const otp = entered;
-
-        const res = await fetchWithCsrfRetry(api.verifyOtpUrl, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                phone,
-                otp
-            })
-        });
-
-        const payload = await res.json().catch(() => ({}));
-        if (!res.ok || !payload.success) {
-            btn.textContent = '✅ Verify & Place Order';
-            btn.disabled = false;
-            btn.style.background = '';
-            document.getElementById('otpError').textContent = payload.message || '❌ Invalid OTP.';
-            document.getElementById('otpError').classList.add('show');
-            // Shake the boxes
-            otpFieldIds.forEach(id => {
-                const el = document.getElementById(id);
-                el.style.borderColor = 'var(--or)';
-                el.style.background = 'var(--orl)';
-                setTimeout(() => {
-                    el.style.borderColor = '';
-                    el.style.background = '';
-                    el.classList.remove('filled');
-                    el.value = '';
-                }, 600);
-            });
-            setTimeout(() => document.getElementById('otp1').focus(), 650);
-            return;
-        }
-
-        clearInterval(otpTimer);
-        isLoggedIn = true;
-        markLoginStepDone();
-        updateCsrfToken(payload.csrf_token || '');
-        await syncPendingCartToServer();
-
-        const hasAddressReady = await ensureCheckoutAddressReady();
-        const couponInput = document.getElementById('couponInput');
-        if (couponInput && couponInput.value.trim()) {
-            window.__checkoutToken = '';
-            await applyCoupon();
-        } else {
-            await loadCartSummary();
-        }
-
-        closeOtpModal();
-
-        if (!hasAddressReady) {
-            nbToast('Login successful! Please add or select a delivery address to place your order.', 'warning', 'Address Required');
-            return;
-        }
-
-        await placeOrder();
-    }
-
-    /* Resend timer */
-    function startResendTimer() {
-        let secs = 30;
-        const timerEl = document.getElementById('timerCount');
-        const timerText = document.getElementById('otpTimerText');
-        timerEl.textContent = secs + 's';
-        timerText.innerHTML = `Resend OTP in <strong id="timerCount">${secs}s</strong>`;
-
-        clearInterval(otpTimer);
-        otpTimer = setInterval(() => {
-            secs--;
-            document.getElementById('timerCount').textContent = secs + 's';
-            if (secs <= 0) {
-                clearInterval(otpTimer);
-                document.getElementById('otpTimerText').innerHTML =
-                    `<span class="resend-link" onclick="resendOtp()">Resend OTP</span>`;
+            if (!hasAddressReady) {
+                nbToast('Login successful! Please add or select a delivery address to place your order.', 'warning', 'Address Required');
+                return;
             }
-        }, 1000);
-    }
 
-    async function resendOtp() {
-        await sendOtp();
-        const otp1 = document.getElementById(otpFieldIds[0]);
-        if (otp1) otp1.focus();
+            await placeOrder();
+        }, { googleRedirect: window.location.href });
     }
-
-    /* ══ PLACE ORDER (called after OTP success) ══ */
-    async function placeOrder() {
+    async function placeOrder(options = {}) {
         if (!isLoggedIn) {
-            if (typeof openLoginModal === 'function') {
-                openLoginModal(async (data) => {
-                    isLoggedIn = true;
-                    markLoginStepDone();
-                    if (typeof updateCsrfToken === 'function') updateCsrfToken(data.csrf_token);
-                    await syncPendingCartToServer();
-                    await loadCartSummary();
-                    // Save the address that was entered as a guest
-                    const hasAddressReady = await ensureCheckoutAddressReady();
-                    if (hasAddressReady) {
-                        await placeOrder();
-                    } else {
-                        nbToast('Please add or select a delivery address to continue.', 'warning', 'Address Required');
-                    }
-                });
-            } else if (typeof openOtpModal === 'function') {
-                openOtpModal();
-            }
+            openOtpModal();
             return;
         }
-
         const addressId = window.__selectedAddressId;
         if (!addressId) {
             nbToast('Please select a delivery address to continue.', 'warning', 'Address Required');
@@ -2994,8 +2834,8 @@ window.addEventListener("DOMContentLoaded", () => {
 
         const btn = document.querySelector('.place-order-btn');
         if (btn) {
-            if (btn.disabled) return;
-            btn.dataset.originalHtml = btn.innerHTML;
+            if (btn.disabled && !options?.codOtp) return;
+            if (!btn.dataset.originalHtml) btn.dataset.originalHtml = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '⏳ Processing...';
         }
@@ -3008,6 +2848,27 @@ window.addEventListener("DOMContentLoaded", () => {
         };
 
         const paymentMethod = document.querySelector('.pay-method.selected')?.getAttribute('data-method') || 'cashfree';
+        const isCod = paymentMethod === 'cod';
+        const codOtpEnabled = window.NB_CHECKOUT_CONFIG?.codOtpEnabled !== false;
+
+        // COD OTP verification gate: if COD is selected and OTP verification is enabled, request OTP first
+        if (isCod && codOtpEnabled && !options?.codOtp) {
+            resetBtn();
+            const overlay = document.getElementById('codOtpOverlay');
+            if (overlay) {
+                overlay.style.display = 'flex';
+                const input = document.getElementById('codOtpInput');
+                if (input) {
+                    input.value = '';
+                    setTimeout(() => input.focus(), 120);
+                }
+            }
+            const sent = await sendCodOtpRequest(addressId);
+            if (!sent) {
+                closeCodOtpModal();
+            }
+            return;
+        }
 
         if (paymentMethod === 'razorpay' && typeof Razorpay !== 'function') {
             if (typeof nbToast === 'function') {
@@ -3025,6 +2886,19 @@ window.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        const requestBody = {
+            address_id: Number(addressId),
+            coupon_code: window.__couponCode || null,
+            // Always send full balance; server caps to allowed % automatically
+            coins_to_redeem: window.NB_CHECKOUT_CONFIG?.userCoinsBalance || 0,
+            payment_method: paymentMethod,
+            checkout_token: window.__checkoutToken || ''
+        };
+
+        if (options?.codOtp) {
+            requestBody.cod_otp = options.codOtp;
+        }
+
         const res = await fetchWithCsrfRetry(api.placeOrderUrl, {
             method: 'POST',
             headers: {
@@ -3034,14 +2908,7 @@ window.addEventListener("DOMContentLoaded", () => {
                     'X-CSRF-TOKEN': api.csrf
                 } : {})
             },
-            body: JSON.stringify({
-                address_id: Number(addressId),
-                coupon_code: window.__couponCode || null,
-                // Always send full balance; server caps to allowed % automatically
-                coins_to_redeem: window.NB_CHECKOUT_CONFIG?.userCoinsBalance || 0,
-                payment_method: document.querySelector('.pay-method.selected')?.getAttribute('data-method') || 'cashfree',
-                checkout_token: window.__checkoutToken || ''
-            })
+            body: JSON.stringify(requestBody)
         });
 
         if (res.status === 401 || res.status === 419) {
@@ -3052,10 +2919,43 @@ window.addEventListener("DOMContentLoaded", () => {
 
         const payload = await res.json().catch(() => ({}));
         if (!res.ok) {
-            if (typeof nbToast === 'function') nbToast(payload.message || 'Unable to place order.', 'error');
+            const errorMsg = payload.message || (payload.errors ? Object.values(payload.errors).flat()[0] : 'Unable to place order.');
+            const codErrEl = document.getElementById('codOtpError');
+
+            // If server rejected because COD OTP is required, ensure the modal is displayed and OTP is sent
+            const isCodOtpError = isCod && (payload.errors?.cod_otp || errorMsg.toLowerCase().includes('verification code'));
+            if (isCodOtpError && !options?.codOtp) {
+                resetBtn();
+                const overlay = document.getElementById('codOtpOverlay');
+                if (overlay) {
+                    overlay.style.display = 'flex';
+                    const input = document.getElementById('codOtpInput');
+                    if (input) {
+                        input.value = '';
+                        setTimeout(() => input.focus(), 120);
+                    }
+                }
+                await sendCodOtpRequest(addressId);
+                return;
+            }
+
+            if (options?.codOtp && codErrEl) {
+                codErrEl.textContent = errorMsg;
+                codErrEl.style.display = 'block';
+                const input = document.getElementById('codOtpInput');
+                if (input) {
+                    input.select();
+                    input.focus();
+                }
+            } else {
+                if (typeof nbToast === 'function') nbToast(errorMsg, 'error');
+            }
             resetBtn();
             return;
         }
+
+        // On successful placement, close any open COD OTP modal
+        closeCodOtpModal();
 
         updateCsrfToken(payload.csrf_token || '');
 
@@ -3164,7 +3064,7 @@ window.addEventListener("DOMContentLoaded", () => {
             }
 
             const cashfree = Cashfree({
-                mode: config.cashfreeMode || 'sandbox'
+                mode: payload.payment?.mode || config.cashfreeMode || 'sandbox'
             });
 
             cashfree.checkout({
@@ -3323,6 +3223,8 @@ window.addEventListener("DOMContentLoaded", () => {
         if (payBtn) payBtn.innerHTML = `Pay Securely — ₹${totalWithCod.toLocaleString('en-IN')}`;
         const pob = document.querySelector('.place-order-btn');
         if (pob) pob.innerHTML = `Pay Securely — ₹${totalWithCod.toLocaleString('en-IN')}`;
+        // update payment button with current total matching selected method
+        syncPlaceBtn();
     }
 
 
@@ -3336,27 +3238,23 @@ window.addEventListener("DOMContentLoaded", () => {
         toggleAddrType,
         autoFillCity,
         selectPayMethod,
-        selectUpiApp,
-        verifyUPI,
-        selectEmi,
-        selectWallet,
         applyCoupon,
-        updateQty,
-        formatCard,
         openOtpModal,
-        closeOtpModal,
-        showStep,
-        useSavedPhone,
-        sendOtp,
-        backToPhone,
-        otpInput,
-        otpKeydown,
-        fillOtpFrom,
-        verifyOtp,
-        resendOtp,
-        placeOrder
+        placeOrder,
+        closeCodOtpModal,
+        resendCodOtp,
+        submitCodOtp
     });
     document.addEventListener('DOMContentLoaded', function () {
+        const codOtpInputEl = document.getElementById('codOtpInput');
+        if (codOtpInputEl) {
+            codOtpInputEl.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    submitCodOtp();
+                }
+            });
+        }
         const stateEl = document.getElementById('stateField');
         const cityEl = document.getElementById('cityField');
         if (stateEl) {
@@ -3422,11 +3320,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
         // Refresh checkout summary to get final pricing including auto-applied coins
         refreshCheckoutSummary();
-    });
-
-    /* Close modal on backdrop click */
-    document.getElementById('otpModal').addEventListener('click', function (e) {
-        if (e.target === this) closeOtpModal();
     });
 
     document.getElementById('successOverlay').addEventListener('click', function (e) {

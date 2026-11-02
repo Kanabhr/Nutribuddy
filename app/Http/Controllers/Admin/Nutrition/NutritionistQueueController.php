@@ -8,8 +8,12 @@ use App\Http\Requests\Admin\Nutrition\UpdateLeadDietPlanRequest;
 use App\Http\Requests\Admin\Nutrition\UpdateLeadProductsRequest;
 use App\Models\Nutrition\DietPlan;
 use App\Models\NutritionLead;
+use App\Models\User;
+use App\Services\Nutrition\NutritionistLeadQueueTableService;
 use App\Services\Nutrition\NutritionLeadReviewService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class NutritionistQueueController extends Controller
@@ -19,12 +23,16 @@ class NutritionistQueueController extends Controller
     public function index(): View
     {
         $isSuperAdmin = auth('admin')->user()->hasRole('Super Admin', 'admin');
-        $leads = NutritionLead::with(['customer', 'child', 'subscription.subscriptionPlan'])
-            ->when(! $isSuperAdmin, fn ($query) => $query->where('assigned_to', auth('admin')->id()))
-            ->latest('created_at')
-            ->paginate(15);
+        $nutritionists = $isSuperAdmin
+            ? User::query()->where('role', 'admin')->where('is_active', true)->orderBy('name')->get(['id', 'name'])
+            : collect();
 
-        return view('admin.nutrition.leads.queue', compact('leads', 'isSuperAdmin'));
+        return view('admin.nutrition.leads.queue', compact('isSuperAdmin', 'nutritionists'));
+    }
+
+    public function data(Request $request, NutritionistLeadQueueTableService $table): JsonResponse
+    {
+        return response()->json($table->paginate($request, auth('admin')->user()));
     }
 
     public function show(NutritionLead $lead): View

@@ -29,6 +29,7 @@ class UserInvoiceController extends Controller
         return view('frontend.account.orders.invoice', [
             'order' => $order,
             'invoiceNumber' => 'INV-' . $order->order_number,
+            'invoiceNumber' => $order->invoice_number ?: ('INV-' . $order->order_number),
         ]);
     }
 
@@ -37,11 +38,14 @@ class UserInvoiceController extends Controller
         $this->authorizeOrder($request, $order);
         $order->load(['items.product', 'items.productVariant', 'payments']);
         $invoiceNumber = 'INV-' . $order->order_number;
+        $invoiceNumber = $order->invoice_number ?: ('INV-' . $order->order_number);
+        $filename = str_replace(['/', '\\'], '-', $invoiceNumber) . '.pdf';
 
         return Pdf::loadView('pdf.invoices.order', [
             'order' => $order,
             'invoiceNumber' => $invoiceNumber,
         ])->setPaper('a4')->download($invoiceNumber . '.pdf');
+        ])->setPaper('a4')->download($filename);
     }
 
     public function show(Request $request, Order $order): JsonResponse
@@ -51,6 +55,7 @@ class UserInvoiceController extends Controller
 
         return response()->json([
             'invoice_number' => 'INV-' . $order->order_number,
+            'invoice_number' => $order->invoice_number ?: ('INV-' . $order->order_number),
             'order' => $order,
             'billing' => [
                 'name' => $order->customer_name,

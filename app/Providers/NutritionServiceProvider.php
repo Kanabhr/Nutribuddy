@@ -63,7 +63,10 @@ class NutritionServiceProvider extends ServiceProvider
 
         // Register DietChartGeneratorService with all dependencies
         $this->app->singleton(DietChartGeneratorService::class, function ($app) {
-            return new DietChartGeneratorService($app->make(RuleBasedDietPlanEngine::class));
+            return new DietChartGeneratorService(
+                $app->make(RuleBasedDietPlanEngine::class),
+                $app->make(\App\Services\Nutrition\DietLifecycleNotificationService::class),
+            );
         });
     }
 

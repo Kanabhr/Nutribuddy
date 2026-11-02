@@ -13,13 +13,6 @@ class StateCityService
         'Daman and Diu' => 'Dadra and Nagar Haveli and Daman and Diu',
     ];
 
-    private const STATE_CODE_NAME_OVERRIDES = [
-        // Flagged: '35' is Andaman & Nicobar in standard GST/state codes, not Madhya Pradesh. Keeping as is per existing logic to avoid breaking changes.
-        '35' => 'Madhya Pradesh',
-        '37' => 'Chhattisgarh',
-        '39' => 'Uttarakhand',
-    ];
-
     private const REQUIRED_STATES = [
         'Andaman and Nicobar Islands',
         'Andhra Pradesh',
@@ -70,7 +63,7 @@ class StateCityService
             return $this->memoizedData;
         }
 
-        $this->memoizedData = Cache::rememberForever('india_states_cities_data_v1', function () {
+        $this->memoizedData = Cache::rememberForever('india_states_cities_data_v2', function () {
             $path = storage_path(self::STATE_CITY_JSON);
 
             if (! File::exists($path)) {
@@ -98,7 +91,7 @@ class StateCityService
                 }
 
                 $states[$normalizedCode] = [
-                    'name' => self::STATE_CODE_NAME_OVERRIDES[$normalizedCode] ?? (string) ($state['name'] ?? ''),
+                    'name' => (string) ($state['name'] ?? ''),
                     'cities' => is_array($state['cities'] ?? null) ? $state['cities'] : [],
                 ];
             }
@@ -162,25 +155,16 @@ class StateCityService
             ->all();
     }
 
-    public function checkoutCityMap(): array
+    public function checkoutCitiesForState(string $stateCode): ?array
     {
-        return collect($this->getStateCityData())
-            ->mapWithKeys(fn (array $state, string $code) => [
-                $code => collect($state['cities'] ?? [])
-                    ->filter(fn ($city) => is_string($city) && trim($city) !== '')
-                    ->sort(SORT_NATURAL | SORT_FLAG_CASE)
-                    ->values()
-                    ->all(),
-            ])
-            ->all();
-    }
+        $state = $this->getStateCityData()[$stateCode] ?? null;
 
-    public function checkoutAllCities(): array
-    {
-        return collect($this->getStateCityData())
-            ->flatMap(fn (array $state) => $state['cities'] ?? [])
+        if (! $state) {
+            return null;
+        }
+
+        return collect($state['cities'] ?? [])
             ->filter(fn ($city) => is_string($city) && trim($city) !== '')
-            ->unique(fn ($city) => strtolower($city))
             ->sort(SORT_NATURAL | SORT_FLAG_CASE)
             ->values()
             ->all();

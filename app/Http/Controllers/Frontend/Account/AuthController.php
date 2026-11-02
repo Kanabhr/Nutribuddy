@@ -24,7 +24,9 @@ class AuthController extends Controller
     {
         $phone = $request->phone;
         $isDevelopment = app()->environment(['local', 'testing']);
-        $otp = $isDevelopment ? '123456' : (string) random_int(100000, 999999);
+        $isUatOtpEnabled = app()->environment('uat') && (bool) config('services.aisensy.uat_otp_enabled');
+        $usesTestOtp = $isDevelopment || $isUatOtpEnabled;
+        $otp = $usesTestOtp ? '123456' : (string) random_int(100000, 999999);
         $expiresAt = now()->addMinutes(10);
 
         $user = User::where('phone', $phone)->first();
@@ -49,7 +51,7 @@ class AuthController extends Controller
         $user->otp_expires_at = $expiresAt;
         $user->save();
 
-        if (! $isDevelopment && ! $aiSensy->sendOtp($phone, $otp)) {
+        if (! $usesTestOtp && ! $aiSensy->sendOtp($phone, $otp)) {
             $user->forceFill(['otp' => null, 'otp_expires_at' => null])->save();
 
             return response()->json([
@@ -60,7 +62,7 @@ class AuthController extends Controller
 
         $payload = [
             'success' => true,
-            'message' => 'OTP sent successfully. Use 123456.',
+            'message' => 'OTP sent successfully.'.($usesTestOtp ? ' Use 123456.' : ''),
         ];
 
         if ($isDevelopment && app()->environment('local')) {

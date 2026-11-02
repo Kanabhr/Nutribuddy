@@ -15,13 +15,21 @@ class NutritionLeadReviewService
     public function __construct(
         private readonly FoodFilterPipeline $foodFilters,
         private readonly DietChartGeneratorService $chartGenerator,
+        private readonly DietLifecycleNotificationService $notifications,
     ) {}
 
-    /** @return array{lead: NutritionLead, dietPlan: ?DietPlan, foodsByMeal: \Illuminate\Support\Collection, mealsByDay: \Illuminate\Support\Collection, products: \Illuminate\Support\Collection} */
+    /** @return array{lead: NutritionLead, assessment: ?\App\Models\Nutrition\ChildAssessment, dietPlan: ?DietPlan, foodsByMeal: \Illuminate\Support\Collection, mealsByDay: \Illuminate\Support\Collection, products: \Illuminate\Support\Collection} */
     public function buildReviewData(NutritionLead $lead): array
     {
-        $lead->load(['customer', 'child.assessments.answers.question', 'child.assessments.dietPlans.meals.items.food', 'subscription.subscriptionPlan']);
-        $dietPlan = $lead->child?->assessments->sortByDesc('created_at')->first()?->dietPlans->sortByDesc('created_at')->first();
+        $lead->load(['customer', 'child', 'subscription.subscriptionPlan']);
+        $assessment = $lead->child?->assessments()
+            ->with(['answers.question', 'clinicalFlags'])
+            ->latest('created_at')
+            ->first();
+        $dietPlan = $assessment?->dietPlans()
+            ->with(['meals.items.food'])
+            ->latest('created_at')
+            ->first();
         $foodsByMeal = collect();
         $mealsByDay = collect();
 
@@ -42,12 +50,26 @@ class NutritionLeadReviewService
             );
         }
 
+        $profile = $dietPlan?->plan_data['child_profile'] ?? [];
+        $allergies = $profile['allergies'] ?? $assessment?->allergies ?? [];
+        $allergies = is_array($allergies) ? $allergies : [$allergies];
+        $clinicalFlags = $assessment?->clinicalFlags ?? collect();
+
         return [
             'lead' => $lead,
+            'assessment' => $assessment,
             'dietPlan' => $dietPlan,
             'foodsByMeal' => $foodsByMeal,
             'mealsByDay' => $mealsByDay,
-            'products' => Product::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'dietType' => $profile['diet_type'] ?? $assessment?->diet_type ?? 'Not provided',
+            'allergies' => $allergies,
+            'mealPattern' => $profile['meal_pattern'] ?? $assessment?->meal_pattern ?? 'Not provided',
+            'cookingMedium' => $profile['cooking_medium'] ?? $assessment?->cooking_medium ?? 'Not provided',
+            'clinicalFlags' => $clinicalFlags,
+            'hasUnavailableMeals' => $foodsByMeal->contains(fn ($eligibleFoods) => $eligibleFoods->isEmpty()),
+            'products' => $dietPlan
+                ? Product::where('is_active', true)->orderBy('name')->get(['id', 'name'])
+                : collect(),
         ];
     }
 
@@ -90,11 +112,14 @@ class NutritionLeadReviewService
                 $meal->items()->update(['food_id' => $selectedFoods[$meal->id]]);
             }
 
+            $planData = $dietPlan->plan_data ?? [];
+            if (array_key_exists('supplement_product_ids', $data)) {
+                $planData['supplement_product_ids'] = $data['supplement_product_ids'] ?? [];
+            }
+
             $dietPlan->update([
-                'review_status' => 'pending_review',
-                'plan_data' => array_merge($dietPlan->plan_data ?? [], [
-                    'supplement_product_ids' => $data['supplement_product_ids'] ?? [],
-                ]),
+                ...$this->pendingReviewAttributes(),
+                'plan_data' => $planData,
             ]);
         });
 
@@ -104,11 +129,14 @@ class NutritionLeadReviewService
     /** @param array{supplement_product_ids?: array<int, int>} $data */
     public function updateRecommendedProducts(DietPlan $dietPlan, array $data): void
     {
-        $dietPlan->update([
-            'plan_data' => array_merge($dietPlan->plan_data ?? [], [
-                'supplement_product_ids' => $data['supplement_product_ids'] ?? [],
-            ]),
-        ]);
+        DB::transaction(function () use ($dietPlan, $data): void {
+            $dietPlan->update([
+                ...$this->pendingReviewAttributes(),
+                'plan_data' => array_merge($dietPlan->plan_data ?? [], [
+                    'supplement_product_ids' => $data['supplement_product_ids'] ?? [],
+                ]),
+            ]);
+        });
     }
 
     /** @param array{review_notes?: string|null} $data */
@@ -124,5 +152,19 @@ class NutritionLeadReviewService
             ]);
             $lead->update(['status' => 'completed', 'completed_at' => now()]);
         });
+
+        $this->notifications->chartApproved($lead, $dietPlan);
+    }
+
+    /** @return array{status:string,review_status:string,reviewed_by:null,reviewed_at:null,review_notes:null} */
+    private function pendingReviewAttributes(): array
+    {
+        return [
+            'status' => 'pending_review',
+            'review_status' => 'pending_review',
+            'reviewed_by' => null,
+            'reviewed_at' => null,
+            'review_notes' => null,
+        ];
     }
 }

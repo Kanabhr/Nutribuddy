@@ -14,6 +14,7 @@ class Order extends Model
 
     protected $fillable = [
         'order_number',
+        'invoice_number',
         'checkout_token',
         'user_id',
         'coupon_id',
@@ -48,6 +49,7 @@ class Order extends Model
         'customer_note',
         'admin_note',
         'placed_at',
+        'cod_verified_at',
         'coins_redeemed',
         'coin_discount',
     ];
@@ -66,6 +68,7 @@ class Order extends Model
             'grand_total' => 'decimal:2',
             'pricing_snapshot' => 'array',
             'placed_at' => 'datetime',
+            'cod_verified_at' => 'datetime',
             'coins_redeemed' => 'integer',
             'coin_discount' => 'decimal:2',
         ];
@@ -104,5 +107,10 @@ class Order extends Model
     public function statusHistories(): HasMany
     {
         return $this->hasMany(OrderStatusHistory::class)->latest();
+    }
+
+    public function getDisplayInvoiceNumberAttribute(): string
+    {
+        return $this->invoice_number ?: ('INV-' . $this->order_number);
     }
 }

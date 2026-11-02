@@ -26,12 +26,15 @@ class RazorpayPaymentController extends Controller
             || ! $this->razorpay->belongsToOrder((int) $order->id, $validated['razorpay_order_id'])) {
             Log::warning('Razorpay signature verification failed.', [
                 'order_id' => $order->id,
-                'payload' => $validated,
             ]);
             return response()->json(['success' => false, 'message' => 'Payment signature verification failed.'], 400);
         }
 
         try {
+            if (! $this->razorpay->isCapturedPaymentForOrder($order, $validated)) {
+                return response()->json(['success' => false, 'message' => 'Payment is not captured or does not match this order.'], 400);
+            }
+
             $this->razorpay->confirmVerifiedPayment($order, $validated);
         } catch (\Throwable $exception) {
             Log::error('Error updating order status for Razorpay.', [

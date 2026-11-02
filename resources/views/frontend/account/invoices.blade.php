@@ -36,6 +36,7 @@
                             <tr>
                                 <td>
                                     <span class="fw-bold" style="color: var(--pk);">INV-{{ $order->order_number }}</span>
+                                    <span class="fw-bold" style="color: var(--pk);">{{ $order->invoice_number ?: ('INV-' . $order->order_number) }}</span>
                                 </td>
                                 <td>{{ optional($order->placed_at)->format('d/m/Y') ?? $order->created_at->format('d/m/Y') }}</td>
                                 <td>#{{ $order->order_number }}</td>

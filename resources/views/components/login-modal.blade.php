@@ -62,7 +62,7 @@
                         <hr style="flex: 1; border-color: #e2e8f0; margin: 0;">
                     </div>
                 @endif
-                <a href="{{ route('frontend.google.redirect') }}"
+                <a id="loginGoogleLink" href="{{ route('frontend.google.redirect') }}" data-default-href="{{ route('frontend.google.redirect') }}"
                    style="display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; padding: 14px 20px; border: 2px solid #e2e8f0; border-radius: 16px; background: #fff; color: #374151; font-weight: 700; font-size: 0.95rem; text-decoration: none; transition: 0.2s; margin-top: 12px;"
                    onmouseover="this.style.borderColor='#4285F4'; this.style.background='#f8f9ff';"
                    onmouseout="this.style.borderColor='#e2e8f0'; this.style.background='#fff';">
@@ -330,8 +330,17 @@
     let loginTimer;
     window.__loginSuccessCallback = null;
     
-    function openLoginModal(onSuccess = null) {
+    function openLoginModal(onSuccess = null, options = {}) {
         window.__loginSuccessCallback = onSuccess;
+        const googleLink = document.getElementById('loginGoogleLink');
+        if (googleLink) {
+            googleLink.href = googleLink.dataset.defaultHref;
+            if (options.googleRedirect) {
+                const googleUrl = new URL(googleLink.href, window.location.origin);
+                googleUrl.searchParams.set('redirect', options.googleRedirect);
+                googleLink.href = googleUrl.toString();
+            }
+        }
         document.getElementById('nbLoginModal').classList.add('show');
         document.body.style.overflow = 'hidden';
     }

@@ -1,11 +1,15 @@
 function switchTab(tab) {
-        document.getElementById('tab-users').style.display = 'none';
-        document.getElementById('tab-roles').style.display = 'none';
-        document.getElementById('btn-tab-users').classList.remove('active');
-        document.getElementById('btn-tab-roles').classList.remove('active');
+        document.getElementById('tab-users')?.style && (document.getElementById('tab-users').style.display = 'none');
+        document.getElementById('tab-roles')?.style && (document.getElementById('tab-roles').style.display = 'none');
+        document.getElementById('btn-tab-users')?.classList.remove('active');
+        document.getElementById('btn-tab-roles')?.classList.remove('active');
         
-        document.getElementById('tab-' + tab).style.display = 'block';
-        document.getElementById('btn-tab-' + tab).classList.add('active');
+        const panel = document.getElementById('tab-' + tab);
+        const button = document.getElementById('btn-tab-' + tab);
+        if (panel && button) {
+            panel.style.display = 'block';
+            button.classList.add('active');
+        }
     }
     
     // USERS LOGIC
@@ -42,7 +46,7 @@ function switchTab(tab) {
         getUserModal().show();
     }
     
-    document.getElementById('userForm').addEventListener('submit', function(e) {
+    document.getElementById('userForm')?.addEventListener('submit', function(e) {
         e.preventDefault();
         const id = document.getElementById('userId').value;
         const url = id ? window.AC_ROUTES.usersUrl + "/" + id : window.AC_ROUTES.usersStoreUrl;
@@ -146,7 +150,7 @@ function switchTab(tab) {
         getRoleModal().show();
     }
     
-    document.getElementById('roleForm').addEventListener('submit', function(e) {
+    document.getElementById('roleForm')?.addEventListener('submit', function(e) {
         e.preventDefault();
         const id = document.getElementById('roleId').value;
         const url = id ? window.AC_ROUTES.rolesUrl + "/" + id : window.AC_ROUTES.rolesStoreUrl;
@@ -192,6 +196,34 @@ function switchTab(tab) {
             else alert(data.message);
         });
     }
+
+    document.addEventListener('click', function (event) {
+        const button = event.target.closest('[data-access-action]');
+        if (!button) return;
+
+        if (button.dataset.accessAction === 'edit-user') {
+            editUser(
+                Number(button.dataset.userId),
+                button.dataset.userName,
+                button.dataset.userEmail,
+                button.dataset.userRole,
+                Number(button.dataset.userStatus)
+            );
+        }
+
+        if (button.dataset.accessAction === 'edit-role') {
+            try {
+                editRole(
+                    Number(button.dataset.roleId),
+                    button.dataset.roleName,
+                    JSON.parse(button.dataset.rolePermissions || '{}')
+                );
+            } catch (error) {
+                console.error('Unable to read role permissions for editing.', error);
+                alert('This role could not be opened. Refresh the page and try again.');
+            }
+        }
+    });
     
     // Auto switch to roles tab if hash is present
     if (window.location.hash === '#roles') {

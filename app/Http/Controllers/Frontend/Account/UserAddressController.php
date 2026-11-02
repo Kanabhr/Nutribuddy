@@ -20,6 +20,10 @@ class UserAddressController extends Controller
             ->latest()
             ->get();
 
+        if ($request->wantsJson()) {
+            return response()->json(['data' => $addresses]);
+        }
+
         return view('frontend.account.profile', ['savedAddresses' => $addresses]);
     }
 
@@ -52,9 +56,18 @@ class UserAddressController extends Controller
         $validated['country'] = $validated['country'] ?? 'India';
         $validated['email'] = ($validated['email'] ?? null) ?: $request->user()->email;
 
-        $address = CustomerAddress::create($validated);
+        // Prevent duplicate addresses by checking unique combination
+        $address = CustomerAddress::firstOrCreate(
+            [
+                'user_id'        => $validated['user_id'],
+                'phone'          => $validated['phone'],
+                'address_line_1' => $validated['address_line_1'],
+                'postal_code'    => $validated['postal_code'],
+            ],
+            $validated
+        );
 
-        return response()->json(['data' => $address], 201);
+        return response()->json(['data' => $address], $address->wasRecentlyCreated ? 201 : 200);
     }
 
     public function destroy(DeleteAddressRequest $request, CustomerAddress $address): JsonResponse

@@ -3,12 +3,14 @@
 namespace App\Services\Storefront;
 
 use App\Models\Ingredient;
+use App\Models\Nutrition\QuestionnaireQuestion;
 use App\Models\Product;
+use App\Models\SubscriptionPlan;
 use Illuminate\Support\Facades\Schema;
 
 class HomePageDataService
 {
-    /** @return array{featuredProducts: \Illuminate\Support\Collection, featuredIngredients: \Illuminate\Support\Collection} */
+    /** @return array{featuredProducts: \Illuminate\Support\Collection, featuredIngredients: \Illuminate\Support\Collection, basicDietQuestions: \Illuminate\Support\Collection, dietPlans: \Illuminate\Support\Collection} */
     public function get(): array
     {
         $featuredProducts = collect();
@@ -37,7 +39,16 @@ class HomePageDataService
             }
         }
 
-        return compact('featuredProducts', 'featuredIngredients');
+        $basicDietQuestions = QuestionnaireQuestion::query()
+            ->where('model', '1 Basic')
+            ->orderBy('sort_order')
+            ->get(['id', 'section', 'question', 'answer_type', 'options_scale', 'only_ask_if', 'is_optional']);
+        $dietPlans = SubscriptionPlan::query()
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->get(['id', 'name', 'slug', 'level', 'monthly_price', 'quarterly_price', 'annual_price', 'features']);
+
+        return compact('featuredProducts', 'featuredIngredients', 'basicDietQuestions', 'dietPlans');
     }
 
     private function productTablesAreReady(): bool

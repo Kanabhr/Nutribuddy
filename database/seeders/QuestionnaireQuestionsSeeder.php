@@ -93,7 +93,7 @@ class QuestionnaireQuestionsSeeder extends Seeder
             {
               "id": 8,
               "question": "Region / cuisine liked",
-              "answer_type": "Choice",
+              "answer_type": "Multi",
               "options_scale": "North / West / East / South / No preference",
               "clinical_reason": "Familiar food gets eaten, not wasted",
               "shapes_chart": "Region column",
@@ -277,7 +277,7 @@ class QuestionnaireQuestionsSeeder extends Seeder
               "id": 25,
               "question": "How often falls ill",
               "answer_type": "Choice",
-              "options_scale": "Rarely / Few times a yr / Often (monthly)",
+              "options_scale": "Rarely / Few times a year / Often (monthly)",
               "clinical_reason": "Frequent illness ↔ zinc/Vit C/immunity gap",
               "shapes_chart": "Immunity tips + micros",
               "only_ask_if": "always"

@@ -62,6 +62,21 @@
         </div>
     </div>
 
+    <div class="alert alert-primary bg-primary-50 text-primary-900 border-primary-100 radius-12 p-16 mb-24 d-flex align-items-start gap-3">
+        <iconify-icon icon="lucide:info" class="text-primary-600 text-xl mt-1 flex-shrink-0"></iconify-icon>
+        <div>
+            <h6 class="text-md fw-bold text-primary-900 mb-1">State-Aware GST System (Intra-State vs Inter-State)</h6>
+            <p class="text-sm mb-0">
+                Supplier State: <strong>{{ \App\Models\Setting::get('store_state', 'Gujarat') }}</strong> 
+                (<a href="{{ route('admin.ecommerce.settings.general') }}" class="text-decoration-underline text-primary-700">Edit in General Settings</a>).
+                <br>
+                • <strong>Same State Supply (e.g. within {{ \App\Models\Setting::get('store_state', 'Gujarat') }}):</strong> Applied as <strong>CGST + SGST</strong> (split 50/50, e.g. 2.5% + 2.5% for 5% GST).
+                <br>
+                • <strong>Other State Supply (outside {{ \App\Models\Setting::get('store_state', 'Gujarat') }}):</strong> Applied as <strong>IGST</strong> at the full rate (e.g. 5% IGST).
+            </p>
+        </div>
+    </div>
+
     <div class="card basic-data-table border-0 radius-12 mb-24">
         <div class="card-header bg-base border-bottom py-16 px-24">
             <h5 class="card-title mb-0">Tax Rate List</h5>
@@ -74,7 +89,7 @@
                             <th>ID</th>
                             <th>Tax Name</th>
                             <th>Code</th>
-                            <th>Rate (%)</th>
+                            <th>Rate Breakdown</th>
                             <th>Status/Sort</th>
                             <th class="text-end">Actions</th>
                         </tr>
@@ -85,7 +100,13 @@
                                 <td><span class="text-sm text-secondary-light">{{ $taxRate->id }}</span></td>
                                 <td><span class="text-md fw-semibold text-dark">{{ $taxRate->name }}</span></td>
                                 <td><span class="text-sm text-secondary-light fw-medium">{{ $taxRate->code }}</span></td>
-                                <td><span class="fw-bold text-primary-600">{{ number_format($taxRate->rate, 2) }}%</span></td>
+                                <td>
+                                    <span class="fw-bold text-primary-600">{{ number_format($taxRate->rate, 2) }}% Total</span>
+                                    <div class="text-xs text-secondary-light mt-1">
+                                        <span class="d-block text-success-700 fw-medium">Same State: {{ number_format($taxRate->rate / 2, 2) }}% CGST + {{ number_format($taxRate->rate / 2, 2) }}% SGST</span>
+                                        <span class="d-block text-info-700 fw-medium">Other State: {{ number_format($taxRate->rate, 2) }}% IGST</span>
+                                    </div>
+                                </td>
                                 <td>
                                     <div class="d-flex flex-column gap-1">
                                         @if($taxRate->is_active)

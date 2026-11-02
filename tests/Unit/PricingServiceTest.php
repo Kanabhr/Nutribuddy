@@ -89,4 +89,96 @@ class PricingServiceTest extends TestCase
             Setting::set('loyalty_max_redeemable_coins', 0);
         }
     }
+
+    public function test_it_splits_gst_into_cgst_and_sgst_for_same_state_supply(): void
+    {
+        Setting::set('store_state', 'Gujarat');
+
+        $user = User::factory()->create();
+        $category = Category::factory()->create();
+        $taxRate = TaxRate::factory()->create(['rate' => 5.0, 'code' => 'GST5']);
+        $product = Product::factory()->create([
+            'category_id' => $category->id,
+            'tax_rate_id' => $taxRate->id,
+            'base_price' => 1000,
+            'shipping_price' => 0,
+        ]);
+        $cart = Cart::create(['user_id' => $user->id, 'currency' => 'INR']);
+        $cartItem = CartItem::create([
+            'cart_id' => $cart->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+        ]);
+        $cartItem->load(['product.taxRate', 'productVariant']);
+
+        $result = app(PricingService::class)->calculate(collect([$cartItem]), null, 0, 'Gujarat');
+
+        $this->assertFalse($result['is_interstate']);
+        $this->assertSame('CGST+SGST', $result['tax_type']);
+        $this->assertEquals(50.0, $result['tax_total']);
+        $this->assertEquals(50.0, $result['gst_total']);
+        $this->assertEquals(25.0, $result['cgst_total']);
+        $this->assertEquals(25.0, $result['sgst_total']);
+        $this->assertEquals(0.0, $result['igst_total']);
+
+        // Check line item breakdown
+        $line = $result['line_items'][0];
+        $this->assertEquals(2.5, $line['cgst_rate']);
+        $this->assertEquals(2.5, $line['sgst_rate']);
+        $this->assertEquals(0.0, $line['igst_rate']);
+        $this->assertEquals(25.0, $line['cgst_amount']);
+        $this->assertEquals(25.0, $line['sgst_amount']);
+        $this->assertEquals(0.0, $line['igst_amount']);
+    }
+
+    public function test_it_charges_full_igst_for_interstate_supply(): void
+    {
+        Setting::set('store_state', 'Gujarat');
+
+        $user = User::factory()->create();
+        $category = Category::factory()->create();
+        $taxRate = TaxRate::factory()->create(['rate' => 5.0, 'code' => 'GST5']);
+        $product = Product::factory()->create([
+            'category_id' => $category->id,
+            'tax_rate_id' => $taxRate->id,
+            'base_price' => 1000,
+            'shipping_price' => 0,
+        ]);
+        $cart = Cart::create(['user_id' => $user->id, 'currency' => 'INR']);
+        $cartItem = CartItem::create([
+            'cart_id' => $cart->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+        ]);
+        $cartItem->load(['product.taxRate', 'productVariant']);
+
+        $result = app(PricingService::class)->calculate(collect([$cartItem]), null, 0, 'Rajasthan');
+
+        $this->assertTrue($result['is_interstate']);
+        $this->assertSame('IGST', $result['tax_type']);
+        $this->assertEquals(50.0, $result['tax_total']);
+        $this->assertEquals(50.0, $result['gst_total']);
+        $this->assertEquals(0.0, $result['cgst_total']);
+        $this->assertEquals(0.0, $result['sgst_total']);
+        $this->assertEquals(50.0, $result['igst_total']);
+
+        // Check line item breakdown
+        $line = $result['line_items'][0];
+        $this->assertEquals(0.0, $line['cgst_rate']);
+        $this->assertEquals(0.0, $line['sgst_rate']);
+        $this->assertEquals(5.0, $line['igst_rate']);
+        $this->assertEquals(0.0, $line['cgst_amount']);
+        $this->assertEquals(0.0, $line['sgst_amount']);
+        $this->assertEquals(50.0, $line['igst_amount']);
+    }
+
+    public function test_it_normalizes_state_names_and_aliases(): void
+    {
+        $this->assertTrue(PricingService::isSameState('Gujarat', 'Gujarat'));
+        $this->assertTrue(PricingService::isSameState('GJ', 'Gujarat'));
+        $this->assertTrue(PricingService::isSameState('gujarat ', 'Gujarat'));
+        $this->assertFalse(PricingService::isSameState('Maharashtra', 'Gujarat'));
+        $this->assertFalse(PricingService::isSameState('MH', 'Gujarat'));
+        $this->assertFalse(PricingService::isSameState('Rajasthan', 'Gujarat'));
+    }
 }

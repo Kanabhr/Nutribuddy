@@ -1,24 +1,24 @@
 <div class="navbar-header">
-    <div class="row align-items-center justify-content-between">
-        <div class="col-auto">
-            <div class="d-flex flex-wrap align-items-center gap-4">
-                <button type="button" class="sidebar-toggle">
-                    <iconify-icon icon="heroicons:bars-3-solid" class="icon text-2xl non-active"></iconify-icon>
-                    <iconify-icon icon="iconoir:arrow-right" class="icon text-2xl active"></iconify-icon>
+    <div class="row align-items-center justify-content-between flex-nowrap w-100 m-0">
+        <div class="col-auto p-0">
+            <div class="d-flex align-items-center gap-2 gap-sm-3 flex-nowrap">
+                <button type="button" class="sidebar-toggle d-none d-xl-flex align-items-center justify-content-center" aria-label="Toggle Sidebar">
+                    <i class="ri-menu-2-line icon text-2xl non-active"></i>
+                    <i class="ri-arrow-right-line icon text-2xl active"></i>
                 </button>
-                <button type="button" class="sidebar-mobile-toggle">
-                    <iconify-icon icon="heroicons:bars-3-solid" class="icon"></iconify-icon>
+                <button type="button" class="sidebar-mobile-toggle d-flex d-xl-none align-items-center justify-content-center" aria-label="Toggle Navigation">
+                    <i class="ri-menu-2-line icon text-2xl"></i>
                 </button>
-                <div class="nb-admin-title">
+                <div class="nb-admin-title d-none d-md-block">
                     <span class="nb-admin-kicker">NutriBuddy Admin</span>
                 </div>
             </div>
         </div>
-        <div class="col-auto">
-            <div class="d-flex flex-wrap align-items-center gap-3 nb-admin-actions">
+        <div class="col-auto p-0">
+            <div class="d-flex align-items-center gap-2 gap-sm-3 nb-admin-actions flex-nowrap">
                 <div class="dropdown">
-                    <button class="d-flex justify-content-center align-items-center rounded-circle nb-admin-notification" type="button" data-bs-toggle="dropdown">
-                        <iconify-icon icon="lucide:bell" class="text-2xl"></iconify-icon>
+                    <button class="d-flex justify-content-center align-items-center rounded-circle nb-admin-notification" type="button" data-bs-toggle="dropdown" aria-label="Notifications">
+                        <i class="ri-notification-3-line text-2xl"></i>
                         @if($unreadNotificationsCount > 0)
                             <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 10px; padding: 4px 6px;">
                                 {{ $unreadNotificationsCount }}
@@ -40,7 +40,7 @@
                                 @endphp
                                 <a href="{{ $data['action_url'] ?? 'javascript:void(0)' }}" class="dropdown-item p-16 border-bottom d-flex align-items-start gap-3 nb-notification-dropdown-item {{ $isUnread ? 'bg-primary-50' : '' }}">
                                     <div class="flex-shrink-0 w-40-px h-40-px radius-circle bg-primary-100 text-primary-600 d-flex align-items-center justify-content-center text-xl">
-                                        <iconify-icon icon="lucide:bell"></iconify-icon>
+                                        <i class="ri-notification-3-line"></i>
                                     </div>
                                     <div class="flex-grow-1 nb-notification-dropdown-copy">
                                         <h6 class="text-sm mb-1 fw-bold {{ $isUnread ? 'text-primary-600' : 'text-secondary-light' }}">{{ $data['title'] ?? 'System Notification' }}</h6>
@@ -69,14 +69,14 @@
                                 <h6 class="text-lg text-primary-light fw-semibold mb-2">{{ auth()->user()->name ?? 'Guest Admin' }}</h6>
                                 <span class="text-secondary-light fw-medium text-sm">{{ ucfirst(auth()->user()->role ?? 'Admin') }}</span>
                             </div>
-                            <button type="button" class="hover-text-danger">
-                                <iconify-icon icon="radix-icons:cross-1" class="icon text-xl"></iconify-icon>
+                            <button type="button" class="hover-text-danger" data-bs-dismiss="dropdown" aria-label="Close">
+                                <i class="ri-close-line icon text-xl"></i>
                             </button>
                         </div>
                         <ul class="to-top-list">
                             <li>
                                 <a class="dropdown-item text-black px-0 py-8 hover-bg-transparent hover-text-danger d-flex align-items-center gap-3" href="javascript:void(0)" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
-                                    <iconify-icon icon="lucide:power" class="icon text-xl"></iconify-icon> Log Out
+                                    <i class="ri-logout-box-r-line icon text-xl"></i> Log Out
                                 </a>
                                 <form id="logout-form" action="{{ route('admin.logout') }}" method="POST" class="d-none">
                                     @csrf

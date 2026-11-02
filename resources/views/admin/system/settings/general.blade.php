@@ -27,12 +27,23 @@
                         </div>
 
                         <div class="col-md-6">
+                            <label class="form-label">Legal Company Name (for Invoices)</label>
+                            <div class="icon-field">
+                                <span class="icon">
+                                    <iconify-icon icon="solar:buildings-outline"></iconify-icon>
+                                </span>
+                                <input type="text" name="company_name" value="{{ old('company_name', $settings['company_name'] ?? '') }}" class="form-control" placeholder="e.g. NutriBuddy Kids Pvt. Ltd.">
+                            </div>
+                            <p class="text-xs text-secondary-light mt-1">Legal entity name printed on tax invoices.</p>
+                        </div>
+
+                        <div class="col-md-6">
                             <label class="form-label">Contact Email</label>
                             <div class="icon-field">
                                 <span class="icon">
                                     <iconify-icon icon="mage:email"></iconify-icon>
                                 </span>
-                                <input type="email" name="contact_email" value="{{ old('contact_email', $settings['contact_email']) }}" class="form-control" placeholder="admin@example.com">
+                                <input type="email" name="contact_email" value="{{ old('contact_email', $settings['contact_email']) }}" class="form-control" placeholder="admin@nutribuddy.com">
                             </div>
                         </div>
 
@@ -46,9 +57,68 @@
                             </div>
                         </div>
 
+                        <div class="col-md-6">
+                            <label class="form-label">Website URL</label>
+                            <div class="icon-field">
+                                <span class="icon">
+                                    <iconify-icon icon="solar:link-outline"></iconify-icon>
+                                </span>
+                                <input type="text" name="website_url" value="{{ old('website_url', $settings['website_url'] ?? '') }}" class="form-control" placeholder="https://nutribuddy.in">
+                            </div>
+                            <p class="text-xs text-secondary-light mt-1">Printed on invoices and footers.</p>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Store / Supplier State (Place of Supply)</label>
+                            <div class="icon-field">
+                                <span class="icon">
+                                    <iconify-icon icon="solar:map-point-outline"></iconify-icon>
+                                </span>
+                                <select name="store_state" class="form-select form-control">
+                                    @foreach($states as $st)
+                                        <option value="{{ $st }}" {{ old('store_state', $settings['store_state']) === $st ? 'selected' : '' }}>{{ $st }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <p class="text-xs text-secondary-light mt-1">Orders within this state apply CGST + SGST (e.g. 2.5% + 2.5%). Other states apply IGST (e.g. 5%).</p>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">GST Number / GSTIN</label>
+                            <div class="icon-field">
+                                <span class="icon">
+                                    <iconify-icon icon="lucide:file-text"></iconify-icon>
+                                </span>
+                                <input type="text" name="gst_number" value="{{ old('gst_number', $settings['gst_number']) }}" class="form-control" placeholder="e.g. 24AAAAA0000A1Z5">
+                            </div>
+                            <p class="text-xs text-secondary-light mt-1">Leave blank if unregistered.</p>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">PAN Number</label>
+                            <div class="icon-field">
+                                <span class="icon">
+                                    <iconify-icon icon="lucide:credit-card"></iconify-icon>
+                                </span>
+                                <input type="text" name="pan_number" value="{{ old('pan_number', $settings['pan_number'] ?? '') }}" class="form-control" placeholder="e.g. AAAAA0000A">
+                            </div>
+                            <p class="text-xs text-secondary-light mt-1">Company PAN for tax invoice.</p>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">CIN Number</label>
+                            <div class="icon-field">
+                                <span class="icon">
+                                    <iconify-icon icon="lucide:hash"></iconify-icon>
+                                </span>
+                                <input type="text" name="cin_number" value="{{ old('cin_number', $settings['cin_number'] ?? '') }}" class="form-control" placeholder="e.g. U74999GJ2020PTC123456">
+                            </div>
+                            <p class="text-xs text-secondary-light mt-1">Corporate Identification Number.</p>
+                        </div>
+
                         <div class="col-md-12">
-                            <label class="form-label">Office Address</label>
-                            <textarea name="address" class="form-control" rows="2" placeholder="Full address...">{{ old('address', $settings['address']) }}</textarea>
+                            <label class="form-label">Registered Office Address</label>
+                            <textarea name="address" class="form-control" rows="2" placeholder="Full registered office address...">{{ old('address', $settings['address']) }}</textarea>
                         </div>
 
                         <hr class="my-4">

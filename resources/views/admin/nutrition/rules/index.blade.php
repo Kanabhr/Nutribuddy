@@ -1,138 +1,142 @@
 @extends('layouts.admin')
 
-@php
-    $title = 'Diet Generation Rules';
-    $subTitle = 'Diet Generation Logic Implementation';
-@endphp
+@php($title = 'Diet Generation Rules')
+@php($subTitle = 'How the active diet chart generator builds and reviews a plan')
+
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('css/diet-generation-rules.css') }}?v={{ filemtime(public_path('css/diet-generation-rules.css')) }}">
+@endpush
 
 @section('content')
-<div class="row gy-4 mb-24">
-    <div class="col-12">
-        <div class="card p-4 bg-base border-0 radius-12 shadow-sm">
-            <div class="d-flex align-items-center gap-3 mb-3">
-                <div class="w-48-px h-48-px rounded-circle bg-success-50 text-success-600 d-flex align-items-center justify-content-center text-2xl">
-                    <iconify-icon icon="lucide:brain-circuit"></iconify-icon>
-                </div>
-                <div>
-                    <h5 class="mb-1 fw-bold text-dark">System Diet Logic Implementation</h5>
-                    <p class="mb-0 text-secondary-light">Discover the intelligent rules and scoring mechanisms that power our automated diet chart generation.</p>
+    <main class="diet-rules-page">
+        <header class="diet-rules-hero">
+            <div class="diet-rules-hero-copy">
+                <span class="diet-rules-eyebrow"><i class="ri-shield-star-line" aria-hidden="true"></i> Nutrition engine guide</span>
+                <h1>How a diet chart is created</h1>
+                <p>The active generator builds a seven-day draft from a child’s assessment, the food catalog, and configured nutrition targets. A nutritionist reviews each draft before it reaches the family.</p>
+                <div class="diet-rules-tags" aria-label="Key process safeguards">
+                    <span><i class="ri-shield-check-line" aria-hidden="true"></i> Safety filters first</span>
+                    <span><i class="ri-calendar-check-line" aria-hidden="true"></i> Seven-day schedule</span>
+                    <span><i class="ri-user-star-line" aria-hidden="true"></i> Nutritionist approval</span>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
+            <div class="diet-rules-hero-icon" aria-hidden="true"><i class="ri-restaurant-2-line"></i></div>
+        </header>
 
-<div class="row gy-4">
-    <!-- Safety & Filtering Rules -->
-    <div class="col-xxl-6 col-md-6">
-        <div class="card p-3 p-xl-4 h-100 bg-base border-0 radius-12 shadow-sm">
-            <div class="d-flex align-items-center gap-2 mb-3 pb-3 border-bottom">
-                <div class="w-40-px h-40-px rounded-circle bg-danger-50 text-danger-600 d-flex align-items-center justify-content-center text-xl">
-                    <iconify-icon icon="lucide:shield-check"></iconify-icon>
-                </div>
-                <h6 class="mb-0 fw-semibold text-dark">Safety & Filtering Rules</h6>
+        <section class="diet-rules-flow" aria-labelledby="diet-rules-flow-heading">
+            <div class="diet-rules-section-heading">
+                <div><span class="diet-rules-kicker">Generation flow</span><h2 id="diet-rules-flow-heading">From assessment to family view</h2></div>
+                <p>Each stage feeds the next; the review gate stays in place for every generated chart.</p>
             </div>
-            <ul class="d-flex flex-column gap-3 mb-0 ps-0 list-unstyled">
-                <li class="d-flex gap-2 align-items-start">
-                    <iconify-icon icon="lucide:check-circle-2" class="text-success-600 mt-1"></iconify-icon>
-                    <div><strong class="text-dark">Vegan:</strong> <span class="text-secondary-light">Excludes foods marked as containing dairy, egg, or honey.</span></div>
-                </li>
-                <li class="d-flex gap-2 align-items-start">
-                    <iconify-icon icon="lucide:check-circle-2" class="text-success-600 mt-1"></iconify-icon>
-                    <div><strong class="text-dark">Jain:</strong> <span class="text-secondary-light">Only includes foods flagged as Jain-friendly.</span></div>
-                </li>
-                <li class="d-flex gap-2 align-items-start">
-                    <iconify-icon icon="lucide:check-circle-2" class="text-success-600 mt-1"></iconify-icon>
-                    <div><strong class="text-dark">Eggetarian:</strong> <span class="text-secondary-light">Excludes meat, poultry, and fish.</span></div>
-                </li>
-                <li class="d-flex gap-2 align-items-start">
-                    <iconify-icon icon="lucide:check-circle-2" class="text-success-600 mt-1"></iconify-icon>
-                    <div><strong class="text-dark">Vegetarian:</strong> <span class="text-secondary-light">Excludes meat, poultry, fish, and eggs.</span></div>
-                </li>
-                <li class="d-flex gap-2 align-items-start">
-                    <iconify-icon icon="lucide:alert-triangle" class="text-danger-600 mt-1"></iconify-icon>
-                    <div><strong class="text-dark">Allergies:</strong> <span class="text-secondary-light">Strictly excludes foods containing specified allergens like dairy, nuts, gluten, or egg.</span></div>
-                </li>
-            </ul>
-        </div>
-    </div>
+            <ol class="diet-flow-steps">
+                <li><span>01</span><strong>Assessment</strong><small>Answers and child profile</small></li>
+                <li><span>02</span><strong>Normalize</strong><small>Diet, allergies, needs</small></li>
+                <li><span>03</span><strong>Set targets</strong><small>Age and sex based RDA</small></li>
+                <li><span>04</span><strong>Filter foods</strong><small>Diet and allergy checks</small></li>
+                <li><span>05</span><strong>Rank choices</strong><small>Nutrient fit and variety</small></li>
+                <li><span>06</span><strong>Build a week</strong><small>Meals from Monday to Sunday</small></li>
+                <li><span>07</span><strong>Review & publish</strong><small>Nutritionist approval</small></li>
+            </ol>
+        </section>
 
-    <!-- Slot & Timing Rules -->
-    <div class="col-xxl-6 col-md-6">
-        <div class="card p-3 p-xl-4 h-100 bg-base border-0 radius-12 shadow-sm">
-            <div class="d-flex align-items-center gap-2 mb-3 pb-3 border-bottom">
-                <div class="w-40-px h-40-px rounded-circle bg-warning-50 text-warning-600 d-flex align-items-center justify-content-center text-xl">
-                    <iconify-icon icon="lucide:clock"></iconify-icon>
+        <div class="diet-rules-grid">
+            <section class="diet-rule-card diet-rule-card-safety" aria-labelledby="diet-safety-heading">
+                <div class="diet-rule-card-heading">
+                    <span class="diet-rule-icon"><i class="ri-shield-check-line" aria-hidden="true"></i></span>
+                    <div><span class="diet-rules-kicker">Stage 1 · Hard exclusions</span><h2 id="diet-safety-heading">Diet and allergy safety</h2></div>
                 </div>
-                <h6 class="mb-0 fw-semibold text-dark">Slot & Timing Rules</h6>
-            </div>
-            <ul class="d-flex flex-column gap-3 mb-0 ps-0 list-unstyled">
-                <li class="d-flex gap-2 align-items-start">
-                    <iconify-icon icon="lucide:layout-list" class="text-primary-600 mt-1"></iconify-icon>
-                    <div><strong class="text-dark">Meal Slot Matching:</strong> <span class="text-secondary-light">Foods must be explicitly flagged as suitable for the target meal slot (e.g., Breakfast, Lunch, Snack, Dinner).</span></div>
-                </li>
-                <li class="d-flex gap-2 align-items-start">
-                    <iconify-icon icon="lucide:calendar-range" class="text-primary-600 mt-1"></iconify-icon>
-                    <div><strong class="text-dark">Meal Patterns:</strong> <span class="text-secondary-light">Distributes eating occasions seamlessly across standard "3 meals", "2 + snacks", and "5 meals" day structures.</span></div>
-                </li>
-            </ul>
-        </div>
-    </div>
+                <p class="diet-rule-intro">These checks remove foods from the candidate pool before scoring.</p>
+                <ul class="diet-rule-list">
+                    <li><strong>Vegan</strong><span>Requires the vegan food flag and excludes dairy, egg, and honey.</span></li>
+                    <li><strong>Jain</strong><span>Only foods marked as Jain suitable remain eligible.</span></li>
+                    <li><strong>Vegetarian</strong><span>Requires the vegetarian flag and excludes foods containing egg.</span></li>
+                    <li><strong>Eggetarian</strong><span>Excludes foods marked non-vegetarian or grouped as meat, fish, or poultry.</span></li>
+                    <li><strong>Non-vegetarian</strong><span>Does not add a diet-type exclusion; allergy and meal-slot checks still apply.</span></li>
+                    <li><strong>Allergies</strong><span>Dairy, nuts, gluten, and egg flags exclude matching foods.</span></li>
+                </ul>
+            </section>
 
-    <!-- Nutritional Targeting -->
-    <div class="col-xxl-6 col-md-6">
-        <div class="card p-3 p-xl-4 h-100 bg-base border-0 radius-12 shadow-sm">
-            <div class="d-flex align-items-center gap-2 mb-3 pb-3 border-bottom">
-                <div class="w-40-px h-40-px rounded-circle bg-info-50 text-info-600 d-flex align-items-center justify-content-center text-xl">
-                    <iconify-icon icon="lucide:pie-chart"></iconify-icon>
+            <section class="diet-rule-card" aria-labelledby="diet-schedule-heading">
+                <div class="diet-rule-card-heading">
+                    <span class="diet-rule-icon is-amber"><i class="ri-time-line" aria-hidden="true"></i></span>
+                    <div><span class="diet-rules-kicker">Stage 2 · Meal structure</span><h2 id="diet-schedule-heading">Slots and weekly schedule</h2></div>
                 </div>
-                <h6 class="mb-0 fw-semibold text-dark">Nutritional Targeting</h6>
-            </div>
-            <ul class="d-flex flex-column gap-3 mb-0 ps-0 list-unstyled">
-                <li class="d-flex gap-2 align-items-start">
-                    <iconify-icon icon="lucide:target" class="text-info-600 mt-1"></iconify-icon>
-                    <div><strong class="text-dark">Gap Filling:</strong> <span class="text-secondary-light">Continuously tracks cumulative daily nutrients (Energy, Protein, Iron, etc.) and prioritizes foods that effectively fill remaining gaps.</span></div>
-                </li>
-                <li class="d-flex gap-2 align-items-start">
-                    <iconify-icon icon="lucide:bar-chart-big" class="text-info-600 mt-1"></iconify-icon>
-                    <div><strong class="text-dark">Over-Nutrition Guard:</strong> <span class="text-secondary-light">Scoring penalizes foods that would drastically exceed daily limits in a single meal.</span></div>
-                </li>
-                <li class="d-flex gap-2 align-items-start">
-                    <iconify-icon icon="lucide:milk-off" class="text-info-600 mt-1"></iconify-icon>
-                    <div><strong class="text-dark">Dairy Cap:</strong> <span class="text-secondary-light">Automatically decreases the probability of selecting additional dairy items if the child's profile already indicates 2 or more dairy glasses consumed daily.</span></div>
-                </li>
-            </ul>
-        </div>
-    </div>
+                <p class="diet-rule-intro">A food must match its meal slot or list the slot as another suitable use. Snack occasions match catalog entries tagged “snack.”</p>
+                <div class="diet-pattern-list">
+                    <div><strong>3 meals</strong><span>Breakfast · Lunch · Dinner</span></div>
+                    <div><strong>2 + snacks</strong><span>Breakfast · Morning snack · Lunch · Evening snack</span></div>
+                    <div><strong>Default</strong><span>Breakfast · Morning snack · Lunch · Evening snack · Dinner</span></div>
+                </div>
+                <p class="diet-rule-footnote"><i class="ri-information-line" aria-hidden="true"></i> The plan covers Monday through Sunday. The generator matches meal slots; meal times are not set during generation.</p>
+            </section>
 
-    <!-- Variety & Preferences -->
-    <div class="col-xxl-6 col-md-6">
-        <div class="card p-3 p-xl-4 h-100 bg-base border-0 radius-12 shadow-sm">
-            <div class="d-flex align-items-center gap-2 mb-3 pb-3 border-bottom">
-                <div class="w-40-px h-40-px rounded-circle bg-primary-50 text-primary-600 d-flex align-items-center justify-content-center text-xl">
-                    <iconify-icon icon="lucide:sparkles"></iconify-icon>
+            <section class="diet-rule-card" aria-labelledby="diet-target-heading">
+                <div class="diet-rule-card-heading">
+                    <span class="diet-rule-icon is-blue"><i class="ri-line-chart-line" aria-hidden="true"></i></span>
+                    <div><span class="diet-rules-kicker">Stage 3 · Nutrition</span><h2 id="diet-target-heading">Targets and nutrient gaps</h2></div>
                 </div>
-                <h6 class="mb-0 fw-semibold text-dark">Variety & Preferences</h6>
-            </div>
-            <ul class="d-flex flex-column gap-3 mb-0 ps-0 list-unstyled">
-                <li class="d-flex gap-2 align-items-start">
-                    <iconify-icon icon="lucide:history" class="text-primary-600 mt-1"></iconify-icon>
-                    <div><strong class="text-dark">Repetition Penalty:</strong> <span class="text-secondary-light">Foods have a defined repeat gap (e.g., 3 days). Generating the same food too soon applies a massive score penalty to force variety.</span></div>
-                </li>
-                <li class="d-flex gap-2 align-items-start">
-                    <iconify-icon icon="lucide:map-pin" class="text-primary-600 mt-1"></iconify-icon>
-                    <div><strong class="text-dark">Regional Bonus:</strong> <span class="text-secondary-light">Foods matching the family's preferred region (e.g., North Indian) receive a selection bonus.</span></div>
-                </li>
-                <li class="d-flex gap-2 align-items-start">
-                    <iconify-icon icon="lucide:thumbs-up" class="text-primary-600 mt-1"></iconify-icon>
-                    <div><strong class="text-dark">Kid Acceptance:</strong> <span class="text-secondary-light">Kid-acceptance ratings directly influence the probability of a food being picked.</span></div>
-                </li>
-                <li class="d-flex gap-2 align-items-start">
-                    <iconify-icon icon="lucide:flame" class="text-primary-600 mt-1"></iconify-icon>
-                    <div><strong class="text-dark">Cooking Medium:</strong> <span class="text-secondary-light">Extra selection priority for foods matching the family's designated cooking medium.</span></div>
-                </li>
-            </ul>
+                <p class="diet-rule-intro">Configured ICMR targets are selected by the child’s age and sex. If that row is unavailable, the engine tries an age-matched “all” row, then falls back to the first configured target. It tracks 17 nutrients for each day:</p>
+                <div class="diet-nutrient-chips" aria-label="Tracked nutrients">
+                    <span>Energy</span><span>Protein</span><span>Fat</span><span>Fiber</span><span>Calcium</span><span>Iron</span><span>Zinc</span><span>Magnesium</span><span>Vitamin A</span><span>Vitamin C</span><span>Vitamin D</span><span>B1</span><span>B2</span><span>B3</span><span>B6</span><span>Folate</span><span>B12</span>
+                </div>
+                <p class="diet-rule-footnote"><i class="ri-information-line" aria-hidden="true"></i> Nutrient totals and gaps are saved with the plan for review. When a nutrient has already reached its target, it adds no further gap score; the engine has no separate upper-limit medical guard.</p>
+            </section>
+
+            <section class="diet-rule-card" aria-labelledby="diet-scoring-heading">
+                <div class="diet-rule-card-heading">
+                    <span class="diet-rule-icon is-purple"><i class="ri-equalizer-2-line" aria-hidden="true"></i></span>
+                    <div><span class="diet-rules-kicker">Stage 4 · Candidate ranking</span><h2 id="diet-scoring-heading">How foods are ranked</h2></div>
+                </div>
+                <p class="diet-rule-intro">Eligible foods start with a +15 base score, then receive adjustments for nutrition fit and variety.</p>
+                <div class="diet-score-list">
+                    <div><span>Nutrient gap fit</span><strong>Up to +30</strong><small>Scaled by the remaining daily target</small></div>
+                    <div><span>Region match</span><strong>+5</strong><small>Matches any selected preferred region</small></div>
+                    <div><span>Kid acceptance</span><strong>Up to +5</strong><small>Based on the catalog rating</small></div>
+                    <div><span>Cooking medium match</span><strong>+5</strong><small>When it appears in the food method</small></div>
+                    <div><span>Recent repetition</span><strong>−20</strong><small>Within that food’s repeat gap; default 3 days</small></div>
+                    <div><span>Dairy preference</span><strong>−4</strong><small>For dairy foods when the profile reports 2+ glasses</small></div>
+                </div>
+                <p class="diet-rule-footnote"><i class="ri-shuffle-line" aria-hidden="true"></i> Selection is weighted across the top five ranked choices. A food inside its repeat gap is avoided when another candidate is available.</p>
+            </section>
+
+            <section class="diet-rule-card" aria-labelledby="diet-clinical-heading">
+                <div class="diet-rule-card-heading">
+                    <span class="diet-rule-icon is-rose"><i class="ri-heart-pulse-line" aria-hidden="true"></i></span>
+                    <div><span class="diet-rules-kicker">Stage 5 · Clinical review</span><h2 id="diet-clinical-heading">Flags and approval gate</h2></div>
+                </div>
+                <ul class="diet-rule-list compact">
+                    <li><strong>Medical conditions</strong><span>A non-empty condition other than “none,” “no,” “n/a,” or “nil” requires professional review.</span></li>
+                    <li><strong>Visible signs</strong><span>Signs matching configured deficiency rules create clinical flags and require review.</span></li>
+                    <li><strong>Initial state</strong><span>Generated plans start as pending review; only an authorized nutritionist can approve them.</span></li>
+                    <li><strong>Family visibility</strong><span>The family sees the chart after it is approved and published.</span></li>
+                </ul>
+            </section>
+
+            <section class="diet-rule-card" aria-labelledby="diet-record-heading">
+                <div class="diet-rule-card-heading">
+                    <span class="diet-rule-icon is-green"><i class="ri-file-list-3-line" aria-hidden="true"></i></span>
+                    <div><span class="diet-rules-kicker">Audit trail</span><h2 id="diet-record-heading">What is saved</h2></div>
+                </div>
+                <ul class="diet-rule-list compact">
+                    <li><strong>Plan version</strong><span>Each generated plan increments the version for its assessment.</span></li>
+                    <li><strong>Daily nutrition</strong><span>Daily totals and target gaps are stored with the plan.</span></li>
+                    <li><strong>Generation details</strong><span>The plan records its normalized profile, eligible food count, chosen meals, and top candidate scores.</span></li>
+                    <li><strong>Final check</strong><span>Before saving, selected foods are checked against the eligible-food set.</span></li>
+                </ul>
+            </section>
         </div>
-    </div>
-</div>
+
+        <aside class="diet-rules-boundaries" aria-labelledby="diet-boundaries-heading">
+            <div class="diet-boundaries-heading">
+                <span class="diet-boundaries-icon"><i class="ri-alert-line" aria-hidden="true"></i></span>
+                <div><span class="diet-rules-kicker">Current implementation notes</span><h2 id="diet-boundaries-heading">Important boundaries in the active generator</h2></div>
+            </div>
+            <ul>
+                <li><strong>Food age limits:</strong> the active filter does not apply per-food age minimums or maximums. Age is used to look up nutrition targets.</li>
+                <li><strong>Disliked foods:</strong> the filter supports exact, case-insensitive dish-name exclusions, but the active generator currently calls it without the child’s dislikes.</li>
+                <li><strong>Lactose:</strong> the allergy answer is normalized, but the active food filter has no lactose-specific exclusion; dairy exclusion is applied only for a dairy allergy.</li>
+                <li><strong>Incomplete allergen data:</strong> an unset allergen flag is not treated as a match by the active filter. Food catalog allergy flags need to be completed for exclusions to work reliably.</li>
+            </ul>
+        </aside>
+    </main>
 @endsection

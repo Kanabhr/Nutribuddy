@@ -105,36 +105,25 @@ class DashboardOverviewService
                 ->map(fn ($offset) => $startDate->copy()->addDays($offset)->startOfDay());
 
         $revenueLabels = $periodBuckets->map(fn (Carbon $bucket) => $bucketByMonth ? $bucket->format('M Y') : $bucket->format('d M'))->values()->all();
-        $revenueSeries = $periodBuckets->map(function (Carbon $bucket) use ($bucketByMonth, $startDate, $endDate) {
-            $bucketStart = $bucketByMonth ? $bucket->copy()->startOfMonth() : $bucket->copy()->startOfDay();
-            $bucketEnd = $bucketByMonth ? $bucket->copy()->endOfMonth() : $bucket->copy()->endOfDay();
-            $bucketStart = $bucketStart->lt($startDate) ? $startDate->copy() : $bucketStart;
-            $bucketEnd = $bucketEnd->gt($endDate) ? $endDate->copy() : $bucketEnd;
+        $bucketExpression = $this->bucketExpression($bucketByMonth);
+        $orderBuckets = Order::query()
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->selectRaw("{$bucketExpression} as bucket, COUNT(*) as order_count, SUM(CASE WHEN payment_status = ? THEN grand_total ELSE 0 END) as revenue", ['paid'])
+            ->groupBy('bucket')
+            ->get()
+            ->keyBy('bucket');
+        $returnBuckets = OrderReturn::query()
+            ->whereIn('status', ['approved', 'completed'])
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->selectRaw("{$bucketExpression} as bucket, SUM(refund_amount) as expense")
+            ->groupBy('bucket')
+            ->get()
+            ->keyBy('bucket');
 
-            return (float) Order::where('payment_status', 'paid')
-                ->whereBetween('created_at', [$bucketStart, $bucketEnd])
-                ->sum('grand_total');
-        })->values()->all();
-        
-        $orderCountSeries = $periodBuckets->map(function (Carbon $bucket) use ($bucketByMonth, $startDate, $endDate) {
-            $bucketStart = $bucketByMonth ? $bucket->copy()->startOfMonth() : $bucket->copy()->startOfDay();
-            $bucketEnd = $bucketByMonth ? $bucket->copy()->endOfMonth() : $bucket->copy()->endOfDay();
-            $bucketStart = $bucketStart->lt($startDate) ? $startDate->copy() : $bucketStart;
-            $bucketEnd = $bucketEnd->gt($endDate) ? $endDate->copy() : $bucketEnd;
-
-            return Order::whereBetween('created_at', [$bucketStart, $bucketEnd])->count();
-        })->values()->all();
-
-        $expenseSeries = $periodBuckets->map(function (Carbon $bucket) use ($bucketByMonth, $startDate, $endDate) {
-            $bucketStart = $bucketByMonth ? $bucket->copy()->startOfMonth() : $bucket->copy()->startOfDay();
-            $bucketEnd = $bucketByMonth ? $bucket->copy()->endOfMonth() : $bucket->copy()->endOfDay();
-            $bucketStart = $bucketStart->lt($startDate) ? $startDate->copy() : $bucketStart;
-            $bucketEnd = $bucketEnd->gt($endDate) ? $endDate->copy() : $bucketEnd;
-
-            return (float) OrderReturn::whereIn('status', ['approved', 'completed'])
-                ->whereBetween('created_at', [$bucketStart, $bucketEnd])
-                ->sum('refund_amount');
-        })->values()->all();
+        $bucketKeys = $periodBuckets->map(fn (Carbon $bucket) => $bucketByMonth ? $bucket->format('Y-m') : $bucket->toDateString());
+        $revenueSeries = $bucketKeys->map(fn ($key) => (float) ($orderBuckets->get($key)->revenue ?? 0))->all();
+        $orderCountSeries = $bucketKeys->map(fn ($key) => (int) ($orderBuckets->get($key)->order_count ?? 0))->all();
+        $expenseSeries = $bucketKeys->map(fn ($key) => (float) ($returnBuckets->get($key)->expense ?? 0))->all();
 
         $todayStart = now()->startOfDay();
         $todayEnd = now()->endOfDay();
@@ -213,6 +202,21 @@ class DashboardOverviewService
         }
 
         return round((($current - $previous) / $previous) * 100, 1);
+    }
+
+    private function bucketExpression(bool $byMonth): string
+    {
+        $driver = DB::connection()->getDriverName();
+
+        if (! $byMonth) {
+            return 'DATE(created_at)';
+        }
+
+        return match ($driver) {
+            'sqlite' => "strftime('%Y-%m', created_at)",
+            'pgsql' => "TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM')",
+            default => "DATE_FORMAT(created_at, '%Y-%m')",
+        };
     }
 
     private function zoneSales(Carbon $startDate, Carbon $endDate): array

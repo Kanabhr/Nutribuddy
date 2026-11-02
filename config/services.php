@@ -46,6 +46,7 @@ return [
 
     'aisensy' => [
         'enabled' => env('AISENSY_ENABLED', true),
+        'uat_otp_enabled' => env('AISENSY_UAT_OTP_ENABLED', false),
         'api_key' => env('AISENSY_API_KEY'),
         'endpoint' => env('AISENSY_ENDPOINT', 'https://backend.aisensy.com/campaign/t1/api/v2'),
         'order_paid_campaign' => env('AISENSY_ORDER_PAID_CAMPAIGN'),

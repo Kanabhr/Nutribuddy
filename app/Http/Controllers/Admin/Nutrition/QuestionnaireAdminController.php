@@ -12,11 +12,17 @@ class QuestionnaireAdminController extends Controller
     use \App\Http\Controllers\Admin\ResourceIndexFallbacks;
     public function index()
     {
-        $questions = QuestionnaireQuestion::orderBy('sort_order')->get();
-        // Group by model, then by section
-        $groupedQuestions = $questions->groupBy('model')->map(function ($items) {
-            return $items->groupBy('section');
-        });
+        $modelsByPlan = [
+            '1 Basic' => ['1 Basic'],
+            '2 Plus' => ['1 Basic', '2 Plus'],
+            '3 Pro' => ['1 Basic', '2 Plus', '3 Pro'],
+            '4 Premium' => ['1 Basic', '2 Plus', '3 Pro', '4 Premium'],
+        ];
+        $groupedQuestions = collect($modelsByPlan)->map(fn (array $models) => QuestionnaireQuestion::query()
+            ->whereIn('model', $models)
+            ->orderBy('sort_order')
+            ->get(['id', 'model', 'section', 'question', 'answer_type', 'options_scale', 'only_ask_if', 'clinical_reason', 'chart_effect', 'is_optional', 'sort_order'])
+            ->groupBy('section'));
 
         return view('admin.nutrition.questions.index', compact('groupedQuestions'));
     }
@@ -43,9 +49,4 @@ class QuestionnaireAdminController extends Controller
         return redirect()->route('admin.nutrition.questions.index')->with('success', 'Question updated successfully.');
     }
 
-    public function destroy(QuestionnaireQuestion $question)
-    {
-        $question->delete();
-        return redirect()->route('admin.nutrition.questions.index')->with('success', 'Question deleted successfully.');
-    }
 }

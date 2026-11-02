@@ -4,6 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\DietSubscription;
 use App\Models\Nutrition\Child;
+use App\Models\Nutrition\ChildAssessment;
+use App\Models\Nutrition\QuestionnaireAnswer;
+use App\Models\Nutrition\QuestionnaireQuestion;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Services\Nutrition\DietPaymentService;
@@ -206,5 +209,60 @@ class DietPaymentControllerRegressionTest extends TestCase
         $this->assertFalse($result['success']);
         $this->assertSame('pending', $subscription->fresh()->status);
         $this->assertSame('pending', $subscription->fresh()->payment_status);
+    }
+
+    public function test_cashfree_return_activates_subscription_when_answers_are_already_decoded(): void
+    {
+        config([
+            'services.cashfree.app_id' => 'test-app',
+            'services.cashfree.secret_key' => 'test-secret',
+        ]);
+        Http::fake(['https://sandbox.cashfree.com/pg/orders/cashfree_diet_456' => Http::response([
+            'order_id' => 'cashfree_diet_456',
+            'order_amount' => 100,
+            'order_currency' => 'INR',
+            'order_status' => 'PAID',
+        ])]);
+        $parent = User::factory()->create();
+        $child = Child::create(['user_id' => $parent->id, 'name' => 'Mira', 'sex' => 'girl']);
+        $subscription = DietSubscription::create([
+            'user_id' => $parent->id,
+            'child_id' => $child->id,
+            'model' => 'Monthly (Monthly)',
+            'status' => 'pending',
+            'payment_status' => 'pending',
+            'amount_paid' => 100,
+            'razorpay_order_id' => 'cashfree_diet_456',
+        ]);
+        $assessment = ChildAssessment::create([
+            'child_id' => $child->id,
+            'model_level' => 'basic',
+        ]);
+        $question = QuestionnaireQuestion::create([
+            'question' => 'Favorite foods?',
+            'answer_type' => 'multi-select',
+        ]);
+        QuestionnaireAnswer::create([
+            'child_assessment_id' => $assessment->id,
+            'question_id' => $question->id,
+            'answer_value' => ['rice', 'dal'],
+        ]);
+        $generator = \Mockery::mock(\App\Services\Nutrition\DietChartGeneratorService::class);
+        $generator->shouldReceive('generateDietChart')
+            ->once()
+            ->withArgs(fn ($actualAssessment, $answers) => $actualAssessment->is($assessment)
+                && $answers === [$question->id => ['rice', 'dal']])
+            ->andReturn(['success' => true]);
+        $this->app->instance(\App\Services\Nutrition\DietChartGeneratorService::class, $generator);
+
+        $result = app(DietPaymentService::class)->confirmCashfreeReturn(
+            'cashfree_diet_456',
+            (string) $subscription->id
+        );
+
+        $this->assertTrue($result['success']);
+        $this->assertSame($child->id, $result['child_id']);
+        $this->assertSame('active', $subscription->fresh()->status);
+        $this->assertSame('paid', $subscription->fresh()->payment_status);
     }
 }

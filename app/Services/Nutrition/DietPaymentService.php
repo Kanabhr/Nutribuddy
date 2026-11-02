@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Log;
 
 class DietPaymentService
 {
+    public function __construct(private readonly DietLifecycleNotificationService $notifications) {}
+
     public function createOrder(User $user, array $data): array
     {
         $plan = SubscriptionPlan::where('slug', $data['plan_slug'])
@@ -111,9 +113,7 @@ class DietPaymentService
                 return ['success' => false, 'message' => 'Invalid payment return data.'];
             }
 
-            $baseUrl = config('services.cashfree.env') === 'production'
-                ? 'https://api.cashfree.com/pg/orders/'
-                : 'https://sandbox.cashfree.com/pg/orders/';
+            $baseUrl = \App\Services\Payments\CashfreePaymentService::resolveBaseUrl() . '/orders/';
             $response = Http::acceptJson()->withHeaders($this->cashfreeHeaders())
                 ->get($baseUrl.urlencode($orderId));
 
@@ -165,9 +165,7 @@ class DietPaymentService
     private function createCashfreeOrder(User $user, SubscriptionPlan $plan, DietSubscription $subscription, float $amount): array
     {
         $orderId = 'diet_sub_'.$subscription->id.'_'.uniqid();
-        $baseUrl = config('services.cashfree.env') === 'production'
-            ? 'https://api.cashfree.com/pg/orders'
-            : 'https://sandbox.cashfree.com/pg/orders';
+        $baseUrl = \App\Services\Payments\CashfreePaymentService::resolveBaseUrl() . '/orders';
         $response = Http::acceptJson()->withHeaders($this->cashfreeHeaders())->post($baseUrl, [
             'order_id' => $orderId,
             'order_amount' => $amount,
@@ -179,7 +177,7 @@ class DietPaymentService
                 'customer_phone' => '9999999999',
             ],
             'order_meta' => [
-                'return_url' => str_replace('http://', 'https://', route('diet.payment.cashfree.return'))
+                'return_url' => route('diet.payment.cashfree.return')
                     .'?order_id={order_id}&subscription_id='.$subscription->id,
             ],
             'order_note' => 'Diet Subscription '.$plan->name,
@@ -193,6 +191,7 @@ class DietPaymentService
         return [
             'success' => true, 'gateway' => 'cashfree', 'payment_session_id' => $order['payment_session_id'],
             'order_id' => $order['order_id'], 'subscription_id' => $subscription->id,
+            'mode' => \App\Services\Payments\CashfreePaymentService::resolveEnvironment(),
         ];
     }
 
@@ -223,7 +222,10 @@ class DietPaymentService
                 'expires_at' => $termSeconds > 0 ? $startsAt->copy()->addSeconds($termSeconds) : null,
             ]);
 
-            return $subscription->fresh();
+            $subscription = $subscription->fresh();
+            $this->notifications->subscriptionActivated($subscription);
+
+            return $subscription;
         });
     }
 
@@ -235,7 +237,7 @@ class DietPaymentService
             return;
         }
         $answers = $assessment->answers()->pluck('answer_value', 'question_id')
-            ->map(fn ($value) => json_decode($value, true))->all();
+            ->map(fn ($value) => is_string($value) ? json_decode($value, true) : $value)->all();
         try {
             $result = app(DietChartGeneratorService::class)->generateDietChart($assessment, $answers);
             if (! ($result['success'] ?? false)) {

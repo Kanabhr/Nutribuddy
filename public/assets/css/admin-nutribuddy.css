@@ -139,30 +139,48 @@ body.admin-nb-theme {
 .nb-admin-profile,
 .nb-admin-notification {
     background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(52, 211, 153, 0.16)) !important;
-    border: 1px solid rgba(16, 185, 129, 0.16) !important;
-    box-shadow: 0 10px 22px rgba(6, 78, 59, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.22) !important;
+    box-shadow: 0 4px 12px rgba(6, 78, 59, 0.08);
 }
 
 .nb-admin-notification {
     width: 40px;
     height: 40px;
     position: relative;
-    color: var(--nb-ink);
+    color: var(--nb-ink, #065f46) !important;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
+    border-radius: 50% !important;
+    flex-shrink: 0;
+    padding: 0;
+    cursor: pointer;
+}
+
+.nb-admin-notification i,
+.nb-admin-notification .icon {
+    color: #065f46 !important;
+    font-size: 20px !important;
+    line-height: 1;
+    display: inline-flex;
 }
 
 .nb-admin-profile {
-    width: 42px;
-    height: 42px;
-    color: #047857;
+    width: 40px;
+    height: 40px;
+    border-radius: 50% !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 0;
+    overflow: hidden;
+    cursor: pointer;
 }
 
 .nb-admin-profile-img {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     object-fit: contain;
 }
 
@@ -313,10 +331,67 @@ body.admin-nb-theme {
     background: rgba(255, 255, 255, 0.16) !important;
 }
 
-.sidebar-close-btn,
 .sidebar-toggle,
 .sidebar-mobile-toggle {
-    border-radius: 14px !important;
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(52, 211, 153, 0.16)) !important;
+    border: 1px solid rgba(16, 185, 129, 0.22) !important;
+    box-shadow: 0 4px 12px rgba(6, 78, 59, 0.08);
+    border-radius: 12px !important;
+    align-items: center;
+    justify-content: center;
+    color: var(--nb-ink, #065f46) !important;
+    transition: all 0.2s ease-in-out;
+    padding: 0;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.sidebar-toggle:hover,
+.sidebar-mobile-toggle:hover {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.22), rgba(52, 211, 153, 0.28)) !important;
+    color: #047857 !important;
+    transform: translateY(-1px);
+}
+
+.sidebar-toggle .icon,
+.sidebar-mobile-toggle .icon,
+.sidebar-toggle i,
+.sidebar-mobile-toggle i {
+    color: #065f46 !important;
+    font-size: 22px !important;
+    line-height: 1;
+    display: inline-flex;
+}
+
+@media (max-width: 1199.98px) {
+    .sidebar-toggle {
+        display: none !important;
+    }
+    .sidebar-mobile-toggle {
+        display: inline-flex !important;
+    }
+}
+
+@media (min-width: 1200px) {
+    .sidebar-toggle {
+        display: inline-flex !important;
+    }
+    .sidebar-mobile-toggle {
+        display: none !important;
+    }
+}
+
+.sidebar-close-btn {
+    border-radius: 12px !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+    color: var(--nb-ink, #1f2937);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease-in-out;
 }
 
 .card {
@@ -657,7 +732,13 @@ body.admin-nb-theme {
     .d-footer {
         margin-left: 12px;
         margin-right: 12px;
-        border-radius: 20px;
+        border-radius: 18px;
+    }
+
+    .navbar-header {
+        padding: 10px 14px;
+        height: auto !important;
+        min-height: 56px;
     }
 
     .dashboard-main-body {
@@ -666,7 +747,7 @@ body.admin-nb-theme {
 
     .nb-admin-chip,
     .nb-admin-title {
-        display: none;
+        display: none !important;
     }
 
     .nb-admin-breadcrumb {

@@ -34,6 +34,19 @@
                     </div>
                 </div>
 
+                @if (filled($dietPlan->review_notes))
+                    <aside class="nutritionist-remark" aria-label="Note from your nutritionist">
+                        <div class="nutritionist-remark-icon"><i class="ri-chat-quote-line" aria-hidden="true"></i></div>
+                        <div>
+                            <span class="nutritionist-remark-label">A note from your nutritionist</span>
+                            <p>{{ $dietPlan->review_notes }}</p>
+                            @if ($dietPlan->reviewed_at)
+                                <time datetime="{{ $dietPlan->reviewed_at->toIso8601String() }}">Reviewed {{ $dietPlan->reviewed_at->format('d M Y') }}</time>
+                            @endif
+                        </div>
+                    </aside>
+                @endif
+
                 <!-- WEEKLY NAVIGATION -->
                 <div class="week-days-nav">
                     <button class="day-tab active" data-day="Monday" data-day-lower="monday">
@@ -353,6 +366,54 @@
             margin-bottom: 30px;
             border-bottom: 2px solid #f0f0f0;
             padding-bottom: 20px;
+        }
+
+        .nutritionist-remark {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            margin: 0 0 24px;
+            padding: 18px 20px;
+            border: 1px solid #cce8da;
+            border-left: 4px solid #168a64;
+            border-radius: 14px;
+            background: linear-gradient(120deg, #f1fbf6, #fbfefc);
+        }
+
+        .nutritionist-remark-icon {
+            display: grid;
+            place-items: center;
+            flex: 0 0 38px;
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            color: #168a64;
+            background: #ddf4e8;
+            font-size: 20px;
+        }
+
+        .nutritionist-remark-label {
+            display: block;
+            margin-bottom: 5px;
+            color: #168a64;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+        }
+
+        .nutritionist-remark p {
+            margin: 0;
+            color: #24483f;
+            line-height: 1.6;
+            white-space: pre-line;
+        }
+
+        .nutritionist-remark time {
+            display: block;
+            margin-top: 8px;
+            color: #71817b;
+            font-size: 12px;
         }
 
         .plan-header h2 {

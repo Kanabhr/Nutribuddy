@@ -13,6 +13,16 @@ class UpdateQuestionnaireQuestionRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['question' => ['required', 'string'], 'sort_order' => ['required', 'integer']];
+        return [
+            'section' => ['nullable', 'string'],
+            'question' => ['required', 'string'],
+            'answer_type' => ['required', 'string'],
+            'options_scale' => ['nullable', 'string'],
+            'only_ask_if' => ['nullable', 'string'],
+            'clinical_reason' => ['nullable', 'string'],
+            'chart_effect' => ['nullable', 'string'],
+            'is_optional' => ['sometimes', 'boolean'],
+            'sort_order' => ['required', 'integer'],
+        ];
     }
 }

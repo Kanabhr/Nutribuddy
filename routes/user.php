@@ -30,6 +30,7 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('/user/checkout')->name('user.checkout.')->middleware('throttle:checkout')->group(function () {
         Route::post('/summary', [FrontendCheckoutController::class, 'summary'])->name('summary');
+        Route::post('/cod/send-otp', [FrontendCheckoutController::class, 'sendCodOtp'])->name('cod.send-otp');
         Route::post('/place-order', [FrontendCheckoutController::class, 'placeOrder'])->middleware('throttle:order-submit')->name('place-order');
     });
 

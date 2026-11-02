@@ -124,6 +124,37 @@ document.addEventListener('DOMContentLoaded', function () {
   donut('#channelChart', (data.channels || []).map(i => i.label), (data.channels || []).map(i => Number(i.total)), ['#2f5d3a', '#d6a32e', '#c1452b', '#3a6e8f']);
 
   renderStateBars();
+
+  if (window.jQuery && jQuery.fn.DataTable) {
+    const filters = Object.fromEntries(new URLSearchParams(window.location.search));
+    const text = jQuery.fn.DataTable.render.text();
+    const table = (selector, name, columns) => jQuery(selector).DataTable({
+      processing: true,
+      serverSide: true,
+      pageLength: 10,
+      lengthChange: false,
+      searching: true,
+      order: [],
+      ajax: { url: window.location.pathname + '/table/' + encodeURIComponent(name), data: filters },
+      columns,
+      language: { emptyTable: 'No data found for this filter.', processing: 'Loading…' }
+    });
+    table('#userAnalyticsTable', 'users', [
+      { data: 'customer', render: text }, { data: 'email', render: text },
+      { data: 'orders' }, { data: 'paid_orders' },
+      { data: 'revenue', render: value => 'Rs. ' + Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 }) },
+      { data: 'last_order', render: text }
+    ]);
+    table('#shipmentAnalyticsTable', 'shipments', [
+      { data: 'status', render: text }, { data: 'orders' },
+      { data: 'shipping', render: value => 'Rs. ' + Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 }) },
+      { data: 'revenue', render: value => 'Rs. ' + Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 }) }
+    ]);
+    table('#cohortRetentionTable', 'cohorts', [
+      { data: 'cohort', render: text },
+      ...[0, 1, 2, 3, 4].map(index => ({ data: null, render: row => row.months[index] === null ? '-' : row.months[index] + '%' }))
+    ]);
+  }
 });
 </script>
 SCRIPT;
@@ -296,7 +327,7 @@ SCRIPT;
                             </div>
                         </div>
                         <div class="table-responsive nb-table-wrap">
-                            <table class="table bordered-table mb-0">
+                            <table id="userAnalyticsTable" class="table bordered-table mb-0">
                                 <thead>
                                     <tr>
                                         <th>Customer</th>
@@ -304,21 +335,10 @@ SCRIPT;
                                         <th>Orders</th>
                                         <th>Paid</th>
                                         <th>Revenue</th>
+                                        <th>Last order</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    @forelse ($userRows as $row)
-                                        <tr>
-                                            <td class="fw-bold">{{ $row['customer'] }}</td>
-                                            <td>{{ $row['email'] }}</td>
-                                            <td>{{ number_format($row['orders']) }}</td>
-                                            <td>{{ number_format($row['paid_orders']) }}</td>
-                                            <td>Rs. {{ number_format($row['revenue'], 0) }}</td>
-                                        </tr>
-                                    @empty
-                                        <tr><td colspan="5" class="text-center text-secondary-light">No user data found.</td></tr>
-                                    @endforelse
-                                </tbody>
+                                <tbody></tbody>
                             </table>
                         </div>
                     </div>
@@ -372,7 +392,7 @@ SCRIPT;
                             </div>
                         </div>
                         <div class="table-responsive nb-table-wrap">
-                            <table class="table bordered-table mb-0">
+                            <table id="shipmentAnalyticsTable" class="table bordered-table mb-0">
                                 <thead>
                                     <tr>
                                         <th>Status</th>
@@ -381,18 +401,7 @@ SCRIPT;
                                         <th>Revenue</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    @forelse ($shipmentRows as $row)
-                                        <tr>
-                                            <td class="fw-bold">{{ $row['status'] }}</td>
-                                            <td>{{ number_format($row['orders']) }}</td>
-                                            <td>Rs. {{ number_format($row['shipping'], 0) }}</td>
-                                            <td>Rs. {{ number_format($row['revenue'], 0) }}</td>
-                                        </tr>
-                                    @empty
-                                        <tr><td colspan="4" class="text-center text-secondary-light">No shipment data found.</td></tr>
-                                    @endforelse
-                                </tbody>
+                                <tbody></tbody>
                             </table>
                         </div>
                     </div>
@@ -530,7 +539,7 @@ SCRIPT;
                             <span class="text-sm text-secondary-light">Repeat purchase rate</span>
                         </div>
                         <div class="table-responsive">
-                            <table class="table bordered-table mb-0">
+                            <table id="cohortRetentionTable" class="table bordered-table mb-0">
                                 <thead>
                                     <tr>
                                         <th>Cohort</th>
@@ -541,20 +550,7 @@ SCRIPT;
                                         <th>M5</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    @forelse ($cohorts as $cohort)
-                                        <tr>
-                                            <td>{{ $cohort['cohort'] }}</td>
-                                            @foreach ($cohort['months'] as $value)
-                                                <td>{{ $value === null ? '-' : $value . '%' }}</td>
-                                            @endforeach
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="6" class="text-center text-secondary-light">No cohort data found.</td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
+                                <tbody></tbody>
                             </table>
                         </div>
                     </div>

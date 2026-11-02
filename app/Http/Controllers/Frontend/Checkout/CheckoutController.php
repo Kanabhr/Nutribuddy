@@ -7,10 +7,12 @@ use App\Http\Requests\Frontend\CheckoutGuestSummaryRequest;
 use App\Http\Requests\Frontend\CheckoutPlaceOrderRequest;
 use App\Http\Requests\Frontend\CheckoutStoreRequest;
 use App\Http\Requests\Frontend\CheckoutSummaryRequest;
+use App\Http\Requests\Frontend\SendCodOtpRequest;
 use App\Models\Cart;
 use App\Models\CustomerAddress;
 use App\Models\Order;
 use App\Services\Checkout\CheckoutSummaryService;
+use App\Services\Checkout\CodOtpService;
 use App\Services\Checkout\OrderPlacementService;
 use App\Services\Checkout\StateCityService;
 use App\Services\Payments\CashfreePaymentService;
@@ -21,8 +23,6 @@ class CheckoutController extends Controller
     public function index(StateCityService $stateCityService): \Illuminate\View\View|\Illuminate\Http\RedirectResponse
     {
         $states = $stateCityService->checkoutStates();
-        $stateCityMap = $stateCityService->checkoutCityMap();
-        $allCities = $stateCityService->checkoutAllCities();
         $savedAddresses = collect();
 
         if (auth()->check()) {
@@ -38,22 +38,16 @@ class CheckoutController extends Controller
                 ->get();
         }
 
-        return view('frontend.storefront.checkout.checkout', compact('savedAddresses', 'states', 'stateCityMap', 'allCities'));
+        return view('frontend.storefront.checkout.checkout', compact('savedAddresses', 'states'));
     }
 
     public function getCities(string $stateCode, StateCityService $stateCityService): JsonResponse
     {
-        $state = $stateCityService->getStateCityData()[$stateCode] ?? null;
+        $cities = $stateCityService->checkoutCitiesForState($stateCode);
 
-        if (! $state) {
+        if ($cities === null) {
             return response()->json(['cities' => []], 404);
         }
-
-        $cities = collect($state['cities'] ?? [])
-            ->filter(fn ($city) => is_string($city) && trim($city) !== '')
-            ->sort(SORT_NATURAL | SORT_FLAG_CASE)
-            ->values()
-            ->all();
 
         return response()->json(['cities' => $cities]);
     }
@@ -79,9 +73,18 @@ class CheckoutController extends Controller
         return response()->json(
             $checkoutSummaryService->forGuest(
                 $request->validated('items'),
-                $request->validated('coupon_code')
+                $request->validated('coupon_code'),
+                $request->validated('shipping_state')
             )
         );
+    }
+
+    public function sendCodOtp(SendCodOtpRequest $request, CodOtpService $codOtpService): JsonResponse
+    {
+        $address = CustomerAddress::where('user_id', $request->user()->id)->findOrFail($request->validated('address_id'));
+        $result = $codOtpService->sendOtp($request->user(), $address);
+
+        return response()->json($result);
     }
 
     public function placeOrder(
@@ -94,27 +97,66 @@ class CheckoutController extends Controller
         $paymentMethod = $request->validated('payment_method') ?? null;
         $paymentData = [];
 
-        $payload = $orderPlacementService->place(
-            $request->user(),
-            $request->validated(),
-            function (Order $order) use ($paymentMethod, $cashfreePaymentService, $razorpayPaymentService, &$paymentData) {
-                if ($paymentMethod === 'cashfree') {
-                    $cashfreeOrder = $cashfreePaymentService->createOrder($order);
-                    $paymentData = [
-                        'provider' => 'cashfree',
-                        'mode' => config('services.cashfree.env') === 'production' ? 'production' : 'sandbox',
-                        'payment_session_id' => $cashfreeOrder['payment_session_id'],
-                    ];
-                } elseif ($paymentMethod === 'razorpay') {
-                    $razorpayOrder = $razorpayPaymentService->createOrder($order);
-                    $paymentData = [
-                        'provider' => 'razorpay',
-                        'razorpay_order_id' => $razorpayOrder['id'],
-                        'razorpay_key_id' => config('services.razorpay.key_id'),
-                    ];
+        try {
+            $payload = $orderPlacementService->place(
+                $request->user(),
+                $request->validated(),
+                function (Order $order) use ($paymentMethod, $cashfreePaymentService, $razorpayPaymentService, &$paymentData) {
+                    if ($paymentMethod === 'cashfree') {
+                        $cashfreeOrder = $cashfreePaymentService->createOrder($order);
+                        $paymentData = [
+                            'provider' => 'cashfree',
+                            'mode' => $cashfreePaymentService->environment(),
+                            'payment_session_id' => $cashfreeOrder['payment_session_id'],
+                        ];
+                    } elseif ($paymentMethod === 'razorpay') {
+                        $razorpayOrder = $razorpayPaymentService->createOrder($order);
+                        $paymentData = [
+                            'provider' => 'razorpay',
+                            'razorpay_order_id' => $razorpayOrder['id'],
+                            'razorpay_key_id' => config('services.razorpay.key_id'),
+                        ];
+                    }
                 }
+            );
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            $requestId = (string) \Illuminate\Support\Str::uuid();
+
+            \Illuminate\Support\Facades\Log::error('Order placement failed: ' . $e->getMessage(), [
+                'request_id' => $requestId,
+                'user_id' => $request->user()?->id,
+                'payment_method' => $paymentMethod,
+                'exception' => $e,
+            ]);
+
+            $statusCode = match (true) {
+                $e instanceof \InvalidArgumentException => 422,
+                $e instanceof \RuntimeException => 502,
+                default => 500,
+            };
+
+            $isCod = $paymentMethod === 'cod';
+            $defaultMessage = $isCod ? 'Unable to place order. Please try again.' : 'Unable to start payment. Please try again.';
+            $defaultCode = $isCod ? 'ORDER_PLACEMENT_FAILED' : 'PAYMENT_INIT_FAILED';
+
+            $message = ($e instanceof \RuntimeException || $e instanceof \InvalidArgumentException)
+                ? $e->getMessage()
+                : $defaultMessage;
+            if ($e instanceof \RuntimeException || $e instanceof \InvalidArgumentException) {
+                $message = $e->getMessage();
+            } else {
+                $message = $defaultMessage;
             }
-        );
+
+            return response()->json([
+                'success' => false,
+                'code' => $defaultCode,
+                'message' => $message,
+                'request_id' => $requestId,
+            ], $statusCode);
+        }
 
         if (!empty($paymentData)) {
             $payload['payment'] = $paymentData;

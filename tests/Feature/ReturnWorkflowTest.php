@@ -134,4 +134,40 @@ class ReturnWorkflowTest extends TestCase
         $this->assertDatabaseCount('order_returns', 0);
         $this->assertDatabaseCount('order_return_items', 0);
     }
+
+    public function test_admin_returns_index_and_show_render_when_order_user_is_null(): void
+    {
+        $permission = \Spatie\Permission\Models\Permission::firstOrCreate(['name' => 'view orders', 'guard_name' => 'admin']);
+        $admin = User::factory()->create(['role' => 'admin']);
+        $admin->givePermissionTo($permission);
+
+        $order = Order::factory()->create([
+            'user_id' => null,
+            'customer_name' => 'Adarsh Vishwakarma',
+            'customer_email' => 'adarsh@example.com',
+            'status' => 'delivered',
+            'grand_total' => 500,
+        ]);
+
+        $orderReturn = \App\Models\OrderReturn::create([
+            'order_id' => $order->id,
+            'user_id' => null,
+            'return_number' => 'RET-TEST-001',
+            'status' => 'pending',
+            'reason' => 'Defective product',
+            'refund_amount' => 500,
+        ]);
+
+        $this->actingAs($admin, 'admin')
+            ->get(route('admin.ecommerce.order-returns.index'))
+            ->assertOk()
+            ->assertSee('RET-TEST-001')
+            ->assertSee('Adarsh Vishwakarma');
+
+        $this->actingAs($admin, 'admin')
+            ->get(route('admin.ecommerce.order-returns.show', $orderReturn))
+            ->assertOk()
+            ->assertSee('RET-TEST-001')
+            ->assertSee('Adarsh Vishwakarma');
+    }
 }

@@ -34,6 +34,7 @@
                             <tr>
                                 <td>
                                     <a href="{{ route('admin.ecommerce.invoices.show', $order) }}" class="text-primary-600 fw-bold">#INV-{{ $order->order_number }}</a>
+                                    <a href="{{ route('admin.ecommerce.invoices.show', $order) }}" class="text-primary-600 fw-bold">{{ $order->invoice_number ?: ('#INV-' . $order->order_number) }}</a>
                                 </td>
                                 <td>{{ optional($order->placed_at)->format('d M Y') ?? $order->created_at->format('d M Y') }}</td>
                                 <td>

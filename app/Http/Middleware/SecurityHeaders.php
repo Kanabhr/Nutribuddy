@@ -29,7 +29,7 @@ class SecurityHeaders
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
                 "img-src 'self' data: blob: https:",
                 "font-src 'self' data: https://fonts.gstatic.com",
-                "connect-src 'self' https://sandbox.cashfree.com https://api.cashfree.com https://*.cashfree.com https://*.razorpay.com https://cdn.ckeditor.com https://cdn.jsdelivr.net",
+                "connect-src 'self' https://sandbox.cashfree.com https://api.cashfree.com https://*.cashfree.com https://*.razorpay.com https://cdn.ckeditor.com https://cdn.jsdelivr.net https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com",
                 "frame-src 'self' https://www.youtube.com https://sandbox.cashfree.com https://api.cashfree.com https://*.cashfree.com https://*.razorpay.com",
                 "object-src 'none'",
                 "base-uri 'self'",

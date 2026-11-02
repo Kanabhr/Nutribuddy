@@ -23,7 +23,7 @@
                         <h6 class="mb-16">Visual</h6>
                         <div class="d-flex justify-content-center align-items-center bg-light radius-12 p-16">
                             <img src="{{ $ingredient->icon_path ? asset('storage/' . $ingredient->icon_path) : asset('assets/images/logo-icon.png') }}"
-                                alt="icon" class="w-140-px h-140-px radius-12 border object-fit-cover">
+                                alt="icon" class="w-140-px h-140-px radius-12 border object-fit-cover" onerror="this.onerror=null;this.src='{{ asset('assets/images/logo-icon.png') }}';">
                         </div>
                     </div>
                 </div>

@@ -5,240 +5,195 @@
 @endphp
 
 @section('content')
-    <style>
-        .notification-feed-card,
-        .notification-feed-card .card-body,
-        .notification-feed-card .list-group,
-        .notification-feed-card .list-group-item {
-            max-width: 100%;
-            overflow-x: hidden;
-        }
+    @include('admin.partials.messages')
 
-        .notification-row {
-            min-width: 0;
-        }
-
-        .notification-content {
-            min-width: 0;
-        }
-
-        .notification-heading {
-            min-width: 0;
-        }
-
-        .notification-title,
-        .notification-message {
-            overflow-wrap: anywhere;
-            word-break: break-word;
-        }
-
-        .notification-time {
-            flex-shrink: 0;
-            white-space: nowrap;
-        }
-
-        .notification-actions {
-            flex-wrap: wrap;
-            min-width: 0;
-        }
-
-        .notification-delete-form {
-            margin-left: auto;
-        }
-
-        @media (max-width: 575.98px) {
-            .notification-item {
-                padding: 16px !important;
-            }
-
-            .notification-row {
-                gap: 12px !important;
-            }
-
-            .notification-heading {
-                align-items: flex-start !important;
-                flex-direction: column;
-            }
-
-            .notification-time {
-                white-space: normal;
-            }
-
-            .notification-actions {
-                align-items: flex-start !important;
-                flex-direction: column;
-                gap: 8px !important;
-            }
-
-            .notification-delete-form {
-                margin-left: 0 !important;
-            }
-        }
-    </style>
-
-    <div class="row g-4">
-        <div class="col-lg-12">
-            @include('admin.partials.messages')
-
-            <div class="card basic-data-table notification-feed-card">
-                <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-3">
-                    <h5 class="card-title mb-0">Activity Feed</h5>
-                    @if($notifications->whereNull('read_at')->count() > 0)
-                        <button type="button" id="mark-all-read" class="btn btn-sm btn-primary-600 d-inline-flex align-items-center gap-1"
-                                data-url="{{ route('admin.ecommerce.notifications.read-all') }}">
-                            <iconify-icon icon="lucide:check-check" class="text-xl"></iconify-icon>
-                            Mark All as Read
-                        </button>
-                    @endif
+    <div class="card border-0 radius-12 mb-24">
+        <div class="card-body p-24">
+            <form id="notification-filter-form" method="GET" action="{{ route('admin.ecommerce.notifications.index') }}"
+                  class="row g-3 align-items-end">
+                <div class="col-lg-4 col-md-6">
+                    <label for="notification-search" class="form-label">Search notifications</label>
+                    <input id="notification-search" type="search" name="search" value="{{ $filters['search'] ?? '' }}"
+                           class="form-control" maxlength="100" placeholder="Search title or message">
                 </div>
-                <div class="card-body p-0">
-                    <div class="list-group list-group-flush">
-                        @forelse ($notifications as $notification)
-                            @php
-                                $data = $notification->data;
-                                $isUnread = is_null($notification->read_at);
-                                $icon = 'lucide:bell';
-                                $bgClass = 'bg-primary-100 text-primary-600';
-                                
-                                if (str_contains($notification->type, 'Order')) {
-                                    $icon = 'f7:bag';
-                                    $bgClass = 'bg-success-100 text-success-600';
-                                } elseif (str_contains($notification->type, 'Return')) {
-                                    $icon = 'solar:undo-left-round-bold';
-                                    $bgClass = 'bg-warning-100 text-warning-main';
-                                } elseif (str_contains($notification->type, 'User') || str_contains($notification->type, 'Customer')) {
-                                    $icon = 'solar:user-bold';
-                                    $bgClass = 'bg-info-100 text-info-600';
-                                }
-                            @endphp
-                            <div id="notification-{{ $notification->id }}" class="list-group-item list-group-item-action p-24 notification-item {{ $isUnread ? 'bg-primary-50 notification-unread' : '' }}">
-                                <div class="d-flex align-items-start gap-3 notification-row">
-                                    <div class="flex-shrink-0 w-48-px h-48-px radius-circle {{ $bgClass }} d-flex align-items-center justify-content-center text-2xl">
-                                        <iconify-icon icon="{{ $icon }}"></iconify-icon>
-                                    </div>
-                                    <div class="flex-grow-1 notification-content">
-                                        <div class="d-flex align-items-center justify-content-between gap-2 mb-4 notification-heading">
-                                            <h6 class="notification-title text-md mb-0 fw-bold {{ $isUnread ? 'text-primary-600' : 'text-secondary-light' }}">
-                                                {{ $data['title'] ?? 'System Notification' }}
-                                            </h6>
-                                            <span class="text-xs text-secondary-light fw-medium notification-time">{{ $notification->created_at->diffForHumans() }}</span>
-                                        </div>
-                                        <p class="text-sm mb-12 text-secondary-light notification-message">
-                                            {{ $data['message'] ?? 'You have a new activity in your store.' }}
-                                        </p>
-                                        
-                                        <div class="d-flex align-items-center gap-3 notification-actions">
-                                            @if($isUnread)
-                                                <button type="button" class="btn btn-sm btn-outline-primary px-16 py-4 radius-4 text-xs mark-as-read" 
-                                                        data-id="{{ $notification->id }}" 
-                                                        data-url="{{ route('admin.ecommerce.notifications.read', $notification->id) }}">
-                                                    Mark as Read
-                                                </button>
-                                            @endif
-                                            
-                                            @if(isset($data['action_url']))
-                                                <a href="{{ $data['action_url'] }}" class="btn btn-sm btn-primary-600 px-16 py-4 radius-4 text-xs d-inline-flex align-items-center gap-1">
-                                                    View Details <iconify-icon icon="lucide:arrow-right" class="text-xs"></iconify-icon>
-                                                </a>
-                                            @endif
-
-                                            <form action="{{ route('admin.ecommerce.notifications.destroy', $notification->id) }}" method="POST" class="ms-auto notification-delete-form" onsubmit="return confirm('Delete this notification?')">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="text-danger-main hover-text-danger-600 text-xl d-flex align-items-center bg-transparent border-0 p-0">
-                                                    <iconify-icon icon="mingcute:delete-2-line"></iconify-icon>
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        @empty
-                            <div class="p-64 text-center">
-                                <div class="w-80-px h-80-px radius-circle bg-secondary-100 d-inline-flex align-items-center justify-content-center text-secondary-light text-4xl mb-16">
-                                    <iconify-icon icon="lucide:bell-off"></iconify-icon>
-                                </div>
-                                <h6 class="text-secondary-light mb-0">No notifications found.</h6>
-                                <p class="text-xs text-secondary-light">We'll alert you when something important happens.</p>
-                            </div>
-                        @endforelse
-                    </div>
+                <div class="col-lg-2 col-md-6">
+                    <label for="notification-type" class="form-label">Type</label>
+                    <select id="notification-type" name="type" class="form-select">
+                        <option value="">All types</option>
+                        @foreach ($notificationTypes as $key => $type)
+                            <option value="{{ $key }}" @selected(($filters['type'] ?? '') === $key)>{{ $type['label'] }}</option>
+                        @endforeach
+                    </select>
                 </div>
-            </div>
+                <div class="col-lg-2 col-md-6">
+                    <label for="notification-status" class="form-label">Status</label>
+                    <select id="notification-status" name="status" class="form-select">
+                        <option value="">All statuses</option>
+                        <option value="unread" @selected(($filters['status'] ?? '') === 'unread')>Unread</option>
+                        <option value="read" @selected(($filters['status'] ?? '') === 'read')>Read</option>
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-6">
+                    <label for="notification-from" class="form-label">From</label>
+                    <input id="notification-from" type="date" name="from" value="{{ $filters['from'] ?? '' }}" class="form-control">
+                </div>
+                <div class="col-lg-2 col-md-6">
+                    <label for="notification-to" class="form-label">To</label>
+                    <input id="notification-to" type="date" name="to" value="{{ $filters['to'] ?? '' }}" class="form-control">
+                </div>
+                <div class="col-12 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary-600">Filter</button>
+                    <a href="{{ route('admin.ecommerce.notifications.index') }}" id="notification-clear-filters"
+                       class="btn btn-outline-secondary">Clear</a>
+                </div>
+            </form>
         </div>
     </div>
+
+    <div id="notification-feedback" class="alert alert-danger d-none" role="status" aria-live="polite"></div>
+    <div id="notification-results" aria-live="polite">
+        @include('admin.system.notifications._results')
+    </div>
+
+    <style>
+        .notification-copy { min-width: 260px; max-width: 620px; white-space: normal; overflow-wrap: anywhere; }
+        .notification-copy > div + div { margin-top: 4px; }
+        .notification-unread { background: var(--bs-primary-bg-subtle, #f4f7ff); }
+    </style>
+
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
+            const form = document.getElementById('notification-filter-form');
+            const results = document.getElementById('notification-results');
+            const feedback = document.getElementById('notification-feedback');
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            let activeRequest;
 
-            // Mark as Read (Individual)
-            document.querySelectorAll('.mark-as-read').forEach(button => {
-                button.addEventListener('click', function() {
-                    const notificationId = this.getAttribute('data-id');
-                    const url = this.getAttribute('data-url');
-                    const btn = this;
+            const showError = (message) => {
+                feedback.textContent = message;
+                feedback.classList.remove('d-none');
+            };
+            const clearError = () => {
+                feedback.textContent = '';
+                feedback.classList.add('d-none');
+            };
+            const syncFilters = (url) => {
+                const params = new URL(url).searchParams;
+                for (const field of form.elements) {
+                    if (field.name) field.value = params.get(field.name) ?? '';
+                }
+            };
+            const loadResults = async (url, pushState = true) => {
+                activeRequest?.abort();
+                const controller = new AbortController();
+                activeRequest = controller;
+                results.setAttribute('aria-busy', 'true');
+                results.classList.add('opacity-50');
+                clearError();
 
-                    fetch(url, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': csrfToken,
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'Content-Type': 'application/json'
-                        }
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            const item = document.getElementById(`notification-${notificationId}`);
-                            if (item) {
-                                item.classList.remove('bg-primary-50', 'notification-unread');
-                                const title = item.querySelector('.notification-title');
-                                if (title) {
-                                    title.classList.remove('text-primary-600');
-                                    title.classList.add('text-secondary-light');
-                                }
-                                btn.remove();
-                            }
-                        }
-                    })
-                    .catch(error => console.error('Error:', error));
+                try {
+                    const response = await fetch(url, {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' },
+                        signal: controller.signal
+                    });
+                    if (!response.ok) {
+                        const error = await response.json().catch(() => ({}));
+                        const message = error.message || Object.values(error.errors || {}).flat()[0] || 'Could not load notifications.';
+                        throw new Error(message);
+                    }
+
+                    const parsed = new DOMParser().parseFromString(await response.text(), 'text/html');
+                    const content = parsed.body.firstElementChild;
+                    if (!content) throw new Error('The notification response was empty.');
+                    results.replaceChildren(content);
+                    if (pushState) history.pushState({}, '', url);
+                } catch (error) {
+                    if (error.name !== 'AbortError') showError(error.message || 'Could not load notifications.');
+                } finally {
+                    if (activeRequest === controller) {
+                        results.removeAttribute('aria-busy');
+                        results.classList.remove('opacity-50');
+                    }
+                }
+            };
+            const filteredUrl = () => {
+                const url = new URL(form.action);
+                for (const [key, value] of new FormData(form)) {
+                    if (String(value).trim()) url.searchParams.set(key, value);
+                }
+                return url;
+            };
+            const sendAction = async (url, method = 'POST') => {
+                const response = await fetch(url, {
+                    method,
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) throw new Error(data.message || 'Notification update failed.');
+                return data;
+            };
+
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+                loadResults(filteredUrl());
+            });
+
+            document.addEventListener('click', function (event) {
+                const clearLink = event.target.closest('#notification-clear-filters');
+                if (clearLink) {
+                    event.preventDefault();
+                    form.reset();
+                    loadResults(clearLink.href);
+                    return;
+                }
+
+                const pageLink = event.target.closest('#notification-results .pagination a[href]');
+                if (pageLink) {
+                    event.preventDefault();
+                    loadResults(pageLink.href);
+                    return;
+                }
+
+                const markRead = event.target.closest('#notification-results .mark-as-read');
+                if (markRead) {
+                    sendAction(markRead.dataset.url).then(() => loadResults(window.location.href, false)).catch(error => showError(error.message));
+                    return;
+                }
+
+                const markAll = event.target.closest('#mark-all-read');
+                if (markAll) {
+                    sendAction(markAll.dataset.url).then(() => loadResults(window.location.href, false)).catch(error => showError(error.message));
+                }
+            });
+
+            document.addEventListener('submit', function (event) {
+                const deleteForm = event.target.closest('#notification-results .notification-delete-form');
+                if (!deleteForm) return;
+                event.preventDefault();
+                if (!window.confirm('Delete this notification?')) return;
+
+                const button = deleteForm.querySelector('button[type="submit"]');
+                button.disabled = true;
+                sendAction(deleteForm.action, 'DELETE').then(data => {
+                    const url = new URL(window.location.href);
+                    const page = Number(url.searchParams.get('page') || 1);
+                    if (page > 1 && data.remaining <= (page - 1) * 10) url.searchParams.set('page', String(page - 1));
+                    history.replaceState({}, '', url);
+                    return loadResults(url, false);
+                }).catch(error => {
+                    button.disabled = false;
+                    showError(error.message);
                 });
             });
 
-            // Mark All as Read
-            const markAllBtn = document.getElementById('mark-all-read');
-            if (markAllBtn) {
-                markAllBtn.addEventListener('click', function() {
-                    const url = this.getAttribute('data-url');
-                    const btn = this;
-
-                    fetch(url, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': csrfToken,
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'Content-Type': 'application/json'
-                        }
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            document.querySelectorAll('.notification-unread').forEach(item => {
-                                item.classList.remove('bg-primary-50', 'notification-unread');
-                                const title = item.querySelector('.notification-title');
-                                if (title) {
-                                    title.classList.remove('text-primary-600');
-                                    title.classList.add('text-secondary-light');
-                                }
-                                const markAsReadBtn = item.querySelector('.mark-as-read');
-                                if (markAsReadBtn) markAsReadBtn.remove();
-                            });
-                            btn.remove();
-                        }
-                    })
-                    .catch(error => console.error('Error:', error));
-                });
-            }
+            window.addEventListener('popstate', function () {
+                syncFilters(window.location.href);
+                loadResults(window.location.href, false);
+            });
         });
     </script>
 @endsection

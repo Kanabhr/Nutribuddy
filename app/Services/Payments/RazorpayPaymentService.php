@@ -18,6 +18,17 @@ class RazorpayPaymentService
 
     public function createOrder(Order $order): array
     {
+        $existingPayment = $order->payments()
+            ->where('provider', 'razorpay')
+            ->where('transaction_type', 'capture')
+            ->latest()
+            ->first();
+
+        if ($existingPayment?->gateway_order_id
+            && ($existingPayment->gateway_payload['id'] ?? null) === $existingPayment->gateway_order_id) {
+            return $existingPayment->gateway_payload;
+        }
+
         $payload = [
             'amount' => round((float) $order->grand_total * 100), // Razorpay expects amount in paise (1 INR = 100 paise)
             'currency' => 'INR',
@@ -42,6 +53,9 @@ class RazorpayPaymentService
         }
 
         $razorpayOrder = $response->json();
+        if (! is_array($razorpayOrder) || empty($razorpayOrder['id'])) {
+            throw new RuntimeException('Razorpay did not return a usable order. Please try again.');
+        }
 
         $order->payments()->updateOrCreate(
             ['provider' => 'razorpay', 'transaction_type' => 'capture'],
@@ -56,6 +70,32 @@ class RazorpayPaymentService
         );
 
         return $razorpayOrder;
+    }
+
+    /** Confirm the gateway reports the signed payment as captured for this exact order and amount. */
+    public function isCapturedPaymentForOrder(Order $order, array $data): bool
+    {
+        $paymentId = (string) ($data['razorpay_payment_id'] ?? '');
+        if ($paymentId === '') {
+            return false;
+        }
+
+        $response = Http::withBasicAuth($this->keyId(), $this->keySecret())
+            ->timeout(20)
+            ->get('https://api.razorpay.com/v1/payments/' . rawurlencode($paymentId));
+
+        if (! $response->successful()) {
+            throw new RuntimeException('Unable to verify Razorpay payment status.');
+        }
+
+        $payment = $response->json();
+
+        return is_array($payment)
+            && ($payment['id'] ?? null) === $paymentId
+            && ($payment['order_id'] ?? null) === ($data['razorpay_order_id'] ?? null)
+            && ($payment['status'] ?? null) === 'captured'
+            && strtoupper((string) ($payment['currency'] ?? '')) === 'INR'
+            && (int) ($payment['amount'] ?? -1) === (int) round((float) $order->grand_total * 100);
     }
 
     public function verifySignature(array $data): bool

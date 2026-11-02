@@ -14,6 +14,8 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Models\User;
 use App\Notifications\NewOrderNotification;
+use App\Services\Checkout\CodOtpService;
+use App\Services\Ecommerce\InvoiceNumberService;
 use App\Services\PricingService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -21,10 +23,18 @@ use Illuminate\Support\Str;
 
 class OrderPlacementService
 {
+    private readonly InvoiceNumberService $invoiceNumberService;
+    private readonly CodOtpService $codOtpService;
+
     public function __construct(
         private readonly CheckoutSummaryService $checkoutSummaryService,
-        private readonly PricingService $pricingService
-    ) {}
+        private readonly PricingService $pricingService,
+        ?InvoiceNumberService $invoiceNumberService = null,
+        ?CodOtpService $codOtpService = null
+    ) {
+        $this->invoiceNumberService = $invoiceNumberService ?? new InvoiceNumberService();
+        $this->codOtpService = $codOtpService ?? app(CodOtpService::class);
+    }
 
     public function place(User $user, array $validated, ?callable $paymentCallback = null): array
     {
@@ -43,6 +53,10 @@ class OrderPlacementService
             ];
         }
 
+        if (($validated['payment_method'] ?? null) === 'cod') {
+            $this->codOtpService->verifyOtp($user, $validated['cod_otp'] ?? null, (int) $address->id);
+        }
+
         $order = DB::transaction(function () use ($user, $address, $coupon, $validated, $checkoutToken, $paymentCallback) {
             $cart = $this->resolveUserCart($user)
                 ->load(['items.product.taxRate', 'items.product.primaryImage', 'items.product.images', 'items.productVariant']);
@@ -52,7 +66,7 @@ class OrderPlacementService
             // Always use the user's full balance — PricingService caps it to the allowed % automatically.
             $coinsToRedeem = (int) $user->coins_balance;
 
-            $pricing = $this->pricingService->calculate($cart->items, $coupon, $coinsToRedeem);
+            $pricing = $this->pricingService->calculate($cart->items, $coupon, $coinsToRedeem, $address->state);
             $this->validateCouponRules($coupon, (float) $pricing['subtotal'], $user->id);
             $this->validateInventory($cart);
 
@@ -134,6 +148,7 @@ class OrderPlacementService
     {
         return Order::create([
             'order_number' => $this->generateOrderNumber(),
+            'invoice_number' => $this->invoiceNumberService->generateNextInvoiceNumber(),
             'checkout_token' => $checkoutToken,
             'user_id' => $user->id,
             'coupon_id' => $coupon?->id,
@@ -168,6 +183,7 @@ class OrderPlacementService
             'grand_total' => $pricing['grand_total'],
             'customer_note' => $validated['customer_note'] ?? null,
             'placed_at' => now(),
+            'cod_verified_at' => ($validated['payment_method'] ?? null) === 'cod' ? now() : null,
             'pricing_snapshot' => [
                 'line_items' => $pricing['line_items'],
                 'coupon' => $coupon?->only(['id', 'code', 'discount_type', 'discount_value']),
@@ -214,6 +230,7 @@ class OrderPlacementService
                     'product_slug' => $product->slug,
                     'variant_name' => $variant?->name,
                     'variant_attributes' => $variant?->attributes,
+                    'hsn_code' => $product->hsn_code,
                 ],
             ]);
         }
@@ -250,13 +267,17 @@ class OrderPlacementService
 
     private function recordStatusHistory(Order $order, User $user): void
     {
+        $note = $order->payment_method === 'cod'
+            ? 'Order placed by customer via Cash on Delivery (OTP verified).'
+            : 'Order placed by customer.';
+
         $order->statusHistories()->create([
             'from_status' => null,
             'to_status' => 'pending',
             'from_fulfillment_status' => null,
             'to_fulfillment_status' => 'unfulfilled',
             'updated_by' => $user->id,
-            'note' => 'Order placed by customer.',
+            'note' => $note,
         ]);
     }
 

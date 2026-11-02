@@ -10,21 +10,22 @@
     <link rel="stylesheet" href="{{ asset('assets/css/access-control.css') }}">
 
     <div class="ac-tabs">
-        <button class="ac-tab-btn active" onclick="switchTab('users')" id="btn-tab-users">
-            <iconify-icon icon="ph:users"></iconify-icon> Users Management
-        </button>
-        <button class="ac-tab-btn" onclick="switchTab('roles')" id="btn-tab-roles">
-            <iconify-icon icon="ph:shield-check"></iconify-icon> Roles & Permissions
-        </button>
+        @if($canViewUsers)
+            <button class="ac-tab-btn active" onclick="switchTab('users')" id="btn-tab-users"><iconify-icon icon="ph:users"></iconify-icon> Users Management</button>
+        @endif
+        @if($canViewRoles)
+            <button class="ac-tab-btn {{ $canViewUsers ? '' : 'active' }}" onclick="switchTab('roles')" id="btn-tab-roles"><iconify-icon icon="ph:shield-check"></iconify-icon> Roles & Permissions</button>
+        @endif
     </div>
 
     <!-- USERS TAB -->
+    @if($canViewUsers)
     <div id="tab-users" class="ac-card">
         <div class="ac-card-header">
             <h3 class="ac-card-title">User Directory</h3>
-            <button class="btn-teal" onclick="openUserModal()">
+            @if($canManageUsers)<button class="btn-teal" onclick="openUserModal()">
                 <iconify-icon icon="ph:plus"></iconify-icon> Add New User
-            </button>
+            </button>@endif
         </div>
 
         <div class="table-responsive">
@@ -48,25 +49,34 @@
                                     class="badge-status {{ $user->is_active ? '' : 'inactive' }}">{{ $user->is_active ? 'Active' : 'Inactive' }}</span>
                             </td>
                             <td>
-                                <button class="action-btn"
-                                    onclick="editUser({{ $user->id }}, '{{ addslashes($user->name) }}', '{{ addslashes($user->email) }}', '{{ $user->roles->first()->name ?? '' }}', {{ $user->is_active ? 1 : 0 }})">
+                                @if($canManageUsers)<button class="action-btn"
+                                    type="button"
+                                    data-access-action="edit-user"
+                                    data-user-id="{{ $user->id }}"
+                                    data-user-name="{{ $user->name }}"
+                                    data-user-email="{{ $user->email }}"
+                                    data-user-role="{{ $user->roles->first()->name ?? '' }}"
+                                    data-user-status="{{ $user->is_active ? 1 : 0 }}">
                                     <iconify-icon icon="ph:dots-three-vertical-bold"></iconify-icon>
-                                </button>
+                                </button>@endif
                             </td>
                         </tr>
                     @endforeach
                 </tbody>
             </table>
         </div>
+        {{ $users->links() }}
     </div>
+    @endif
 
     <!-- ROLES TAB -->
-    <div id="tab-roles" class="ac-card" style="display:none;">
+    @if($canViewRoles)
+    <div id="tab-roles" class="ac-card" style="{{ $canViewUsers ? 'display:none;' : '' }}">
         <div class="ac-card-header">
             <h3 class="ac-card-title">Role Permissions Matrix</h3>
-            <button class="btn-teal" onclick="openRoleModal()">
+            @if($canManageRoles)<button class="btn-teal" onclick="openRoleModal()">
                 <iconify-icon icon="ph:plus"></iconify-icon> Add New Role
-            </button>
+            </button>@endif
         </div>
 
         <div class="table-responsive">
@@ -79,7 +89,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach($roles as $role)
+                    @foreach($roleRows as $role)
                         <tr>
                             <td><strong style="color:#0f172a;">{{ $role->name }}</strong></td>
                             <td>
@@ -110,19 +120,26 @@
                                 @endif
                             </td>
                             <td>
-                                <button class="action-btn"
-                                    onclick="editRole({{ $role->id }}, '{{ addslashes($role->name) }}', {{ json_encode($modulesWithAccess ?? []) }})">
+                                @if($canManageRoles)<button class="action-btn"
+                                    type="button"
+                                    data-access-action="edit-role"
+                                    data-role-id="{{ $role->id }}"
+                                    data-role-name="{{ $role->name }}"
+                                    data-role-permissions="{{ json_encode($modulesWithAccess ?? []) }}">
                                     <iconify-icon icon="ph:dots-three-vertical-bold"></iconify-icon>
-                                </button>
+                                </button>@endif
                             </td>
                         </tr>
                     @endforeach
                 </tbody>
             </table>
         </div>
+        {{ $roleRows->links() }}
     </div>
+    @endif
 
     <!-- USER MODAL -->
+    @if($canManageUsers)
     <div class="modal fade" id="userModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content ac-modal-content">
@@ -184,8 +201,10 @@
             </div>
         </div>
     </div>
+    @endif
 
     <!-- ROLE MODAL -->
+    @if($canManageRoles)
     <div class="modal fade" id="roleModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content ac-modal-content">
@@ -243,6 +262,7 @@
             </div>
         </div>
     </div>
+    @endif
 
     <script>
         window.AC_ROUTES = {
@@ -252,6 +272,6 @@
             rolesStoreUrl: "{{ route('admin.access-control.roles.store') }}"
         };
     </script>
-    <script src="{{ asset('assets/js/access-control.js') }}"></script>
+    <script src="{{ asset('assets/js/access-control.js') }}?v={{ filemtime(public_path('assets/js/access-control.js')) }}"></script>
 
 @endsection

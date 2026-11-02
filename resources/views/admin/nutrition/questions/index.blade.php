@@ -18,8 +18,7 @@
       
       @if($groupedQuestions->isEmpty())
         <div class="text-center p-4">
-          <p class="text-muted mb-3">No nutrition questions found.</p>
-          <a href="{{ route('admin.nutrition.questions.create') }}" class="btn btn-outline-primary">Create your first question</a>
+          <p class="text-muted mb-3">No plan questions found.</p>
         </div>
       @else
         <div class="accordion mt-3" id="questionsAccordion">
@@ -61,16 +60,10 @@
                                     <small class="text-muted" title="Clinical Reason">{{ Str::limit($question->clinical_reason, 40) }}</small>
                                   </td>
                                   <td><span class="badge bg-secondary">{{ $question->answer_type }}</span></td>
-                                  <td>{{ Str::limit($question->options_scale, 30) }}</td>
+                                  <td>{{ Str::limit(str_replace('Few times a yr', 'Few times a year', (string) $question->options_scale), 30) }}</td>
                                   <td><span class="badge bg-info">{{ $question->only_ask_if }}</span></td>
                                   <td>
-                                    <div class="d-flex gap-2">
-                                        <a href="{{ route('admin.nutrition.questions.edit', $question->id) }}" class="btn btn-sm btn-info text-white"><i class="bx bx-edit-alt"></i> Edit</a>
-                                        <form action="{{ route('admin.nutrition.questions.destroy', $question->id) }}" method="POST" onsubmit="return confirm('Delete this question?');">
-                                          @csrf @method('DELETE')
-                                          <button type="submit" class="btn btn-sm btn-danger"><i class="bx bx-trash"></i> Delete</button>
-                                        </form>
-                                    </div>
+                                    <a href="{{ route('admin.nutrition.questions.edit', $question->id) }}" class="btn btn-sm btn-info text-white"><i class="bx bx-edit-alt"></i> Edit</a>
                                   </td>
                                 </tr>
                               @endforeach

@@ -41,7 +41,8 @@ return [
             'root' => env('PUBLIC_STORAGE_PATH', storage_path('app/public')),
             'url' => env('APP_URL').'/storage',
             'visibility' => 'public',
-            'throw' => false,
+            // A failed upload must not leave a database path pointing at a missing file.
+            'throw' => true,
         ],
 
         's3' => [
