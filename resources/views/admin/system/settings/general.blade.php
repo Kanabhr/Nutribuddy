@@ -21,7 +21,7 @@
                                 <span class="icon">
                                     <iconify-icon icon="solar:global-outline"></iconify-icon>
                                 </span>
-                                <input type="text" name="site_name" value="{{ old('site_name', $settings['site_name']) }}" class="form-control" placeholder="Enter Site Name">
+                                <input type="text" name="site_name" value="{{ old('site_name', $settings['site_name'] ?? '') }}" class="form-control" placeholder="Enter Site Name">
                             </div>
                             @error('site_name')<span class="text-danger small">{{ $message }}</span>@enderror
                         </div>
@@ -43,7 +43,7 @@
                                 <span class="icon">
                                     <iconify-icon icon="mage:email"></iconify-icon>
                                 </span>
-                                <input type="email" name="contact_email" value="{{ old('contact_email', $settings['contact_email']) }}" class="form-control" placeholder="admin@nutribuddy.com">
+                                <input type="email" name="contact_email" value="{{ old('contact_email', $settings['contact_email'] ?? '') }}" class="form-control" placeholder="admin@nutribuddy.com">
                             </div>
                         </div>
 
@@ -53,7 +53,7 @@
                                 <span class="icon">
                                     <iconify-icon icon="solar:phone-outline"></iconify-icon>
                                 </span>
-                                <input type="text" name="contact_phone" value="{{ old('contact_phone', $settings['contact_phone']) }}" class="form-control" placeholder="+91 XXXX XXXX">
+                                <input type="text" name="contact_phone" value="{{ old('contact_phone', $settings['contact_phone'] ?? '') }}" class="form-control" placeholder="+91 XXXX XXXX">
                             </div>
                         </div>
 
@@ -76,7 +76,7 @@
                                 </span>
                                 <select name="store_state" class="form-select form-control">
                                     @foreach($states as $st)
-                                        <option value="{{ $st }}" {{ old('store_state', $settings['store_state']) === $st ? 'selected' : '' }}>{{ $st }}</option>
+                                        <option value="{{ $st }}" {{ old('store_state', $settings['store_state'] ?? '') === $st ? 'selected' : '' }}>{{ $st }}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -89,7 +89,7 @@
                                 <span class="icon">
                                     <iconify-icon icon="lucide:file-text"></iconify-icon>
                                 </span>
-                                <input type="text" name="gst_number" value="{{ old('gst_number', $settings['gst_number']) }}" class="form-control" placeholder="e.g. 24AAAAA0000A1Z5">
+                                <input type="text" name="gst_number" value="{{ old('gst_number', $settings['gst_number'] ?? '') }}" class="form-control" placeholder="e.g. 24AAAAA0000A1Z5">
                             </div>
                             <p class="text-xs text-secondary-light mt-1">Leave blank if unregistered.</p>
                         </div>
@@ -118,7 +118,7 @@
 
                         <div class="col-md-12">
                             <label class="form-label">Registered Office Address</label>
-                            <textarea name="address" class="form-control" rows="2" placeholder="Full registered office address...">{{ old('address', $settings['address']) }}</textarea>
+                            <textarea name="address" class="form-control" rows="2" placeholder="Full registered office address...">{{ old('address', $settings['address'] ?? '') }}</textarea>
                         </div>
 
                         <hr class="my-4">
@@ -129,7 +129,7 @@
 
                         <div class="col-md-12">
                             <label class="form-label">Default Meta Description</label>
-                            <textarea name="meta_description" class="form-control" rows="3" placeholder="This shows when a page doesn't have its own description">{{ old('meta_description', $settings['meta_description']) }}</textarea>
+                            <textarea name="meta_description" class="form-control" rows="3" placeholder="This shows when a page doesn't have its own description">{{ old('meta_description', $settings['meta_description'] ?? '') }}</textarea>
                             <p class="text-xs text-secondary-light mt-8">Recommended: 150-160 characters. Used for Home, Contact, and other generic pages.</p>
                         </div>
 
@@ -139,7 +139,7 @@
                                 <span class="icon">
                                     <iconify-icon icon="lucide:hash"></iconify-icon>
                                 </span>
-                                <input type="text" name="meta_keywords" value="{{ old('meta_keywords', $settings['meta_keywords']) }}" class="form-control" placeholder="keyword1, keyword2, keyword3">
+                                <input type="text" name="meta_keywords" value="{{ old('meta_keywords', $settings['meta_keywords'] ?? '') }}" class="form-control" placeholder="keyword1, keyword2, keyword3">
                             </div>
                             <p class="text-xs text-secondary-light mt-8">Separated by commas.</p>
                         </div>

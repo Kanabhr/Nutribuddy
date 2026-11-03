@@ -15,18 +15,18 @@ class GeneralSettingController extends Controller
     public function index(): View
     {
         $settings = [
-            'site_name' => Setting::get('site_name', 'NutriBuddy'),
-            'company_name' => Setting::get('company_name', Setting::get('site_name', 'NutriBuddy Kids Pvt. Ltd.')),
-            'meta_description' => Setting::get('meta_description', 'Your Health Partner - Premium Nutrition & Wellness Store'),
-            'meta_keywords' => Setting::get('meta_keywords', 'nutrition, wellness, health, supplements'),
-            'contact_email' => Setting::get('contact_email', 'admin@nutribuddy.com'),
-            'contact_phone' => Setting::get('contact_phone', '+91 9876543210'),
-            'address' => Setting::get('address', '123 Health St, Wellness City'),
-            'website_url' => Setting::get('website_url', config('app.url', 'https://nutribuddy.in')),
-            'gst_number' => Setting::get('gst_number', ''),
-            'pan_number' => Setting::get('pan_number', ''),
-            'cin_number' => Setting::get('cin_number', ''),
-            'store_state' => Setting::get('store_state', 'Gujarat'),
+            'site_name' => (string) Setting::get('site_name', 'NutriBuddy'),
+            'company_name' => (string) Setting::get('company_name', Setting::get('site_name', 'NutriBuddy Kids Pvt. Ltd.')),
+            'meta_description' => (string) Setting::get('meta_description', 'Your Health Partner - Premium Nutrition & Wellness Store'),
+            'meta_keywords' => (string) Setting::get('meta_keywords', 'nutrition, wellness, health, supplements'),
+            'contact_email' => (string) Setting::get('contact_email', 'admin@nutribuddy.com'),
+            'contact_phone' => (string) Setting::get('contact_phone', '+91 9876543210'),
+            'address' => (string) Setting::get('address', '123 Health St, Wellness City'),
+            'website_url' => (string) Setting::get('website_url', config('app.url', 'https://nutribuddy.in')),
+            'gst_number' => (string) Setting::get('gst_number', ''),
+            'pan_number' => (string) Setting::get('pan_number', ''),
+            'cin_number' => (string) Setting::get('cin_number', ''),
+            'store_state' => (string) Setting::get('store_state', 'Gujarat'),
         ];
 
         $states = app(\App\Services\Checkout\StateCityService::class)->checkoutStates();
