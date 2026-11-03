@@ -118,9 +118,16 @@
                             @php
                                 $reviewCount = $product->reviews->where('is_active', true)->count();
                                 $rating = $reviewCount > 0 ? $product->reviews->where('is_active', true)->avg('rating') : 0;
+                                $fullStars = floor($rating);
                             @endphp
                             @for ($i = 0; $i < 5; $i++)
-                                {{ $i < $rating ? '★' : '☆' }}
+                                @if ($i < $fullStars)
+                                    ★
+                                @elseif ($i == $fullStars && ($rating - $fullStars) >= 0.5)
+                                    ★
+                                @else
+                                    ☆
+                                @endif
                             @endfor
                             <span style="color:#aaa;font-size:.75rem;font-family:'DM Sans',sans-serif">
                                 ({{ $reviewCount }} reviews)

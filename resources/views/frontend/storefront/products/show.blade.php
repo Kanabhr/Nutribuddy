@@ -200,9 +200,16 @@
                         $activeReviewsCount = $product->reviews->where('is_active', true)->count();
                         $rating =
                             $activeReviewsCount > 0 ? $product->reviews->where('is_active', true)->avg('rating') : 0;
+                        $fullStars = floor($rating);
                     @endphp
                     @for ($i = 0; $i < 5; $i++)
-                        {{ $i < $rating ? '★' : '☆' }}
+                        @if ($i < $fullStars)
+                            ★
+                        @elseif ($i == $fullStars && ($rating - $fullStars) >= 0.5)
+                            ★
+                        @else
+                            ☆
+                        @endif
                     @endfor
                 </div>
                 <div class="rating-val">{{ number_format($rating, 1) }}</div>
