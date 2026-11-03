@@ -116,8 +116,8 @@
                         <a href="{{ route('product.show', $product->slug) }}#reviews" class="pc-stars"
                             style="text-decoration: none;">
                             @php
-                                $reviewCount = $product->reviews->count();
-                                $rating = $reviewCount > 0 ? $product->reviews->avg('rating') : 0;
+                                $reviewCount = $product->reviews->where('is_active', true)->count();
+                                $rating = $reviewCount > 0 ? $product->reviews->where('is_active', true)->avg('rating') : 0;
                             @endphp
                             @for ($i = 0; $i < 5; $i++)
                                 {{ $i < $rating ? '★' : '☆' }}
