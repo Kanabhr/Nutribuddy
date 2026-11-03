@@ -709,10 +709,7 @@
                             </div>
                             <div>
                                 <div class="feat-item-title">No Refined Sugar</div>
-                                <div class="feat-item-desc">We sweeten with Stevia + monk fruit extract — giving a
-                                    naturally sweet taste
-                                    with zero impact on blood sugar. Kids get the yummy without the sugar crash or tooth
-                                    decay.</div>
+                                <div class="feat-item-desc">We sweeten with Fructooligosaccharides (FOS), a prebiotic dietary fibre derived from chicory root. FOS feeds beneficial gut bacteria, supports digestive health, provides mild sweetness with fewer calories than regular sugar, and is not considered refined sugar.</div>
                             </div>
                         </div>
 

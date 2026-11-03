@@ -2414,9 +2414,9 @@ document.querySelectorAll('.reveal').forEach(r => ro.observe(r));
       dosage: 'Gummy base', badgeColor: 'rgba(255,255,255,.4)', badgeBg: 'rgba(255,255,255,.06)', emojiBg: 'rgba(255,255,255,.05)'
     },
     {
-      id: 'stevia', name: 'Stevia + Monk Fruit', emoji: '🍃', cat: 'ba', catLabel: 'Base', latin: 'Stevia rebaudiana + Siraitia grosvenorii',
-      desc: 'Our natural zero-calorie sweetener blend. 300x sweeter than sugar but with zero glycemic impact — no sugar crashes, no tooth decay. Kids get the sweetness without any downsides.',
-      benefits: ['Zero Sugar', 'Zero Calories', 'No Glycemic Impact', 'No Tooth Decay'],
+      id: 'fos', name: 'Fructooligosaccharides (FOS)', emoji: '🌾', cat: 'ba', catLabel: 'Base', latin: 'Prebiotic Dietary Fibre',
+      desc: 'A prebiotic dietary fibre commonly derived from chicory root, sugar beet or other plant sources. FOS feeds beneficial gut bacteria, supports digestive health, provides mild sweetness with fewer calories than regular sugar, and is not considered refined sugar.',
+      benefits: ['Prebiotic Fibre', 'Supports Gut Health', 'Mild Natural Sweetness', 'No Refined Sugar'],
       dosage: 'Natural sweetener', badgeColor: 'rgba(255,255,255,.4)', badgeBg: 'rgba(255,255,255,.06)', emojiBg: 'rgba(255,255,255,.05)'
     },
     {
