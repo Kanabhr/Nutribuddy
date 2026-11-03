@@ -74,8 +74,23 @@ class BlogPostManagementService
      */
     private function prepareAttributes(array $data, ?BlogPost $post = null): array
     {
-        $data['slug'] = $data['slug'] ?? Str::slug($data['title']);
-        if ($data['status'] === 'published' && empty($data['published_at']) && ! $post?->published_at) {
+        $baseSlug = !empty($data['slug']) ? Str::slug($data['slug']) : Str::slug($data['title'] ?? 'post');
+        $slug = $baseSlug;
+        $counter = 1;
+        while (BlogPost::withTrashed()
+            ->where('slug', $slug)
+            ->when($post, fn ($q) => $q->where('id', '!=', $post->id))
+            ->exists()) {
+            $slug = "{$baseSlug}-{$counter}";
+            $counter++;
+        }
+        $data['slug'] = $slug;
+
+        if (empty($data['author_id'])) {
+            $data['author_id'] = auth('admin')->id() ?? auth()->id();
+        }
+
+        if (($data['status'] ?? '') === 'published' && empty($data['published_at']) && ! $post?->published_at) {
             $data['published_at'] = now();
         }
 

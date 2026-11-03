@@ -58,7 +58,7 @@
                                     </div>
                                 </td>
                                 <td><span class="badge bg-info-100 text-info-600 px-2 fw-medium">{{ $post->category?->name ?? 'Uncategorized' }}</span></td>
-                                <td><span class="text-sm text-secondary-light fw-medium">{{ $post->author?->name ?? 'Admin' }}</span></td>
+                                <td><span class="text-sm text-secondary-light fw-medium">{{ $post->display_author }}</span></td>
                                 <td>
                                     <span class="badge bg-{{ $statusClass }}-100 text-{{ $statusClass }}-600 px-2 fw-medium">
                                         {{ ucfirst($post->status) }}
@@ -67,6 +67,9 @@
                                 <td><span class="text-sm text-secondary-light fw-medium">{{ $post->published_at?->format('d M Y') ?? $post->created_at?->format('d M Y') ?? 'N/A' }}</span></td>
                                 <td class="text-end">
                                     <div class="d-flex align-items-center justify-content-end gap-2">
+                                        <a href="{{ route('blog.show', $post->id) }}" target="_blank" class="btn btn-sm btn-outline-info-600 radius-8 d-inline-flex align-items-center gap-1" title="View on Storefront">
+                                            <iconify-icon icon="lucide:external-link"></iconify-icon> View
+                                        </a>
                                         <a href="{{ route('admin.ecommerce.blog-posts.edit', $post) }}" class="btn btn-sm btn-outline-success-600 radius-8 d-inline-flex align-items-center gap-1">
                                             <iconify-icon icon="lucide:edit"></iconify-icon> Edit
                                         </a>

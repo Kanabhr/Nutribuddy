@@ -44,7 +44,6 @@ class UserInvoiceController extends Controller
         return Pdf::loadView('pdf.invoices.order', [
             'order' => $order,
             'invoiceNumber' => $invoiceNumber,
-        ])->setPaper('a4')->download($invoiceNumber . '.pdf');
         ])->setPaper('a4')->download($filename);
     }
 

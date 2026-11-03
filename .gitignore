@@ -16,8 +16,8 @@ npm-debug.log
 yarn-error.log
 /.fleet
 /.idea
-.vscode
+/.vscode
+/.agents
 _nutribuddy.zip
 /scratch
 /storage/framework/PsySH/
-.agent

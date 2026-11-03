@@ -142,8 +142,8 @@ class CheckoutPlaceOrderPaymentFailureTest extends TestCase
     public function test_cashfree_configuration_validation_rejects_test_secret_in_production(): void
     {
         config([
-            'services.cashfree.app_id' => 'TEST_APP_ID_12345',
-            'services.cashfree.secret_key' => 'cfsk_ma_test_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX_YYYYYYYY',
+            'services.cashfree.app_id' => 'CF_TEST_APP_ID_12345',
+            'services.cashfree.secret_key' => 'cfsk_ma_test_dummy_secret_for_testing_only',
             'services.cashfree.env' => 'production',
         ]);
 
@@ -173,8 +173,8 @@ class CheckoutPlaceOrderPaymentFailureTest extends TestCase
     public function test_cashfree_boot_check_rejects_production_secret_in_sandbox(): void
     {
         config([
-            'services.cashfree.app_id' => 'TEST_APP_ID_12345',
-            'services.cashfree.secret_key' => 'cfsk_ma_prod_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX_YYYYYYYY',
+            'services.cashfree.app_id' => 'CF_TEST_APP_ID_12345',
+            'services.cashfree.secret_key' => 'cfsk_ma_prod_dummy_secret_for_testing_only',
             'services.cashfree.env' => 'sandbox',
         ]);
 
