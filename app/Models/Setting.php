@@ -20,13 +20,33 @@ class Setting extends Model
         }
 
         if (array_key_exists($key, static::$cachedValues)) {
-            return static::$cachedValues[$key] ?? $default;
+            $cachedValue = static::$cachedValues[$key];
+            // If cached value is an array, return default
+            if (is_array($cachedValue)) {
+                return $default;
+            }
+            return $cachedValue ?? $default;
         }
 
         try {
             $value = static::query()->where('key', $key)->value('value');
         } catch (\Throwable) {
             return $default;
+        }
+
+        // If the value from DB is somehow an array, use default
+        if (is_array($value)) {
+            static::$cachedValues[$key] = $default;
+            return $default;
+        }
+
+        // Handle JSON/serialized strings that decode to arrays
+        if (is_string($value) && !empty($value)) {
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                static::$cachedValues[$key] = $default;
+                return $default;
+            }
         }
 
         static::$cachedValues[$key] = $value;
