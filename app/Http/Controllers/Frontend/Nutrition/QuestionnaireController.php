@@ -36,19 +36,46 @@ class QuestionnaireController extends Controller
             $child = $request->user()->children()->first();
         }
 
-        // We will fetch questions dynamically on the frontend via API,
-        // or we can pass them here. Let's pass them here for easier Blade rendering.
-
         $modelsToFetch = PlanAccess::questionModels($planSlug);
 
-        // An existing child only answers what they have not answered yet (e.g. Basic -> Premium
-        // must answer Plus + Pro + Premium questions, not only Premium questions).
-        $answeredIds = $child
-            ? ($child->assessments()->latest()->first()?->answers()->pluck('question_id')->all() ?? [])
-            : [];
+        // For an existing child, only ask questions whose model level is ABOVE the
+        // level they were last assessed at – so upgrading Basic → Premium shows only
+        // Plus, Pro, and Premium questions (the ones the child has never answered).
+        //
+        // If the new plan is the same rank or lower than the previous assessment
+        // (e.g. re-submitting Basic), or if there happen to be no higher-level
+        // questions for the chosen plan, we fall back to showing the full question
+        // set for the plan so parents can update all their answers.
+        if ($child) {
+            $previousSlug = $child->assessments()->latest()->value('model_level');
+            $previousRank = PlanAccess::rank($previousSlug);
+            $newRank      = PlanAccess::rank($planSlug);
 
+            if ($previousRank > 0 && $newRank > $previousRank) {
+                // Collect only the model tiers strictly above the previous assessment.
+                $higherModels = array_values(array_filter(
+                    PlanAccess::QUESTION_MODELS,
+                    fn (int $rank) => $rank > $previousRank && $rank <= $newRank,
+                    ARRAY_FILTER_USE_KEY
+                ));
+
+                $higherQuestions = QuestionnaireQuestion::whereIn('model', $higherModels)
+                    ->orderBy('sort_order')
+                    ->get()
+                    ->groupBy('section');
+
+                // Only use the narrower set when there are actually higher-level questions.
+                if ($higherQuestions->isNotEmpty()) {
+                    $questions = $higherQuestions;
+
+                    return view('frontend.nutrition.questionnaire', compact('plan', 'cycle', 'questions', 'child'));
+                }
+            }
+        }
+
+        // Default: show all questions for the chosen plan (new child, same plan, or
+        // downgrade path – the last case is not expected in normal flow).
         $questions = QuestionnaireQuestion::whereIn('model', $modelsToFetch)
-            ->whereNotIn('id', $answeredIds)
             ->orderBy('sort_order')
             ->get()
             ->groupBy('section');
@@ -59,10 +86,16 @@ class QuestionnaireController extends Controller
     public function showForChild(Request $request, Child $child)
     {
         $child = $request->user()->children()->findOrFail($child->id);
-        $planSlug = $child->assessments()->latest()->value('model_level');
 
-        if ($planSlug && SubscriptionPlan::where('slug', $planSlug)->exists()) {
-            $request->query->set('plan', $planSlug);
+        // Only supply a default plan slug when the caller did not provide one.
+        // If the request already carries ?plan=premium (an upgrade link), preserve it
+        // so the upgrade-filter logic in show() can compare the two ranks correctly.
+        if (! $request->filled('plan') && ! $request->filled('payload')) {
+            $planSlug = $child->assessments()->latest()->value('model_level');
+
+            if ($planSlug && SubscriptionPlan::where('slug', $planSlug)->exists()) {
+                $request->query->set('plan', $planSlug);
+            }
         }
 
         return $this->show($request, $child);

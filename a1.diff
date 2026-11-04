@@ -1,0 +1,124 @@
+﻿diff --git a/app/Http/Controllers/Frontend/Nutrition/QuestionnaireController.php b/app/Http/Controllers/Frontend/Nutrition/QuestionnaireController.php
+index d6a302d..ad39ebf 100644
+--- a/app/Http/Controllers/Frontend/Nutrition/QuestionnaireController.php
++++ b/app/Http/Controllers/Frontend/Nutrition/QuestionnaireController.php
+@@ -36,19 +36,46 @@ public function show(Request $request, ?Child $child = null)
+             $child = $request->user()->children()->first();
+         }
+ 
+-        // We will fetch questions dynamically on the frontend via API,
+-        // or we can pass them here. Let's pass them here for easier Blade rendering.
+-
+         $modelsToFetch = PlanAccess::questionModels($planSlug);
+ 
+-        // An existing child only answers what they have not answered yet (e.g. Basic -> Premium
+-        // must answer Plus + Pro + Premium questions, not only Premium questions).
+-        $answeredIds = $child
+-            ? ($child->assessments()->latest()->first()?->answers()->pluck('question_id')->all() ?? [])
+-            : [];
++        // For an existing child, only ask questions whose model level is ABOVE the
++        // level they were last assessed at ΓÇô so upgrading Basic ΓåÆ Premium shows only
++        // Plus, Pro, and Premium questions (the ones the child has never answered).
++        //
++        // If the new plan is the same rank or lower than the previous assessment
++        // (e.g. re-submitting Basic), or if there happen to be no higher-level
++        // questions for the chosen plan, we fall back to showing the full question
++        // set for the plan so parents can update all their answers.
++        if ($child) {
++            $previousSlug = $child->assessments()->latest()->value('model_level');
++            $previousRank = PlanAccess::rank($previousSlug);
++            $newRank      = PlanAccess::rank($planSlug);
++
++            if ($previousRank > 0 && $newRank > $previousRank) {
++                // Collect only the model tiers strictly above the previous assessment.
++                $higherModels = array_values(array_filter(
++                    PlanAccess::QUESTION_MODELS,
++                    fn (int $rank) => $rank > $previousRank && $rank <= $newRank,
++                    ARRAY_FILTER_USE_KEY
++                ));
++
++                $higherQuestions = QuestionnaireQuestion::whereIn('model', $higherModels)
++                    ->orderBy('sort_order')
++                    ->get()
++                    ->groupBy('section');
++
++                // Only use the narrower set when there are actually higher-level questions.
++                if ($higherQuestions->isNotEmpty()) {
++                    $questions = $higherQuestions;
++
++                    return view('frontend.nutrition.questionnaire', compact('plan', 'cycle', 'questions', 'child'));
++                }
++            }
++        }
+ 
++        // Default: show all questions for the chosen plan (new child, same plan, or
++        // downgrade path ΓÇô the last case is not expected in normal flow).
+         $questions = QuestionnaireQuestion::whereIn('model', $modelsToFetch)
+-            ->whereNotIn('id', $answeredIds)
+             ->orderBy('sort_order')
+             ->get()
+             ->groupBy('section');
+diff --git a/app/Services/Nutrition/ChildProfileService.php b/app/Services/Nutrition/ChildProfileService.php
+index f4e1197..fb28df5 100644
+--- a/app/Services/Nutrition/ChildProfileService.php
++++ b/app/Services/Nutrition/ChildProfileService.php
+@@ -168,7 +168,11 @@ private function allergies(mixed $value): array
+             return match (true) {
+                 str_contains($item, 'lactose') => 'lactose', str_contains($item, 'dairy') => 'dairy',
+                 str_contains($item, 'nut') || str_contains($item, 'seed') => 'nuts', str_contains($item, 'gluten') || str_contains($item, 'wheat') => 'gluten',
+-                str_contains($item, 'egg') => 'egg', default => null,
++                str_contains($item, 'egg') => 'egg',
++                str_contains($item, 'soy') => 'soy',
++                str_contains($item, 'sesame') => 'sesame',
++                str_contains($item, 'honey') => 'honey',
++                default => null,
+             };
+         })->filter()->unique()->values()->all();
+     }
+diff --git a/app/Services/Nutrition/FoodFilterPipeline.php b/app/Services/Nutrition/FoodFilterPipeline.php
+index 0fe745f..f219748 100644
+--- a/app/Services/Nutrition/FoodFilterPipeline.php
++++ b/app/Services/Nutrition/FoodFilterPipeline.php
+@@ -53,14 +53,38 @@ private function dietAllows(FoodMaster $food, string $diet): bool
+ 
+     private function hasAllergen(FoodMaster $food, string $allergy): bool
+     {
++        // For each allergy token we check the corresponding flag on the food row.
++        // If the flag is NULL or empty (i.e. not explicitly set to "Yes") we treat the
++        // food as UNSAFE for that allergy to err on the side of child safety.
+         return match ($allergy) {
+-            'dairy' => $this->flag($food, 'contains_dairy'), 'nuts' => $this->flag($food, 'contains_nuts'),
+-            'gluten' => $this->flag($food, 'contains_gluten'), 'egg' => $this->flag($food, 'contains_egg'),
+-            // The schema has no lactose-specific flag. Do not treat all dairy as lactose by assumption.
+-            default => false,
++            // 'dairy' and 'lactose' both exclude foods with contains_dairy = Yes.
++            // Nutritionist note: a nutritionist may relax the lactose restriction to allow
++            // low-lactose dairy (e.g. hard cheese, ghee) on a case-by-case basis; the system
++            // keeps it strict by default per ICMR paediatric allergy guidelines.
++            'dairy', 'lactose' => $this->flagUnsafe($food, 'contains_dairy'),
++            'nuts'             => $this->flagUnsafe($food, 'contains_nuts'),
++            'gluten'           => $this->flagUnsafe($food, 'contains_gluten'),
++            'egg'              => $this->flagUnsafe($food, 'contains_egg'),
++            'soy'              => $this->flagUnsafe($food, 'contains_soy'),
++            'sesame'           => $this->flagUnsafe($food, 'contains_sesame'),
++            'honey'            => $this->flagUnsafe($food, 'contains_honey'),
++            default            => false,
+         };
+     }
+ 
++    /**
++     * Returns true (unsafe) when the food has the allergy flag set to Yes,
++     * AND also when the flag column is NULL or empty ΓÇô i.e. the data entry team
++     * has not yet verified the food.  Failing safe protects the child.
++     */
++    private function flagUnsafe(FoodMaster $food, string $field): bool
++    {
++        $raw = $food->getAttributes()[$field] ?? null;
++
++        // Explicitly "No" ΓåÆ safe.  Anything else (Yes, null, '', unknown) ΓåÆ unsafe.
++        return ! in_array(strtolower(trim((string) $raw)), ['no', '0', 'false'], true);
++    }
++
+     private function isMeatOrFish(FoodMaster $food): bool
+     {
+         return str_contains(strtolower((string) $food->diet_type), 'non')

@@ -8,12 +8,18 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 
+// NOTE: prepareForValidation coerces single-string answers into arrays for every
+// multi-answer question (identified by answer_type containing 'multi' or sort_order = 8).
+// This allows browsers that submit a single checkbox tick as a plain string to pass
+// the ['array', 'min:1'] rule without a client-side fix.
+
 class SubmitQuestionnaireRequest extends FormRequest
 {
     protected function prepareForValidation(): void
     {
         $input = $this->all();
 
+        // Step 1 – normalise legacy "q_N[]" browser keys to "q_N".
         foreach (array_keys($input) as $key) {
             if (! preg_match('/^q_([1-9]\d*)\[\]$/', (string) $key, $matches)) {
                 continue;
@@ -25,6 +31,33 @@ class SubmitQuestionnaireRequest extends FormRequest
             if (! array_key_exists($normalizedKey, $input)) {
                 $input[$normalizedKey] = $input[$key];
                 unset($input[$key]);
+            }
+        }
+
+        // Step 2 – for every question whose answer_type contains 'multi' (case-insensitive)
+        // or whose sort_order is 8 (the Allergies question), a plain string posted from a
+        // browser that ticked exactly one checkbox must become a single-element array so the
+        // ['array', 'min:1'] rule does not reject it.  An empty string collapses to [].
+        $questionIds = collect(array_keys($input))
+            ->map(fn ($k) => preg_match('/^q_([1-9]\d*)$/', (string) $k, $m) ? (int) $m[1] : null)
+            ->filter()
+            ->values()
+            ->all();
+
+        if ($questionIds !== []) {
+            $multiIds = QuestionnaireQuestion::whereIn('id', $questionIds)
+                ->where(function ($query): void {
+                    $query->whereRaw('LOWER(answer_type) LIKE ?', ['%multi%'])
+                        ->orWhere('sort_order', 8);
+                })
+                ->pluck('id')
+                ->all();
+
+            foreach ($multiIds as $id) {
+                $key = 'q_'.$id;
+                if (array_key_exists($key, $input) && is_string($input[$key])) {
+                    $input[$key] = $input[$key] === '' ? [] : [$input[$key]];
+                }
             }
         }
 

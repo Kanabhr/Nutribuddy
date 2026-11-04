@@ -165,10 +165,21 @@ class ChildProfileService
         $values = is_array($value) ? $value : preg_split('/[,|]/', (string) $value);
 
         return collect($values)->map(fn ($item) => strtolower(trim((string) $item)))->map(function ($item) {
+            // IMPORTANT: sesame, soy, and honey must be checked BEFORE the nuts/seeds
+            // arm so that strings like "Sesame seeds" or "Soya" match their specific
+            // token rather than falling through to 'nuts'.  The questionnaire option
+            // "Nuts & seeds" does not contain 'sesame', 'soy', or 'honey', so it still
+            // maps to 'nuts' correctly.
             return match (true) {
-                str_contains($item, 'lactose') => 'lactose', str_contains($item, 'dairy') => 'dairy',
-                str_contains($item, 'nut') || str_contains($item, 'seed') => 'nuts', str_contains($item, 'gluten') || str_contains($item, 'wheat') => 'gluten',
-                str_contains($item, 'egg') => 'egg', default => null,
+                str_contains($item, 'lactose')                             => 'lactose',
+                str_contains($item, 'dairy')                               => 'dairy',
+                str_contains($item, 'gluten') || str_contains($item, 'wheat') => 'gluten',
+                str_contains($item, 'egg')                                 => 'egg',
+                str_contains($item, 'sesame')                              => 'sesame',
+                str_contains($item, 'soy')                                 => 'soy',
+                str_contains($item, 'honey')                               => 'honey',
+                str_contains($item, 'nut') || str_contains($item, 'seed') => 'nuts',
+                default                                                    => null,
             };
         })->filter()->unique()->values()->all();
     }

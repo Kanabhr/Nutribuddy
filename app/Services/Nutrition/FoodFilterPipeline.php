@@ -53,12 +53,36 @@ class FoodFilterPipeline
 
     private function hasAllergen(FoodMaster $food, string $allergy): bool
     {
+        // For each allergy token we check the corresponding flag on the food row.
+        // If the flag is NULL or empty (i.e. not explicitly set to "Yes") we treat the
+        // food as UNSAFE for that allergy to err on the side of child safety.
         return match ($allergy) {
-            'dairy' => $this->flag($food, 'contains_dairy'), 'nuts' => $this->flag($food, 'contains_nuts'),
-            'gluten' => $this->flag($food, 'contains_gluten'), 'egg' => $this->flag($food, 'contains_egg'),
-            // The schema has no lactose-specific flag. Do not treat all dairy as lactose by assumption.
-            default => false,
+            // 'dairy' and 'lactose' both exclude foods with contains_dairy = Yes.
+            // Nutritionist note: a nutritionist may relax the lactose restriction to allow
+            // low-lactose dairy (e.g. hard cheese, ghee) on a case-by-case basis; the system
+            // keeps it strict by default as a safety choice; needs nutritionist confirmation.
+            'dairy', 'lactose' => $this->flagUnsafe($food, 'contains_dairy'),
+            'nuts'             => $this->flagUnsafe($food, 'contains_nuts'),
+            'gluten'           => $this->flagUnsafe($food, 'contains_gluten'),
+            'egg'              => $this->flagUnsafe($food, 'contains_egg'),
+            'soy'              => $this->flagUnsafe($food, 'contains_soy'),
+            'sesame'           => $this->flagUnsafe($food, 'contains_sesame'),
+            'honey'            => $this->flagUnsafe($food, 'contains_honey'),
+            default            => false,
         };
+    }
+
+    /**
+     * Returns true (unsafe) when the food has the allergy flag set to Yes,
+     * AND also when the flag column is NULL or empty – i.e. the data entry team
+     * has not yet verified the food.  Failing safe protects the child.
+     */
+    private function flagUnsafe(FoodMaster $food, string $field): bool
+    {
+        $raw = $food->getAttributes()[$field] ?? null;
+
+        // Explicitly "No" → safe.  Anything else (Yes, null, '', unknown) → unsafe.
+        return ! in_array(strtolower(trim((string) $raw)), ['no', '0', 'false'], true);
     }
 
     private function isMeatOrFish(FoodMaster $food): bool
