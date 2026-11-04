@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\PlanAccess;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -9,35 +10,32 @@ use Symfony\Component\HttpFoundation\Response;
 class CheckDietSubscription
 {
     /**
-     * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * Requires a usable (active, paid/free, not expired) diet subscription.
+     * Optional feature check: ->middleware('<alias>:health_score') also requires a plan that includes it.
      */
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next, ?string $feature = null): Response
     {
-        // Expecting a child_id in route parameters or query/session
-        // E.g., /user/assessment/{child_id}
+        $user = $request->user();
         $childId = $request->route('child') ?? $request->query('child_id');
 
-        if (!$childId) {
-            // For now, if there is no explicit child passed, just check if user has ANY active subscription
-            $hasActive = $request->user()->dietSubscriptions()->where('status', 'active')->exists();
-            if (!$hasActive) {
-                return redirect()->route('user.subscription')->with('error', 'You do not have an active diet service subscription.');
+        if (! $childId) {
+            $slug = PlanAccess::slugForUser($user);
+            $message = 'You do not have an active diet service subscription.';
+        } else {
+            $child = $user->children()->find($childId);
+            if (! $child) {
+                abort(403, 'Unauthorized access to child profile.');
             }
-            return $next($request);
+            $slug = PlanAccess::slugForChild($child);
+            $message = 'The subscription for this child has expired or is inactive. Please renew to continue.';
         }
 
-        // Specific child check
-        $child = $request->user()->children()->find($childId);
-        if (!$child) {
-            abort(403, 'Unauthorized access to child profile.');
+        if (! $slug) {
+            return redirect()->route('user.subscription')->with('error', $message);
         }
 
-        $hasActive = $child->dietSubscriptions()->where('status', 'active')->exists();
-
-        if (!$hasActive) {
-            return redirect()->route('user.subscription')->with('error', 'The subscription for this child has expired or is inactive. Please renew to continue.');
+        if ($feature && ! PlanAccess::allows($slug, $feature)) {
+            return redirect()->route('diet_chart')->with('error', 'Upgrade your plan to use this feature.');
         }
 
         return $next($request);

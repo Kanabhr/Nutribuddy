@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Nutrition\Child;
 use App\Models\Nutrition\QuestionnaireQuestion;
 use App\Models\SubscriptionPlan;
+use App\Support\PlanAccess;
 use Illuminate\Http\Request;
 
 class QuestionnaireController extends Controller
@@ -38,17 +39,16 @@ class QuestionnaireController extends Controller
         // We will fetch questions dynamically on the frontend via API,
         // or we can pass them here. Let's pass them here for easier Blade rendering.
 
-        // Map plan slug to models we need to fetch
-        $modelsToFetch = $child
-            ? match ($planSlug) {
-                'plus' => ['2 Plus'], 'pro' => ['3 Pro'], 'premium' => ['4 Premium'], default => ['1 Basic']
-            }
-        : match ($planSlug) {
-            'plus' => ['1 Basic', '2 Plus'], 'pro' => ['1 Basic', '2 Plus', '3 Pro'], 'premium' => ['1 Basic', '2 Plus', '3 Pro', '4 Premium'], default => ['1 Basic']
-        };
+        $modelsToFetch = PlanAccess::questionModels($planSlug);
 
-        // Fetch questions for these models
+        // An existing child only answers what they have not answered yet (e.g. Basic -> Premium
+        // must answer Plus + Pro + Premium questions, not only Premium questions).
+        $answeredIds = $child
+            ? ($child->assessments()->latest()->first()?->answers()->pluck('question_id')->all() ?? [])
+            : [];
+
         $questions = QuestionnaireQuestion::whereIn('model', $modelsToFetch)
+            ->whereNotIn('id', $answeredIds)
             ->orderBy('sort_order')
             ->get()
             ->groupBy('section');

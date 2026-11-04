@@ -222,50 +222,60 @@ class DietChartDisplayService
         return $tips;
     }
 
+    /**
+     * Rule: one new chart per child per month, on any plan.
+     * (The old plans_remaining counter is no longer used.)
+     * Kept under the old method names so the controller keeps working:
+     * returns 1 when a chart can be generated now, otherwise 0.
+     */
     public function getUserPurchasedPlansCount(Child $child): int
     {
-        return (int) DietSubscription::query()
-            ->where('user_id', Auth::id())
-            ->where('child_id', $child->id)
-            ->where('status', 'active')
-            ->where('payment_status', 'paid')
-            ->where(function ($query) {
-                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
-            })
-            ->sum('plans_remaining');
+        return $this->canGenerateChart($child) ? 1 : 0;
     }
 
-    public function decrementPurchasedPlans(Child $child): ?int
+    public function canGenerateChart(Child $child): bool
     {
-        $subscriptionId = DietSubscription::query()
-            ->where('user_id', Auth::id())
-            ->where('child_id', $child->id)
-            ->where('status', 'active')
-            ->where('payment_status', 'paid')
-            ->where(function ($query) {
-                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
-            })
-            ->where('plans_remaining', '>', 0)
-            ->orderBy('expires_at')
-            ->value('id');
-
-        if (!$subscriptionId) {
-            return null;
+        if (! $this->usableSubscriptionId($child)) {
+            return false;
         }
 
-        $updated = DietSubscription::query()
-            ->whereKey($subscriptionId)
-            ->where('plans_remaining', '>', 0)
-            ->decrement('plans_remaining');
+        $next = $this->nextChartAvailableAt($child);
 
-        return $updated === 1 ? (int) $subscriptionId : null;
+        return $next === null || $next->isPast();
     }
 
+    /** When the next chart may be generated (null = right now, no chart exists yet). */
+    public function nextChartAvailableAt(Child $child): ?\Carbon\Carbon
+    {
+        $last = DietPlan::query()
+            ->whereIn('child_assessment_id', $child->assessments()->pluck('id'))
+            ->latest()
+            ->value('created_at');
+
+        return $last ? \Carbon\Carbon::parse($last)->addMonthNoOverflow() : null;
+    }
+
+    /** Returns the subscription id that allows the generation, or null if not allowed now. */
+    public function decrementPurchasedPlans(Child $child): ?int
+    {
+        return $this->canGenerateChart($child) ? $this->usableSubscriptionId($child) : null;
+    }
+
+    /** Nothing is consumed any more, so there is nothing to give back if generation fails. */
     public function restorePurchasedPlan(int $subscriptionId): void
     {
-        DietSubscription::query()
-            ->whereKey($subscriptionId)
-            ->increment('plans_remaining');
+    }
+
+    private function usableSubscriptionId(Child $child): ?int
+    {
+        $id = DietSubscription::query()
+            ->where('user_id', Auth::id())
+            ->where('child_id', $child->id)
+            ->usable()
+            ->orderByDesc('id')
+            ->value('id');
+
+        return $id ? (int) $id : null;
     }
 
     public function authorizeChildAccess(Child $child): void

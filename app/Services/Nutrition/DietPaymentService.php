@@ -5,6 +5,7 @@ namespace App\Services\Nutrition;
 use App\Models\DietSubscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
+use App\Support\PlanAccess;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -18,6 +19,44 @@ class DietPaymentService
         $plan = SubscriptionPlan::where('slug', $data['plan_slug'])
             ->where('is_active', true)
             ->firstOrFail();
+
+        // What does this child already have? (skipped when no child is attached yet)
+        $existing = ! empty($data['child_id'])
+            ? DietSubscription::query()
+                ->where('user_id', $user->id)
+                ->where('child_id', $data['child_id'])
+                ->usable()
+                ->with('subscriptionPlan')
+                ->get()
+            : collect();
+
+        // FREE plan (Basic): no billing cycle, never expires, one per child.
+        if ($plan->slug === 'basic') {
+            if ($existing->isNotEmpty()) {
+                return ['success' => true, 'gateway' => 'free', 'subscription_id' => $existing->first()->id];
+            }
+
+            $subscription = DietSubscription::create([
+                'user_id' => $user->id,
+                'child_id' => $data['child_id'] ?? null,
+                'subscription_plan_id' => $plan->id,
+                'model' => $plan->name,
+                'status' => 'pending',
+                'payment_status' => 'pending',
+                'amount_paid' => 0,
+                'starts_at' => now(),
+                'expires_at' => null,
+            ]);
+            $this->activateFree($subscription);
+
+            return ['success' => true, 'gateway' => 'free', 'subscription_id' => $subscription->id];
+        }
+
+        // Paid plans: no downgrades. Same plan = renewal, higher plan = upgrade.
+        if (PlanAccess::rank($plan->slug) < PlanAccess::rank(PlanAccess::highestSlug($existing))) {
+            return ['success' => false, 'message' => 'This child already has a higher plan.', '_status' => 422];
+        }
+
         [$priceColumn, $days] = match ($data['cycle']) {
             'monthly' => ['monthly_price', 30],
             'quarterly' => ['quarterly_price', 90],
@@ -174,7 +213,7 @@ class DietPaymentService
                 'customer_id' => 'user_'.$user->id,
                 'customer_name' => $user->name,
                 'customer_email' => $user->email,
-                'customer_phone' => '9999999999',
+                'customer_phone' => $this->customerPhone($user),
             ],
             'order_meta' => [
                 'return_url' => route('diet.payment.cashfree.return')
@@ -193,6 +232,40 @@ class DietPaymentService
             'order_id' => $order['order_id'], 'subscription_id' => $subscription->id,
             'mode' => \App\Services\Payments\CashfreePaymentService::resolveEnvironment(),
         ];
+    }
+
+    private function activateFree(DietSubscription $subscription): void
+    {
+        $subscription->update([
+            'status' => 'active',
+            'payment_status' => 'free',
+            'starts_at' => now(),
+            'expires_at' => null,
+        ]);
+
+        $subscription = $subscription->fresh();
+        $this->notifications->subscriptionActivated($subscription);
+        $this->activateRelatedServices($subscription);
+    }
+
+    /** After an upgrade, cancel the child's lower plans so only the new one stays active. */
+    private function supersedeLowerPlans(DietSubscription $subscription): void
+    {
+        if (! $subscription->child_id) {
+            return;
+        }
+
+        $newRank = PlanAccess::rank($subscription->subscriptionPlan?->slug);
+
+        DietSubscription::query()
+            ->where('user_id', $subscription->user_id)
+            ->where('child_id', $subscription->child_id)
+            ->where('id', '!=', $subscription->id)
+            ->usable()
+            ->with('subscriptionPlan')
+            ->get()
+            ->filter(fn (DietSubscription $old) => PlanAccess::rank($old->subscriptionPlan?->slug) < $newRank)
+            ->each(fn (DietSubscription $old) => $old->update(['status' => 'cancelled', 'cancelled_at' => now()]));
     }
 
     private function activate(DietSubscription $subscription): void
@@ -223,6 +296,7 @@ class DietPaymentService
             ]);
 
             $subscription = $subscription->fresh();
+            $this->supersedeLowerPlans($subscription);
             $this->notifications->subscriptionActivated($subscription);
 
             return $subscription;
@@ -250,6 +324,13 @@ class DietPaymentService
                 'exception' => $exception,
             ]);
         }
+    }
+
+    private function customerPhone(User $user): string
+    {
+        $digits = preg_replace('/\D+/', '', (string) ($user->phone ?? ''));
+
+        return strlen($digits) >= 10 ? substr($digits, -10) : '9999999999';
     }
 
     private function cashfreeHeaders(): array
