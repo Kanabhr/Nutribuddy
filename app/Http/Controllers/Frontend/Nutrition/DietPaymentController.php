@@ -50,14 +50,22 @@ class DietPaymentController extends Controller
             $planSlug = $result['plan_slug'] ?? null;
 
             if ($childId && $planSlug) {
-                return redirect()
-                    ->route('frontend.nutrition.questionnaire.child', $childId)
+                // Append ?plan=<slug> so QuestionnaireController::showForChild() can
+                // enter the upgrade-filter branch and show only the higher-level
+                // questions (Plus/Pro/Premium above the child's existing Basic level).
+                // Without this parameter showForChild() falls back to reading the
+                // child's current model_level ('basic'), passes plan=basic into show(),
+                // and the user sees all 12 Basic questions instead of the ~9 Plus ones.
+                $url = route('frontend.nutrition.questionnaire.child', $childId)
+                    . '?plan=' . urlencode((string) $planSlug);
+
+                return redirect($url)
                     ->with('info', 'Payment successful! Please answer a few more questions to complete your plan.');
             }
 
-            return redirect()
-                ->route('frontend.nutrition.questionnaire')
-                ->with('info', 'Payment successful! Please complete the questionnaire to generate your plan.');
+            return redirect(
+                route('frontend.nutrition.questionnaire') . '?plan=' . urlencode((string) $planSlug)
+            )->with('info', 'Payment successful! Please complete the questionnaire to generate your plan.');
         }
 
         return redirect()->route('meal-plan', ['child_id' => $result['child_id']]);
