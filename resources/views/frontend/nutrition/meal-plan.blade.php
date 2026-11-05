@@ -59,6 +59,20 @@
     </div>
   </div>
 
+  <!-- Questionnaire pending banner (Rule 5) -->
+  @if (!empty($questionnairePending))
+  <div class="season-alert" style="background:var(--pul,#fef3c7);border-left:4px solid var(--pk,#f59e0b);margin-bottom:1rem;">
+    <div class="alert-icon">📋</div>
+    <div>
+      <div class="alert-title">Complete your questionnaire to unlock your plan</div>
+      <div class="alert-body">
+        Your payment was successful! Answer a few more questions so we can personalise your diet chart.
+        <a href="{{ $questionnaireUrl ?? '#' }}" class="fw-bold ms-2">Continue →</a>
+      </div>
+    </div>
+  </div>
+  @endif
+
   <!-- Meal Card -->
   <div class="meal-card" id="mealCard">
     <!-- injected by JS -->

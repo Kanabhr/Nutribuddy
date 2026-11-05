@@ -2,9 +2,11 @@
 
 namespace App\Services\Nutrition;
 
+use App\Models\DietSubscription;
 use App\Models\Nutrition\Child;
 use App\Models\Nutrition\DietPlan;
 use App\Models\Nutrition\MealItemLog;
+use App\Support\PlanAccess;
 use Illuminate\Support\Carbon;
 
 class NutritionPageService
@@ -13,6 +15,10 @@ class NutritionPageService
 
     /**
      * Build the meal-plan view data while keeping the legacy empty and pending states.
+     *
+     * Rule 5: when the user has a paid subscription but has not yet submitted the
+     * higher-level questionnaire, $questionnairePending is true and the view shows
+     * a "Complete your questionnaire" banner instead of the chart.
      *
      * @return array<string, mixed>|null
      */
@@ -23,6 +29,32 @@ class NutritionPageService
             ? $childQuery->whereKey($childId)->first()
             : $childQuery->latest()->first();
         $assessment = $child?->assessments()->latest()->first();
+
+        // Rule 5: check whether the child's active subscription requires a questionnaire.
+        $questionnairePending = false;
+        $questionnaireUrl     = null;
+        if ($child) {
+            $subscription = DietSubscription::where('user_id', $userId)
+                ->where('child_id', $child->id)
+                ->usable()
+                ->with('subscriptionPlan')
+                ->get()
+                ->sortByDesc(fn ($s) => PlanAccess::rank($s->subscriptionPlan?->slug))
+                ->first();
+
+            if ($subscription) {
+                $planSlug = $subscription->subscriptionPlan?->slug;
+                if (! PlanAccess::assessmentCoversPlan($assessment?->model_level, $planSlug)) {
+                    $questionnairePending = true;
+                    $questionnaireUrl     = route('frontend.nutrition.questionnaire.child', $child->id)
+                        . '?plan=' . urlencode((string) $planSlug);
+                }
+            }
+        }
+
+        if ($questionnairePending) {
+            return compact('questionnairePending', 'questionnaireUrl');
+        }
 
         if (! $assessment) {
             return null;
@@ -68,7 +100,7 @@ class NutritionPageService
 
                 $meals[] = [
                     'time' => $slotName,
-                    'emoji' => 'ðŸ²',
+                    'emoji' => 'ðŸ²',
                     'name' => implode(' + ', $mealItems),
                     'desc' => $data['focus'] ?? 'Healthy and nutritious meal.',
                     'tags' => ['Nutrition:protein'],

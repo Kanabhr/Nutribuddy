@@ -134,9 +134,15 @@ class DietPaymentService
         }
 
         $subscription = $this->markPaid($subscription, $data['razorpay_payment_id']);
-        $this->activateRelatedServices($subscription);
+        $needsQuestionnaire = $this->activateRelatedServices($subscription);
 
-        return ['success' => true, 'message' => 'Subscription activated successfully!'];
+        return [
+            'success'            => true,
+            'message'            => 'Subscription activated successfully!',
+            'needs_questionnaire' => $needsQuestionnaire,
+            'child_id'           => $subscription->child_id,
+            'plan_slug'          => $subscription->subscriptionPlan?->slug,
+        ];
     }
 
     public function confirmCashfreeReturn(?string $orderId, ?string $subscriptionId): array
@@ -168,9 +174,14 @@ class DietPaymentService
             }
 
             $subscription = $this->markPaid($subscription, $order['cf_order_id'] ?? null);
-            $this->activateRelatedServices($subscription);
+            $needsQuestionnaire = $this->activateRelatedServices($subscription);
 
-            return ['success' => true, 'child_id' => $subscription->child_id];
+            return [
+                'success' => true,
+                'child_id' => $subscription->child_id,
+                'needs_questionnaire' => $needsQuestionnaire,
+                'plan_slug' => $subscription->subscriptionPlan?->slug,
+            ];
         } catch (\Throwable $exception) {
             Log::error('Cashfree diet payment verification failed.', ['exception' => $exception]);
 
@@ -245,10 +256,10 @@ class DietPaymentService
 
         $subscription = $subscription->fresh();
         $this->notifications->subscriptionActivated($subscription);
+        // Basic is always free and the answers always cover it — generate immediately.
         $this->activateRelatedServices($subscription);
     }
 
-    /** After an upgrade, cancel the child's lower plans so only the new one stays active. */
     private function supersedeLowerPlans(DietSubscription $subscription): void
     {
         if (! $subscription->child_id) {
@@ -303,27 +314,22 @@ class DietPaymentService
         });
     }
 
-    private function activateRelatedServices(DietSubscription $subscription): void
+    /**
+     * After payment is confirmed, decide whether to generate the chart immediately
+     * or defer to a post-questionnaire step.
+     *
+     * Returns true  → the child must still answer the higher-plan questions;
+     *                 chart generation is deferred.
+     * Returns false → everything is ready; chart was (or already had been) generated.
+     */
+    private function activateRelatedServices(DietSubscription $subscription): bool
     {
-        app(NutritionLeadService::class)->createForSubscription($subscription);
-        $assessment = $subscription->child?->assessments()->latest()->first();
-        if (! $assessment || $assessment->dietPlans()->exists()) {
-            return;
-        }
-        $answers = $assessment->answers()->pluck('answer_value', 'question_id')
-            ->map(fn ($value) => is_string($value) ? json_decode($value, true) : $value)->all();
-        try {
-            $result = app(DietChartGeneratorService::class)->generateDietChart($assessment, $answers);
-            if (! ($result['success'] ?? false)) {
-                throw new \RuntimeException($result['message'] ?? 'Diet chart generation failed.');
-            }
-            $subscription->nutritionLead?->update(['status' => 'awaiting_review']);
-        } catch (\Throwable $exception) {
-            Log::error('Paid diet chart generation failed.', [
-                'subscription_id' => $subscription->id,
-                'exception' => $exception,
-            ]);
-        }
+        // NutritionLead is always created at this point (idempotent inside the service).
+        // Chart generation is attempted only when the assessment covers the plan level.
+        $ready = app(PostPaymentChartService::class)->generateIfReady($subscription);
+
+        // ready=false means the assessment does NOT yet cover the purchased plan.
+        return ! $ready; // needs_questionnaire = true when NOT ready
     }
 
     private function customerPhone(User $user): string

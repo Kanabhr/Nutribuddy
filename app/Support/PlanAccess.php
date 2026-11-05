@@ -105,6 +105,26 @@ class PlanAccess
     }
 
     /**
+     * Return true when $assessmentSlug covers all questions required by $planSlug.
+     *
+     * "Covers" means the assessment's model_level rank is greater than or equal to
+     * the purchased plan's rank.  A null or unknown assessment slug means nothing
+     * has been answered yet, so the assessment never covers a paid plan.
+     */
+    public static function assessmentCoversPlan(?string $assessmentSlug, ?string $planSlug): bool
+    {
+        $planRank       = self::rank($planSlug);
+        $assessmentRank = self::rank($assessmentSlug);
+
+        // A rank-0 plan (unknown slug) is always "covered" — nothing extra to ask.
+        if ($planRank === 0) {
+            return true;
+        }
+
+        return $assessmentRank >= $planRank;
+    }
+
+    /**
      * How many days the plan covers for the given slug and start date.
      *
      * basic (or unknown) → always 7 days.

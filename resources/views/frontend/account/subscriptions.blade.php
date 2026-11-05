@@ -18,7 +18,22 @@
 
         <div class="page">
 
-               
+            {{-- Rule 5: pending questionnaire banners --}}
+            @if (!empty($pendingQuestionnaires) && $pendingQuestionnaires->isNotEmpty())
+                @foreach ($pendingQuestionnaires as $pq)
+                <div class="season-alert" style="background:var(--pul,#fef3c7);border-left:4px solid var(--pk,#f59e0b);margin-bottom:1rem;">
+                    <div class="alert-icon">📋</div>
+                    <div>
+                        <div class="alert-title">Complete your questionnaire — {{ $pq['subscription']->subscriptionPlan?->name ?? 'Paid' }} Plan</div>
+                        <div class="alert-body">
+                            Your payment for {{ $pq['subscription']->child?->name }} was successful!
+                            Answer a few more questions to unlock the personalised diet chart.
+                            <a href="{{ $pq['url'] }}" class="fw-bold ms-2">Continue →</a>
+                        </div>
+                    </div>
+                </div>
+                @endforeach
+            @endif
 
 
             <!-- CURRENT PLAN BANNER -->

@@ -2,11 +2,13 @@
 
 namespace App\Services\Nutrition;
 
+use App\Models\DietSubscription;
 use App\Models\Nutrition\Child;
 use App\Models\Nutrition\ChildAssessment;
 use App\Models\Nutrition\QuestionnaireAnswer;
 use App\Models\Nutrition\QuestionnaireQuestion;
 use App\Models\User;
+use App\Support\PlanAccess;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -15,7 +17,7 @@ class QuestionnaireSubmissionService
     /** @param array<string, mixed> $validated */
     public function submit(User $user, array $validated): array
     {
-        return DB::transaction(function () use ($user, $validated): array {
+        $result = DB::transaction(function () use ($user, $validated): array {
             $child = isset($validated['child_id'])
                 ? $user->children()->findOrFail($validated['child_id'])
                 : null;
@@ -62,6 +64,8 @@ class QuestionnaireSubmissionService
                 'current_season' => $this->currentIndianSeason(),
             ]);
 
+            // Rule 3: carry all answers from the previous assessment forward so the
+            // engine sees the full picture (e.g. Basic answers when upgrading to Plus).
             foreach ($previousAssessment?->answers ?? [] as $answer) {
                 QuestionnaireAnswer::create([
                     'child_assessment_id' => $assessment->id,
@@ -86,6 +90,41 @@ class QuestionnaireSubmissionService
 
             return ['child_id' => $child->id, 'assessment_id' => $assessment->id];
         });
+
+        // Rule 4: after a successful submit, generate the chart if the child's active
+        // subscription now covers the plan answered.  This runs OUTSIDE the transaction
+        // so the new assessment row is fully committed and visible.
+        $this->maybeGenerateChartAfterSubmit($user, $result['child_id'], $validated['plan_slug'] ?? 'basic');
+
+        return $result;
+    }
+
+    /**
+     * If the child holds an active paid subscription at or below the just-submitted
+     * plan level, and no chart exists yet for the new assessment, generate it now.
+     */
+    private function maybeGenerateChartAfterSubmit(User $user, int $childId, string $planSlug): void
+    {
+        // Only triggered for paid plans (plus / pro / premium).
+        if (PlanAccess::rank($planSlug) <= PlanAccess::rank('basic')) {
+            return;
+        }
+
+        $subscription = DietSubscription::query()
+            ->where('user_id', $user->id)
+            ->where('child_id', $childId)
+            ->usable()
+            ->with('subscriptionPlan')
+            ->get()
+            ->sortByDesc(fn ($s) => PlanAccess::rank($s->subscriptionPlan?->slug))
+            ->first();
+
+        if (! $subscription) {
+            return;
+        }
+
+        // PostPaymentChartService is idempotent — safe to call even if already done.
+        app(PostPaymentChartService::class)->generateIfReady($subscription);
     }
 
     private function answerText(mixed $value, ?string $default = null): ?string
