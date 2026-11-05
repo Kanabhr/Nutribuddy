@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Nutrition\Child;
 use App\Models\User;
+use Carbon\Carbon;
 
 /**
  * Single source of truth for "what does each plan include?".
@@ -101,5 +102,21 @@ class PlanAccess
     public static function slugForUser(User $user): ?string
     {
         return self::highestSlug($user->dietSubscriptions()->usable()->with('subscriptionPlan')->get());
+    }
+
+    /**
+     * How many days the plan covers for the given slug and start date.
+     *
+     * basic (or unknown) → always 7 days.
+     * plus / pro / premium → the number of days in $start's calendar month,
+     *   so a February start gives 28 or 29, a January start gives 31.
+     */
+    public static function planDays(?string $slug, Carbon $start): int
+    {
+        if (self::rank($slug) >= self::RANK['plus']) {
+            return $start->daysInMonth;
+        }
+
+        return 7;
     }
 }
