@@ -71,6 +71,13 @@ class QuestionnaireSubmissionService
             }
 
             foreach ($answers as $questionId => $value) {
+                // Skip null, empty-string, and empty-array answers so the NOT NULL
+                // constraint on answer_value is never violated for optional questions.
+                // Any previous answer copied forward from an earlier assessment is kept.
+                if ($value === null || $value === '' || $value === []) {
+                    continue;
+                }
+
                 QuestionnaireAnswer::updateOrCreate(
                     ['child_assessment_id' => $assessment->id, 'question_id' => $questionId],
                     ['answer_value' => $value],
