@@ -11,20 +11,102 @@
     <div class="page">
         <div class="nutrition-container">
 
-            <!-- Date Selector -->
-            <div class="nutri-date-selector">
-                @php $today = \Carbon\Carbon::today(); @endphp
+            {{-- ── Week / day navigation ──────────────────────────────────────── --}}
+            @php
+                use Carbon\Carbon;
+
+                $planStartDate = null;
+                $planTotalDays = 7;
+                $isBasicPlan   = true;
+
+                if (isset($dietPlan) && $dietPlan) {
+                    $pd = $dietPlan->plan_data;
+                    if (is_string($pd)) { $pd = json_decode($pd, true) ?? []; }
+                    $planStartDate = isset($pd['schedule']['start_date'])
+                        ? Carbon::parse($pd['schedule']['start_date'])
+                        : Carbon::parse($dietPlan->created_at)->startOfDay();
+                    $planTotalDays = isset($pd['schedule']['days']) ? (int) $pd['schedule']['days'] : 7;
+                    $isBasicPlan   = $planTotalDays <= 7;
+                }
+
+                // Group days into weeks of 7; last week may be shorter.
+                $weekGroups = [];   // [ week_no => [ ['index'=>0,'date'=>Carbon,...], ... ] ]
+                if ($planStartDate) {
+                    for ($di = 0; $di < $planTotalDays; $di++) {
+                        $d       = $planStartDate->copy()->addDays($di);
+                        $weekNo  = intdiv($di, 7) + 1;
+                        $weekGroups[$weekNo][] = ['index' => $di, 'date' => $d];
+                    }
+                }
+
+                // Determine active week and active day index.
+                $today          = Carbon::today();
+                $activeWeekNo   = 1;
+                $activeDayIndex = 0;
+
+                if ($planStartDate) {
+                    $diffDays = (int) $planStartDate->diffInDays($today, false);
+                    if ($diffDays >= 0 && $diffDays < $planTotalDays) {
+                        // Today is within the plan.
+                        $activeDayIndex = $diffDays;
+                        $activeWeekNo   = intdiv($diffDays, 7) + 1;
+                    }
+                    // else: outside plan → default to week 1, day 0 (already set).
+                }
+
+                // Build a lookup: day_index → weekday label (for $sevenDayPlan keying).
+                $dayIndexToLabel = [];
+                if ($planStartDate) {
+                    for ($di = 0; $di < $planTotalDays; $di++) {
+                        $dayIndexToLabel[$di] = $planStartDate->copy()->addDays($di)->format('l');
+                    }
+                }
+
+                // Active day's weekday label (used in Tab 1 / Tab 3).
+                $activeDayLabel = $dayIndexToLabel[$activeDayIndex] ?? date('l');
+            @endphp
+
+            {{-- Week tabs — only shown for plans longer than 7 days --}}
+            @if(!$isBasicPlan && count($weekGroups) > 1)
+            <div class="nutri-week-tabs" id="weekTabBar">
+                @foreach($weekGroups as $wn => $wdays)
+                    <button type="button"
+                            class="nutri-week-tab {{ $wn === $activeWeekNo ? 'active' : '' }}"
+                            data-week="{{ $wn }}">
+                        Week {{ $wn }}
+                    </button>
+                @endforeach
+            </div>
+            @endif
+
+            {{-- Date chips — one per day in the active week --}}
+            @if($planStartDate)
+            <div class="nutri-date-selector" id="dateSelectorBar">
+                @foreach($weekGroups as $wn => $wdays)
+                    @foreach($wdays as $wd)
+                        <div class="nutri-date-item
+                                    {{ $wd['index'] === $activeDayIndex ? 'active' : '' }}
+                                    {{ $wn !== $activeWeekNo ? 'nutri-date-hidden' : '' }}"
+                             data-day-index="{{ $wd['index'] }}"
+                             data-week="{{ $wn }}">
+                            <span class="nutri-date-day">{{ $wd['date']->format('D') }}</span>
+                            <span class="nutri-date-num">{{ $wd['date']->format('j') }}</span>
+                        </div>
+                    @endforeach
+                @endforeach
+            </div>
+            @else
+            {{-- Fallback: plain 5-day strip when there is no plan yet --}}
+            <div class="nutri-date-selector" id="dateSelectorBar">
                 @for ($i = 0; $i < 5; $i++)
-                    @php
-                        $date = $today->copy()->addDays($i);
-                        $isActive = $i === 0;
-                    @endphp
-                    <div class="nutri-date-item {{ $isActive ? 'active' : '' }}">
-                        <span class="nutri-date-day">{{ $date->format('D') }}</span>
-                        <span class="nutri-date-num">{{ $date->format('j') }}</span>
+                    @php $fd = $today->copy()->addDays($i); @endphp
+                    <div class="nutri-date-item {{ $i === 0 ? 'active' : '' }}">
+                        <span class="nutri-date-day">{{ $fd->format('D') }}</span>
+                        <span class="nutri-date-num">{{ $fd->format('j') }}</span>
                     </div>
                 @endfor
             </div>
+            @endif
 
             <!-- Tabs -->
             <div class="nutri-tabs">
@@ -38,14 +120,17 @@
             <div id="tab-food" class="nutri-tab-content active">
 
                 @php
-                    $targetCals    = isset($todayTarget) ? ($todayTarget['energy_kcal'] ?? 2100) : 2100;
-                    $targetProtein = isset($todayTarget) ? ($todayTarget['protein_g'] ?? 152) : 152;
-                    $targetFat     = isset($todayTarget) ? ($todayTarget['fat_g'] ?? 61) : 61;
-                    $currentDayForRing = date('l');
+                    // todayTarget is null when no ICMR row covers this child.
+                    $hasTargets    = isset($todayTarget) && is_array($todayTarget);
+                    $targetCals    = $hasTargets ? (float) ($todayTarget['energy_kcal'] ?? 0) : 0;
+                    $targetProtein = $hasTargets ? (float) ($todayTarget['protein_g']   ?? 0) : 0;
+                    $targetFat     = $hasTargets ? (float) ($todayTarget['fat_g']       ?? 0) : 0;
+
+                    $currentDayForRing = $activeDayLabel ?? date('l');
                     $dayPlanForRing = isset($sevenDayPlan) ? ($sevenDayPlan[$currentDayForRing] ?? ($sevenDayPlan['Monday'] ?? [])) : [];
 
-                    // No carbohydrate target is stored in the ICMR target table; compare intake to today's planned foods.
-                    $targetCarbs = 0;
+                    // Carbs: no ICMR target exists; sum planned foods only (shown as plain number).
+                    $plannedCarbs = 0;
                     $plannedCarbFoodIds = [];
                     foreach ($dayPlanForRing as $slot) {
                         if (!isset($slot['items'])) continue;
@@ -53,10 +138,10 @@
                             $fid = (int) ($itm['food_id'] ?? 0);
                             if ($fid <= 0 || isset($plannedCarbFoodIds[$fid])) continue;
                             $plannedCarbFoodIds[$fid] = true;
-                            $targetCarbs += (float) ($itm['nutrients']['carb_g'] ?? 0);
+                            $plannedCarbs += (float) ($itm['nutrients']['carb_g'] ?? 0);
                         }
                     }
-                    $targetCarbs = round($targetCarbs, 1);
+                    $plannedCarbs = round($plannedCarbs, 1);
 
                     // Normalize consumed IDs to integers
                     $consumedIds = array_map('intval', (array) ($consumedItems ?? []));
@@ -88,27 +173,25 @@
                     $initialConsumedCarbs   = round($initialConsumedCarbs, 1);
                     $initialConsumedFat     = round($initialConsumedFat, 1);
 
-                    // Percentages for initial SSR render
-                    $pctProtein = $targetProtein > 0 ? min(100, ($initialConsumedProtein / $targetProtein) * 100) : 0;
-                    $pctCarbs   = $targetCarbs   > 0 ? min(100, ($initialConsumedCarbs   / $targetCarbs)   * 100) : 0;
-                    $pctFat     = $targetFat     > 0 ? min(100, ($initialConsumedFat     / $targetFat)     * 100) : 0;
+                    // Percentages for initial SSR render — only meaningful when targets exist.
+                    $pctProtein = ($hasTargets && $targetProtein > 0) ? min(100, ($initialConsumedProtein / $targetProtein) * 100) : 0;
+                    $pctFat     = ($hasTargets && $targetFat     > 0) ? min(100, ($initialConsumedFat     / $targetFat)     * 100) : 0;
 
                     $ringCircumference = 251.3;
-                    $calsPct = $targetCals > 0 ? min(1, $initialConsumedCals / $targetCals) : 0;
+                    $calsPct   = ($hasTargets && $targetCals > 0) ? min(1, $initialConsumedCals / $targetCals) : 0;
                     $ringOffset = $ringCircumference * (1 - $calsPct);
-                    $ringColor = $calsPct >= 0.99 ? '#22c55e' : ($calsPct >= 0.5 ? '#22c55e' : ($calsPct > 0 ? '#f59e0b' : '#e5e7eb'));
+                    $ringColor  = $calsPct >= 0.99 ? '#22c55e' : ($calsPct >= 0.5 ? '#22c55e' : ($calsPct > 0 ? '#f59e0b' : '#e5e7eb'));
                 @endphp
 
                 <div class="nutri-card">
+                    @if($hasTargets)
                     <div class="cal-summary-grid">
                         <div class="cal-ring-container"
                              data-target-cals="{{ $targetCals }}"
                              data-consumed-cals="{{ $initialConsumedCals }}"
                              data-target-protein="{{ $targetProtein }}"
-                             data-target-carbs="{{ $targetCarbs }}"
                              data-target-fat="{{ $targetFat }}"
                              data-consumed-protein="{{ $initialConsumedProtein }}"
-                             data-consumed-carbs="{{ $initialConsumedCarbs }}"
                              data-consumed-fat="{{ $initialConsumedFat }}">
                             <svg viewBox="0 0 100 100" class="cal-ring-svg">
                                 <circle cx="50" cy="50" r="40" class="cal-ring-bg"
@@ -136,12 +219,12 @@
                                 </div>
                                 <div class="macro-track"><div class="macro-fill protein" id="proteinFill" style="width: {{ $pctProtein }}%"></div></div>
                             </div>
+                            {{-- Carbs: no ICMR target — show planned total as plain info only --}}
                             <div class="macro-bar-item">
                                 <div class="macro-bar-labels">
                                     <span class="macro-name">Carbs planned</span>
-                                    <span class="macro-val" id="carbsVal">{{ $initialConsumedCarbs }} / {{ $targetCarbs }}g</span>
+                                    <span class="macro-val" id="carbsVal">{{ $plannedCarbs }}g</span>
                                 </div>
-                                <div class="macro-track"><div class="macro-fill carbs" id="carbsFill" style="width: {{ $pctCarbs }}%"></div></div>
                             </div>
                             <div class="macro-bar-item">
                                 <div class="macro-bar-labels">
@@ -152,11 +235,43 @@
                             </div>
                         </div>
                     </div>
+                    @else
+                    {{-- No ICMR target covers this child: show consumed values without progress bars --}}
+                    <div style="padding: 12px 0; font-size: 0.9rem; color: var(--muted); font-weight: 600;">
+                        Target not available — showing planned values only.
+                    </div>
+                    <div class="macro-bars">
+                        <div class="macro-bar-item">
+                            <div class="macro-bar-labels">
+                                <span class="macro-name">Calories</span>
+                                <span class="macro-val" id="calsConsumed">{{ $initialConsumedCals }} kcal</span>
+                            </div>
+                        </div>
+                        <div class="macro-bar-item">
+                            <div class="macro-bar-labels">
+                                <span class="macro-name">Protein</span>
+                                <span class="macro-val" id="proteinVal">{{ $initialConsumedProtein }}g</span>
+                            </div>
+                        </div>
+                        <div class="macro-bar-item">
+                            <div class="macro-bar-labels">
+                                <span class="macro-name">Carbs planned</span>
+                                <span class="macro-val" id="carbsVal">{{ $plannedCarbs }}g</span>
+                            </div>
+                        </div>
+                        <div class="macro-bar-item">
+                            <div class="macro-bar-labels">
+                                <span class="macro-name">Fats</span>
+                                <span class="macro-val" id="fatVal">{{ $initialConsumedFat }}g</span>
+                            </div>
+                        </div>
+                    </div>
+                    @endif
                 </div>
 
                 <!-- Meals -->
                 @php
-                    $currentDay = date('l');
+                    $currentDay = $activeDayLabel ?? date('l');
                     $dayPlan = isset($sevenDayPlan) ? ($sevenDayPlan[$currentDay] ?? ($sevenDayPlan['Monday'] ?? [])) : [];
                 @endphp
 
@@ -206,7 +321,12 @@
                                         $p = round($item['nutrients']['protein_g'] ?? 0, 1);
                                         $c = round($item['nutrients']['carb_g'] ?? 0, 1);
                                         $f = round($item['nutrients']['fat_g'] ?? 0, 1);
-                                        $portion = $item['portion_g'] . 'g';
+                                        $portion = (string) ($item['portion_g'] ?? '');
+                                        // Avoid double-unit: only append 'g' when the value is
+                                        // a plain number (old plans stored it as e.g. "150g").
+                                        if (is_numeric($portion)) {
+                                            $portion .= 'g';
+                                        }
                                         $isConsumed = in_array((int)($item['food_id'] ?? 0), $consumedIds, true);
                                     @endphp
                                     <div class="food-item meal-item {{ $isConsumed ? 'meal-taken' : '' }}"
@@ -360,14 +480,15 @@
                         }
                         $dailyPlanSummary[$planDay] = $totals;
                     }
+                    // Goal line: use todayTarget's energy value if available, else omit marker.
+                    $dailyGoalKcal = $hasTargets ? $targetCals : null;
                     $maxPlannedEnergy = max(array_merge(
-                        [1, (float) $targetCals],
-                        array_map(fn ($totals) => (float) $totals['energy_kcal'], array_values($dailyPlanSummary)),
-                        array_map(fn ($goal) => (float) ($goal['energy_kcal'] ?? 0), array_values($dailyTargets ?? []))
+                        [$dailyGoalKcal ?? 1],
+                        array_map(fn ($totals) => (float) $totals['energy_kcal'], array_values($dailyPlanSummary))
                     ));
                     $todayConsumedCals = (float) ($initialConsumedCals ?? 0);
-                    $todayCaloriesProgress = $targetCals > 0 ? min(100, ($todayConsumedCals / $targetCals) * 100) : 0;
-                    $todayCaloriesRemaining = max(0, $targetCals - $todayConsumedCals);
+                    $todayCaloriesProgress = ($hasTargets && $targetCals > 0) ? min(100, ($todayConsumedCals / $targetCals) * 100) : 0;
+                    $todayCaloriesRemaining = $hasTargets ? max(0, $targetCals - $todayConsumedCals) : null;
                     $todayPlanMacros = $dailyPlanSummary[date('l')] ?? $dailyPlanSummary[array_key_first($dailyPlanSummary) ?? ''] ?? [];
                 @endphp
 
@@ -384,20 +505,33 @@
                         <div class="dc-today-topline">
                             <div>
                                 <span class="dc-eyebrow">Calories consumed</span>
-                                <h3 id="dc-today-title"><span id="dailyCaloriesConsumed">{{ round($todayConsumedCals) }}</span> <small>of {{ round($targetCals) }} kcal</small></h3>
+                                <h3 id="dc-today-title">
+                                    <span id="dailyCaloriesConsumed">{{ round($todayConsumedCals) }}</span>
+                                    @if($hasTargets)
+                                        <small>of {{ round($targetCals) }} kcal</small>
+                                    @else
+                                        <small>kcal</small>
+                                    @endif
+                                </h3>
                             </div>
                             <div class="dc-calorie-status" id="dailyCaloriesStatus">
-                                @if($todayConsumedCals > $targetCals)
-                                    {{ round($todayConsumedCals - $targetCals) }} kcal over goal
+                                @if($hasTargets)
+                                    @if($todayConsumedCals > $targetCals)
+                                        {{ round($todayConsumedCals - $targetCals) }} kcal over goal
+                                    @else
+                                        {{ round($todayCaloriesRemaining) }} kcal remaining
+                                    @endif
                                 @else
-                                    {{ round($todayCaloriesRemaining) }} kcal remaining
+                                    Target not available
                                 @endif
                             </div>
                         </div>
+                        @if($hasTargets)
                         <div class="dc-progress-track" role="progressbar" aria-label="Calories consumed today" aria-valuemin="0" aria-valuemax="{{ round($targetCals) }}" aria-valuenow="{{ round($todayConsumedCals) }}">
                             <div class="dc-progress-fill" id="dailyCaloriesProgress" style="width: {{ $todayCaloriesProgress }}%;"></div>
                         </div>
                         <div class="dc-progress-caption"><span>0 kcal</span><span>Goal: {{ round($targetCals) }} kcal</span></div>
+                        @endif
                     </section>
 
                     <section class="dc-macro-section" aria-label="Today's consumed and planned macronutrients">
@@ -434,18 +568,20 @@
                         </div>
                         @forelse($dailyPlanSummary as $planDay => $totals)
                             @php
-                                $plannedPct = min(100, ($totals['energy_kcal'] / $maxPlannedEnergy) * 100);
-                                $dayGoal = (float) ($dailyTargets[$planDay]['energy_kcal'] ?? $targetCals);
-                                $dayGoalPct = min(100, ($dayGoal / $maxPlannedEnergy) * 100);
+                                $plannedPct  = min(100, ($totals['energy_kcal'] / $maxPlannedEnergy) * 100);
+                                $dayGoal     = $dailyGoalKcal;          // same target every day
+                                $dayGoalPct  = ($dayGoal !== null) ? min(100, ($dayGoal / $maxPlannedEnergy) * 100) : null;
                             @endphp
                             <div class="dc-week-row {{ $planDay === date('l') ? 'is-today' : '' }}">
                                 <div class="dc-week-label">
                                     <strong>{{ substr($planDay, 0, 3) }}</strong>
-                                    <span>{{ round($totals['energy_kcal']) }} / {{ round($dayGoal) }} kcal</span>
+                                    <span>{{ round($totals['energy_kcal']) }}{{ $dayGoal !== null ? ' / '.round($dayGoal) : '' }} kcal</span>
                                 </div>
                                 <div class="dc-week-track">
                                     <div class="dc-week-bar" style="width: {{ $plannedPct }}%;"></div>
+                                    @if($dayGoalPct !== null)
                                     <span class="dc-goal-marker" style="left: {{ $dayGoalPct }}%;" aria-hidden="true"></span>
+                                    @endif
                                 </div>
                                 <div class="dc-week-macros">P {{ round($totals['protein_g'], 1) }}g · C {{ round($totals['carb_g'], 1) }}g · F {{ round($totals['fat_g'], 1) }}g</div>
                             </div>
@@ -538,20 +674,61 @@
 
             <!-- Assessment Section (bottom) -->
             @php
-                $initialWeight = isset($assessment) ? ($assessment->initial_weight_kg ?? $assessment->current_weight_kg ?? 0) : 0;
-                $initialHeight = isset($assessment) ? ($assessment->initial_height_cm ?? $assessment->current_height_cm ?? 0) : 0;
-                $currentWeight = isset($assessment) ? ($assessment->current_weight_kg ?? 0) : 0;
-                $currentHeight = isset($assessment) ? ($assessment->current_height_cm ?? 0) : 0;
-                $targetWeight = $currentWeight > 0 ? round($currentWeight * 1.15, 1) : 0;
-                $targetHeight = $currentHeight > 0 ? round($currentHeight * 1.05, 1) : 0;
-                $weightMin = max(1, min($initialWeight, $currentWeight, $targetWeight) - 5);
-                $weightMax = max($initialWeight, $currentWeight, $targetWeight) + 5;
-                $heightMin = max(1, min($initialHeight, $currentHeight, $targetHeight) - 5);
-                $heightMax = max($initialHeight, $currentHeight, $targetHeight) + 5;
-                $weightRange = max(1, $weightMax - $weightMin);
-                $heightRange = max(1, $heightMax - $heightMin);
-                $currWpct = (($currentWeight - $weightMin) / $weightRange) * 100;
-                $currHpct = (($currentHeight - $heightMin) / $heightRange) * 100;
+                $initialWeight = isset($assessment) ? ($assessment->initial_weight_kg ?? $assessment->current_weight_kg ?? null) : null;
+                $initialHeight = isset($assessment) ? ($assessment->initial_height_cm ?? $assessment->current_height_cm ?? null) : null;
+                $currentWeight = isset($assessment) ? ($assessment->current_weight_kg ?? null) : null;
+                $currentHeight = isset($assessment) ? ($assessment->current_height_cm ?? null) : null;
+
+                // Weight badge & range — only computable when all values are present and > 0.
+                $weightAvailable = ($currentWeight !== null && $currentWeight > 0);
+                if ($weightAvailable) {
+                    $targetWeight = round($currentWeight * 1.15, 1);
+                    $initW        = $initialWeight > 0 ? $initialWeight : $currentWeight;
+                    $weightMin    = round(min($initW, $currentWeight, $targetWeight) - 5, 1);
+                    $weightMax    = round(max($initW, $currentWeight, $targetWeight) + 5, 1);
+                    $weightRange  = max(0.1, $weightMax - $weightMin);
+                    $currWpct     = max(0, min(100, (($currentWeight - $weightMin) / $weightRange) * 100));
+                    // Badge: below / on track / above relative to initial + target corridor.
+                    if ($currentWeight < $initW * 0.97) {
+                        $weightBadgeText  = 'Below range';
+                        $weightBadgeBg    = '#fef3c7';
+                        $weightBadgeColor = '#b45309';
+                    } elseif ($currentWeight > $targetWeight * 1.03) {
+                        $weightBadgeText  = 'Above range';
+                        $weightBadgeBg    = '#fee2e2';
+                        $weightBadgeColor = '#dc2626';
+                    } else {
+                        $weightBadgeText  = 'On track ✓';
+                        $weightBadgeBg    = '#ecfccb';
+                        $weightBadgeColor = '#4d7c0f';
+                    }
+                }
+
+                // Height badge & range.
+                $heightAvailable = ($currentHeight !== null && $currentHeight > 0);
+                if ($heightAvailable) {
+                    $targetHeight = round($currentHeight * 1.05, 1);
+                    $initH        = ($initialHeight !== null && $initialHeight > 0) ? $initialHeight : $currentHeight;
+                    $heightMin    = round(min($initH, $currentHeight, $targetHeight) - 5, 1);
+                    $heightMax    = round(max($initH, $currentHeight, $targetHeight) + 5, 1);
+                    $heightRange  = max(0.1, $heightMax - $heightMin);
+                    $currHpct     = max(0, min(100, (($currentHeight - $heightMin) / $heightRange) * 100));
+                    // Badge: below expected growth corridor vs initial.
+                    if ($initH > 0 && $currentHeight < $initH * 0.98) {
+                        $heightBadgeText  = 'Below range';
+                        $heightBadgeBg    = '#fef3c7';
+                        $heightBadgeColor = '#b45309';
+                    } elseif ($initH > 0 && $currentHeight > $targetHeight * 1.02) {
+                        $heightBadgeText  = 'Above range';
+                        $heightBadgeBg    = '#fee2e2';
+                        $heightBadgeColor = '#dc2626';
+                    } else {
+                        $heightBadgeText  = 'On track ✓';
+                        $heightBadgeBg    = '#ecfccb';
+                        $heightBadgeColor = '#4d7c0f';
+                    }
+                }
+
                 $planState = 'pending';
                 if (isset($latestPlan) && $latestPlan) {
                     if ($latestPlan->status === 'active' && $latestPlan->review_status === 'approved') {
@@ -568,11 +745,15 @@
 
                 <h3 style="font-family: 'Nunito', sans-serif; margin-bottom: 16px; color: var(--dk); font-size: 1rem; font-weight: 600;">Healthy targets for their age</h3>
 
+                {{-- Height card --}}
                 <div style="background: #fff; border: 1.5px solid var(--border); border-radius: 20px; padding: 24px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
                         <div style="font-weight: 600; color: var(--dk); font-size: 1rem;">📏 Height</div>
-                        <div style="background: #ecfccb; color: #4d7c0f; font-weight: 700; font-size: 0.8rem; padding: 4px 12px; border-radius: 20px;">On track ✓</div>
+                        @if($heightAvailable)
+                        <div style="background: {{ $heightBadgeBg }}; color: {{ $heightBadgeColor }}; font-weight: 700; font-size: 0.8rem; padding: 4px 12px; border-radius: 20px;">{{ $heightBadgeText }}</div>
+                        @endif
                     </div>
+                    @if($heightAvailable)
                     <div style="position: relative; height: 16px; margin-bottom: 8px; border-radius: 8px; background: linear-gradient(to right, #a3e635, #fef08a);">
                         <div style="position: absolute; left: {{ $currHpct }}%; top: -6px; bottom: -6px; width: 4px; background: #1e293b; border-radius: 2px; transform: translateX(-50%); z-index: 2;"></div>
                     </div>
@@ -581,13 +762,20 @@
                         <span style="position: absolute; left: {{ $currHpct }}%; transform: translateX(-50%); color: var(--dk); font-weight: 600;">{{ $child->name ?? 'Child' }} {{ $currentHeight }} cm</span>
                         <span style="position: absolute; right: 0;">{{ $heightMax }} cm</span>
                     </div>
+                    @else
+                    <div style="font-size: 0.85rem; color: var(--muted); font-weight: 600;">Not provided</div>
+                    @endif
                 </div>
 
+                {{-- Weight card --}}
                 <div style="background: #fff; border: 1.5px solid var(--border); border-radius: 20px; padding: 24px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
                         <div style="font-weight: 600; color: var(--dk); font-size: 1rem;">⚖️ Weight</div>
-                        <div style="background: #ecfccb; color: #4d7c0f; font-weight: 700; font-size: 0.8rem; padding: 4px 12px; border-radius: 20px;">On track ✓</div>
+                        @if($weightAvailable)
+                        <div style="background: {{ $weightBadgeBg }}; color: {{ $weightBadgeColor }}; font-weight: 700; font-size: 0.8rem; padding: 4px 12px; border-radius: 20px;">{{ $weightBadgeText }}</div>
+                        @endif
                     </div>
+                    @if($weightAvailable)
                     <div style="position: relative; height: 16px; margin-bottom: 8px; border-radius: 8px; background: linear-gradient(to right, #a3e635, #fef08a);">
                         <div style="position: absolute; left: {{ $currWpct }}%; top: -6px; bottom: -6px; width: 4px; background: #1e293b; border-radius: 2px; transform: translateX(-50%); z-index: 2;"></div>
                     </div>
@@ -596,19 +784,25 @@
                         <span style="position: absolute; left: {{ $currWpct }}%; transform: translateX(-50%); color: var(--dk); font-weight: 600;">{{ $child->name ?? 'Child' }} {{ $currentWeight }} kg</span>
                         <span style="position: absolute; right: 0;">{{ $weightMax }} kg</span>
                     </div>
+                    @else
+                    <div style="font-size: 0.85rem; color: var(--muted); font-weight: 600;">Not provided</div>
+                    @endif
                 </div>
 
                 @php
-                    $calsPct = $targetCals > 0 ? min(100, ($initialConsumedCals / $targetCals) * 100) : 0;
-                    $energyStateBadge = $calsPct < 80 ? 'Needs a boost' : 'On track ✓';
-                    $energyStateColor = $calsPct < 80 ? '#fef3c7' : '#ecfccb';
-                    $energyStateText = $calsPct < 80 ? '#b45309' : '#4d7c0f';
+                    $calsPct = ($hasTargets && $targetCals > 0) ? min(100, ($initialConsumedCals / $targetCals) * 100) : null;
+                    $energyStateBadge = ($calsPct === null) ? null : ($calsPct < 80 ? 'Needs a boost' : 'On track ✓');
+                    $energyStateColor = ($calsPct === null) ? '#f3f4f6' : ($calsPct < 80 ? '#fef3c7' : '#ecfccb');
+                    $energyStateText  = ($calsPct === null) ? '#6b7280' : ($calsPct < 80 ? '#b45309' : '#4d7c0f');
                 @endphp
                 <div style="background: #fff; border: 1.5px solid var(--border); border-radius: 20px; padding: 24px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
                         <div style="font-weight: 600; color: var(--dk); font-size: 1rem;">⚡ Daily energy</div>
+                        @if($energyStateBadge !== null)
                         <div id="energyBadge" style="background: {{ $energyStateColor }}; color: {{ $energyStateText }}; font-weight: 700; font-size: 0.8rem; padding: 4px 12px; border-radius: 20px;">{{ $energyStateBadge }}</div>
+                        @endif
                     </div>
+                    @if($hasTargets)
                     <div style="position: relative; height: 16px; margin-bottom: 12px; border-radius: 8px; background: #e5e7eb; overflow: hidden;">
                         <div id="energyBarFill" style="position: absolute; left: 0; top: 0; bottom: 0; width: {{ $calsPct }}%; background: var(--or); border-radius: 8px; transition: width 0.3s ease;"></div>
                     </div>
@@ -616,6 +810,9 @@
                         <span style="color: var(--muted);">Now ≈ <span style="color: var(--dk); font-weight: 700;" id="calsConsumedEnergyCard">{{ $initialConsumedCals }}</span> <span style="color: var(--dk); font-weight: 700;">kcal</span></span>
                         <span style="color: var(--muted);">Needs <span style="color: var(--dk); font-weight: 700;">{{ $targetCals }} kcal</span></span>
                     </div>
+                    @else
+                    <div style="font-size: 0.85rem; color: var(--muted); font-weight: 600;">Target not available</div>
+                    @endif
                 </div>
 
                 @if($planState !== 'approved')
@@ -654,6 +851,93 @@
         <div class="search-results" id="swap-candidates-list"></div>
     </div>
 </div>
+
+{{-- Inline JS for week/day navigation --}}
+<script>
+(function () {
+    'use strict';
+
+    var weekTabBar    = document.getElementById('weekTabBar');
+    var dateSelectorBar = document.getElementById('dateSelectorBar');
+    if (!dateSelectorBar) return;
+
+    /**
+     * Show only chips for the given weekNo; hide all others.
+     * Also mark the active week tab button.
+     */
+    function switchWeek(weekNo) {
+        // Update date chips visibility
+        var chips = dateSelectorBar.querySelectorAll('.nutri-date-item');
+        chips.forEach(function (chip) {
+            var chipWeek = parseInt(chip.dataset.week || '1', 10);
+            if (chipWeek === weekNo) {
+                chip.classList.remove('nutri-date-hidden');
+            } else {
+                chip.classList.add('nutri-date-hidden');
+            }
+        });
+
+        // Update week tab active state
+        if (weekTabBar) {
+            weekTabBar.querySelectorAll('.nutri-week-tab').forEach(function (btn) {
+                btn.classList.toggle('active', parseInt(btn.dataset.week, 10) === weekNo);
+            });
+        }
+    }
+
+    /**
+     * Activate a date chip by day_index.
+     * Finds the day label (weekday name) and triggers the global plan-day
+     * switching logic used by the Food View / Nutri View tabs.
+     */
+    function switchDay(dayIndex, weekNo) {
+        var chips = dateSelectorBar.querySelectorAll('.nutri-date-item[data-day-index]');
+        chips.forEach(function (chip) {
+            chip.classList.toggle('active', parseInt(chip.dataset.dayIndex, 10) === dayIndex);
+        });
+
+        // Re-render the Food View meal list for the chosen day.
+        // The day label (weekday name) is stored as the chip's data-day-label attribute
+        // if present, otherwise we fall back to updating a global JS variable the
+        // existing nutrition.js reads on tab switch.
+        var activeDayLabel = null;
+        var activeChip = dateSelectorBar.querySelector('.nutri-date-item[data-day-index="' + dayIndex + '"]');
+        if (activeChip && activeChip.dataset.dayLabel) {
+            activeDayLabel = activeChip.dataset.dayLabel;
+        }
+
+        // Emit a custom event so nutrition.js can react without coupling.
+        document.dispatchEvent(new CustomEvent('nutriDayChanged', {
+            detail: { dayIndex: dayIndex, weekNo: weekNo, dayLabel: activeDayLabel }
+        }));
+    }
+
+    // Week tab clicks
+    if (weekTabBar) {
+        weekTabBar.addEventListener('click', function (e) {
+            var btn = e.target.closest('.nutri-week-tab');
+            if (!btn) return;
+            var wn = parseInt(btn.dataset.week, 10);
+            switchWeek(wn);
+            // Select the first chip in the new week
+            var firstChip = dateSelectorBar.querySelector('.nutri-date-item[data-week="' + wn + '"]');
+            if (firstChip) {
+                var di = parseInt(firstChip.dataset.dayIndex || '0', 10);
+                switchDay(di, wn);
+            }
+        });
+    }
+
+    // Date chip clicks
+    dateSelectorBar.addEventListener('click', function (e) {
+        var chip = e.target.closest('.nutri-date-item[data-day-index]');
+        if (!chip) return;
+        var di = parseInt(chip.dataset.dayIndex, 10);
+        var wn = parseInt(chip.dataset.week || '1', 10);
+        switchDay(di, wn);
+    });
+})();
+</script>
 
 {{-- Inline JS for check-in --}}
 <script>

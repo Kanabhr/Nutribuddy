@@ -152,7 +152,47 @@ class NutritionPageService
             ->latest()
             ->first();
         $latestPlan = $plans->latest()->first();
-        $todayTarget = ['energy_kcal' => 2100, 'protein_g' => 152, 'fat_g' => 61];
+
+        // Resolve today's macro targets.
+        // Priority 1: flat nutrient_gaps summary already stored in plan_data.
+        // Priority 2: TargetEngine live lookup for the child's age/sex.
+        // If neither is available todayTarget stays null — the view hides bars.
+        $todayTarget = null;
+
+        if ($dietPlan) {
+            $planData = $dietPlan->plan_data;
+            if (is_string($planData)) {
+                $planData = json_decode($planData, true) ?? [];
+            }
+            // plan_data['nutrient_gaps'] is a flat per-nutrient summary:
+            //   { "energy_kcal": { "target": 1700, ... }, "protein_g": { ... }, ... }
+            $gaps = is_array($planData) ? ($planData['nutrient_gaps'] ?? []) : [];
+            if (
+                isset($gaps['energy_kcal']['target']) &&
+                isset($gaps['protein_g']['target']) &&
+                isset($gaps['fat_g']['target'])
+            ) {
+                $todayTarget = [
+                    'energy_kcal' => (float) $gaps['energy_kcal']['target'],
+                    'protein_g'   => (float) $gaps['protein_g']['target'],
+                    'fat_g'       => (float) $gaps['fat_g']['target'],
+                ];
+            }
+        }
+
+        // Fallback: live TargetEngine lookup (no plan yet, or plan lacks gaps).
+        if ($todayTarget === null) {
+            $icmrTarget = app(\App\Services\Nutrition\TargetEngine::class)->getTargets($child);
+            if ($icmrTarget) {
+                $todayTarget = [
+                    'energy_kcal' => (float) $icmrTarget->energy_kcal,
+                    'protein_g'   => (float) $icmrTarget->protein_g,
+                    'fat_g'       => (float) $icmrTarget->fat_g,
+                ];
+            }
+        }
+        // todayTarget remains null when no ICMR row covers this child's age.
+        // The view checks for null and shows 'Target not available' instead of bars.
 
         $viewData = compact('child', 'assessment', 'latestPlan', 'todayTarget');
         if (! $dietPlan) {
@@ -163,24 +203,7 @@ class NutritionPageService
             $dietPlan,
             $dietPlan->assessment ?? $assessment
         );
-        $planData = $dietPlan->plan_data;
-        if (is_string($planData)) {
-            $planData = json_decode($planData, true) ?? [];
-        }
-        $nutrientGaps = is_array($planData) ? ($planData['nutrient_gaps'] ?? []) : [];
 
-        $dailyTargets = [];
-        foreach ($nutrientGaps as $day => $gaps) {
-            $dailyTargets[$day] = [
-                'energy_kcal' => $gaps['energy_kcal']['target'] ?? 1360,
-                'protein_g' => $gaps['protein_g']['target'] ?? 16,
-                'fat_g' => $gaps['fat_g']['target'] ?? 40,
-            ];
-        }
-
-        $todayTarget = $dailyTargets[Carbon::now()->format('l')]
-            ?? $dailyTargets['Monday']
-            ?? ['energy_kcal' => 2100, 'protein_g' => 152, 'fat_g' => 61];
         $consumedItems = MealItemLog::where('child_id', $child->id)
             ->where('log_date', Carbon::today()->toDateString())
             ->where('is_consumed', true)
@@ -198,8 +221,7 @@ class NutritionPageService
                 'assessment',
                 'consumedItems',
                 'latestPlan',
-                'todayTarget',
-                'dailyTargets'
+                'todayTarget'
             ),
         ];
     }
