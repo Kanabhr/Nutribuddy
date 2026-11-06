@@ -54,16 +54,17 @@
                     // else: outside plan → default to week 1, day 0 (already set).
                 }
 
-                // Build a lookup: day_index → weekday label (for $sevenDayPlan keying).
-                $dayIndexToLabel = [];
-                if ($planStartDate) {
-                    for ($di = 0; $di < $planTotalDays; $di++) {
-                        $dayIndexToLabel[$di] = $planStartDate->copy()->addDays($di)->format('l');
-                    }
+                // $planDays comes from NutritionPageService via DietChartDisplayService::formatPlan().
+                // It is a flat list of day objects, one per plan day, keyed by numeric index:
+                //   [0 => ['index'=>0,'label'=>'Monday','date'=>'…','week'=>1,'meals'=>[…]], …]
+                // We index it by the 'index' field for O(1) lookup.
+                $planDaysIndexed = [];
+                foreach (($planDays ?? []) as $pd) {
+                    $planDaysIndexed[$pd['index']] = $pd;
                 }
 
-                // Active day's weekday label (used in Tab 1 / Tab 3).
-                $activeDayLabel = $dayIndexToLabel[$activeDayIndex] ?? date('l');
+                // Active day's weekday label (used in Daily Calories tab heading only — not for keying).
+                $activeDayLabel = $planDaysIndexed[$activeDayIndex]['label'] ?? date('l');
             @endphp
 
             {{-- Week tabs — only shown for plans longer than 7 days --}}
@@ -88,7 +89,8 @@
                                     {{ $wd['index'] === $activeDayIndex ? 'active' : '' }}
                                     {{ $wn !== $activeWeekNo ? 'nutri-date-hidden' : '' }}"
                              data-day-index="{{ $wd['index'] }}"
-                             data-week="{{ $wn }}">
+                             data-week="{{ $wn }}"
+                             data-day-label="{{ $wd['date']->format('l') }}">
                             <span class="nutri-date-day">{{ $wd['date']->format('D') }}</span>
                             <span class="nutri-date-num">{{ $wd['date']->format('j') }}</span>
                         </div>
@@ -120,14 +122,27 @@
             <div id="tab-food" class="nutri-tab-content active">
 
                 @php
-                    // todayTarget is null when no ICMR row covers this child.
+                    // todayTarget is null when no ICMR row covers this child at all.
+                    // Each nutrient is resolved independently by NutritionPageService:
+                    // a target that is missing or <= 0 is stored as null ("not
+                    // available") for that nutrient only, so only its bar/ring is
+                    // hidden while the others keep showing.
                     $hasTargets    = isset($todayTarget) && is_array($todayTarget);
-                    $targetCals    = $hasTargets ? (float) ($todayTarget['energy_kcal'] ?? 0) : 0;
-                    $targetProtein = $hasTargets ? (float) ($todayTarget['protein_g']   ?? 0) : 0;
-                    $targetFat     = $hasTargets ? (float) ($todayTarget['fat_g']       ?? 0) : 0;
+                    $energyTarget  = $hasTargets ? ($todayTarget['energy_kcal'] ?? null) : null;
+                    $proteinTarget = $hasTargets ? ($todayTarget['protein_g']   ?? null) : null;
+                    $fatTarget     = $hasTargets ? ($todayTarget['fat_g']       ?? null) : null;
 
-                    $currentDayForRing = $activeDayLabel ?? date('l');
-                    $dayPlanForRing = isset($sevenDayPlan) ? ($sevenDayPlan[$currentDayForRing] ?? ($sevenDayPlan['Monday'] ?? [])) : [];
+                    $hasEnergy  = $energyTarget  !== null && (float) $energyTarget  > 0;
+                    $hasProtein = $proteinTarget !== null && (float) $proteinTarget > 0;
+                    $hasFat     = $fatTarget     !== null && (float) $fatTarget     > 0;
+
+                    $targetCals    = $hasEnergy  ? (float) $energyTarget  : 0;
+                    $targetProtein = $hasProtein ? (float) $proteinTarget : 0;
+                    $targetFat     = $hasFat     ? (float) $fatTarget     : 0;
+
+                    $currentDayForRing = $activeDayIndex;
+                    // Get the active day's meal slots from the formatPlan() indexed list.
+                    $dayPlanForRing = $planDaysIndexed[$currentDayForRing]['meals'] ?? [];
 
                     // Carbs: no ICMR target exists; sum planned foods only (shown as plain number).
                     $plannedCarbs = 0;
@@ -173,12 +188,14 @@
                     $initialConsumedCarbs   = round($initialConsumedCarbs, 1);
                     $initialConsumedFat     = round($initialConsumedFat, 1);
 
-                    // Percentages for initial SSR render — only meaningful when targets exist.
-                    $pctProtein = ($hasTargets && $targetProtein > 0) ? min(100, ($initialConsumedProtein / $targetProtein) * 100) : 0;
-                    $pctFat     = ($hasTargets && $targetFat     > 0) ? min(100, ($initialConsumedFat     / $targetFat)     * 100) : 0;
+                    // Percentages for initial SSR render — only meaningful when a
+                    // given nutrient's target is available. Each is computed
+                    // independently so a missing nutrient never divides by zero.
+                    $pctProtein = $hasProtein ? min(100, ($initialConsumedProtein / $targetProtein) * 100) : 0;
+                    $pctFat     = $hasFat     ? min(100, ($initialConsumedFat     / $targetFat)     * 100) : 0;
 
                     $ringCircumference = 251.3;
-                    $calsPct   = ($hasTargets && $targetCals > 0) ? min(1, $initialConsumedCals / $targetCals) : 0;
+                    $calsPct   = $hasEnergy ? min(1, $initialConsumedCals / $targetCals) : 0;
                     $ringOffset = $ringCircumference * (1 - $calsPct);
                     $ringColor  = $calsPct >= 0.99 ? '#22c55e' : ($calsPct >= 0.5 ? '#22c55e' : ($calsPct > 0 ? '#f59e0b' : '#e5e7eb'));
                 @endphp
@@ -186,11 +203,12 @@
                 <div class="nutri-card">
                     @if($hasTargets)
                     <div class="cal-summary-grid">
+                        @if($hasEnergy)
                         <div class="cal-ring-container"
                              data-target-cals="{{ $targetCals }}"
                              data-consumed-cals="{{ $initialConsumedCals }}"
-                             data-target-protein="{{ $targetProtein }}"
-                             data-target-fat="{{ $targetFat }}"
+                             data-target-protein="{{ $hasProtein ? $targetProtein : 0 }}"
+                             data-target-fat="{{ $hasFat ? $targetFat : 0 }}"
                              data-consumed-protein="{{ $initialConsumedProtein }}"
                              data-consumed-fat="{{ $initialConsumedFat }}">
                             <svg viewBox="0 0 100 100" class="cal-ring-svg">
@@ -208,16 +226,43 @@
                                 <span class="cal-ring-lbl">of {{ $targetCals }}</span>
                             </div>
                         </div>
+                        @else
+                        {{-- Energy target not available: no ring SVG. A container is still
+                             rendered so nutrition.js can read the protein/fat targets. --}}
+                        <div class="cal-ring-container cal-ring-unavailable"
+                             data-target-cals="0"
+                             data-target-protein="{{ $hasProtein ? $targetProtein : 0 }}"
+                             data-target-fat="{{ $hasFat ? $targetFat : 0 }}"
+                             data-consumed-protein="{{ $initialConsumedProtein }}"
+                             data-consumed-fat="{{ $initialConsumedFat }}">
+                            <div class="cal-ring-text">
+                                <span class="cal-ring-val" id="calsConsumed">{{ $initialConsumedCals }}</span>
+                                <span class="cal-ring-lbl">kcal · target not available</span>
+                            </div>
+                        </div>
+                        @endif
                         <div class="macro-bars">
+                            @if($hasEnergy)
                             <div style="font-weight: 800; font-size: 0.9rem; margin-bottom: 4px;">
                                 <span id="calsRemaining" style="color: var(--pk);">{{ max(0, $targetCals - $initialConsumedCals) }}</span> kcal remaining
                             </div>
+                            @else
+                            <div style="font-weight: 800; font-size: 0.9rem; margin-bottom: 4px; color: var(--muted);">
+                                Energy target not available
+                            </div>
+                            @endif
                             <div class="macro-bar-item">
                                 <div class="macro-bar-labels">
                                     <span class="macro-name">Protein</span>
+                                    @if($hasProtein)
                                     <span class="macro-val" id="proteinVal">{{ $initialConsumedProtein }} / {{ $targetProtein }}g</span>
+                                    @else
+                                    <span class="macro-val" id="proteinVal">{{ $initialConsumedProtein }}g · target not available</span>
+                                    @endif
                                 </div>
+                                @if($hasProtein)
                                 <div class="macro-track"><div class="macro-fill protein" id="proteinFill" style="width: {{ $pctProtein }}%"></div></div>
+                                @endif
                             </div>
                             {{-- Carbs: no ICMR target — show planned total as plain info only --}}
                             <div class="macro-bar-item">
@@ -229,14 +274,20 @@
                             <div class="macro-bar-item">
                                 <div class="macro-bar-labels">
                                     <span class="macro-name">Fats</span>
+                                    @if($hasFat)
                                     <span class="macro-val" id="fatVal">{{ $initialConsumedFat }} / {{ $targetFat }}g</span>
+                                    @else
+                                    <span class="macro-val" id="fatVal">{{ $initialConsumedFat }}g · target not available</span>
+                                    @endif
                                 </div>
+                                @if($hasFat)
                                 <div class="macro-track"><div class="macro-fill fats" id="fatFill" style="width: {{ $pctFat }}%"></div></div>
+                                @endif
                             </div>
                         </div>
                     </div>
                     @else
-                    {{-- No ICMR target covers this child: show consumed values without progress bars --}}
+                    {{-- No ICMR target covers this child at all: show consumed values without progress bars --}}
                     <div style="padding: 12px 0; font-size: 0.9rem; color: var(--muted); font-weight: 600;">
                         Target not available — showing planned values only.
                     </div>
@@ -271,21 +322,38 @@
 
                 <!-- Meals -->
                 @php
-                    $currentDay = $activeDayLabel ?? date('l');
-                    $dayPlan = isset($sevenDayPlan) ? ($sevenDayPlan[$currentDay] ?? ($sevenDayPlan['Monday'] ?? [])) : [];
+                    $allDaysForFoodView = isset($planDays) && is_array($planDays) ? $planDays : [];
+                    // Active day index for initial render.
                 @endphp
 
-                @if(!empty($dayPlan))
-                    @foreach($dayPlan as $slotName => $data)
+                @if(!empty($allDaysForFoodView))
+                    @foreach($allDaysForFoodView as $fdDay)
                         @php
-                            $slotId = strtolower(str_replace(' ', '-', $slotName));
+                            $fdDayIndex   = (int) $fdDay['index'];
+                            $fdDaySlots   = $fdDay['meals'];
+                            $isFoodDayActive = ($fdDayIndex === $activeDayIndex);
+                            // Ticks (consumed items) belong to today's date only.
+                            // For another date we show nothing ticked and display a note.
+                            $fdDayIsToday = ($fdDay['date'] ?? null) === Carbon::today()->toDateString();
+                        @endphp
+                        <div class="food-day-panel{{ $isFoodDayActive ? ' active' : '' }}"
+                             data-food-day="{{ $fdDayIndex }}"
+                             data-is-today="{{ $fdDayIsToday ? '1' : '0' }}">
+                        @if(!$fdDayIsToday)
+                        <div class="nutri-tracking-note" style="padding: 8px 12px; margin-bottom: 12px; background: #f3f4f6; border-radius: 10px; font-size: 0.8rem; color: var(--muted); font-weight: 600;">
+                            📋 Tracking is available for today only. Tap a food to log it when it's today's plan day.
+                        </div>
+                        @endif
+                        @foreach($fdDaySlots as $slotName => $data)
+                        @php
+                            $slotId = strtolower(str_replace(' ', '-', 'day' . $fdDayIndex . '-' . $slotName));
                             $slotKcalTotal    = round($data['total_nutrients']['energy_kcal'] ?? 0);
                             $slotProteinTotal = round($data['total_nutrients']['protein_g'] ?? 0);
 
                             $slotKcalConsumed    = 0;
                             $slotProteinConsumed = 0;
                             $slotSeenIds = [];
-                            if (!empty($data['items'])) {
+                            if ($isFoodDayActive && !empty($data['items'])) {
                                 foreach ($data['items'] as $itm) {
                                     $fid = (int) ($itm['food_id'] ?? 0);
                                     if ($fid <= 0) continue;
@@ -327,7 +395,8 @@
                                         if (is_numeric($portion)) {
                                             $portion .= 'g';
                                         }
-                                        $isConsumed = in_array((int)($item['food_id'] ?? 0), $consumedIds, true);
+                                        // Only mark as consumed for the active day (consumed items are today-scoped)
+                                        $isConsumed = $isFoodDayActive && in_array((int)($item['food_id'] ?? 0), $consumedIds, true);
                                     @endphp
                                     <div class="food-item meal-item {{ $isConsumed ? 'meal-taken' : '' }}"
                                          data-cals="{{ $cals }}"
@@ -351,6 +420,8 @@
                                 @endforeach
                             </div>
                         </div>
+                        @endforeach
+                        </div>{{-- /.food-day-panel --}}
                     @endforeach
                 @else
                     <div class="meal-section">
@@ -368,17 +439,22 @@
             <!-- TAB 2: NUTRI VIEW -->
             <div id="tab-nutri" class="nutri-tab-content">
                 @php
-                    $nutriDays = is_array($sevenDayPlan ?? null) ? $sevenDayPlan : [];
-                    $selectedNutriDay = array_key_exists(date('l'), $nutriDays)
-                        ? date('l')
-                        : (array_key_first($nutriDays) ?? null);
+                    // Build a flat indexed array from the formatPlan() day list so the nutri view
+                    // can iterate all plan days regardless of length.
+                    $nutriDays = isset($planDays) && is_array($planDays) ? $planDays : [];
+                    // Default selection: today's plan day index if it is within the plan, else 0.
+                    $selectedNutriIndex = $activeDayIndex;
+                    $allIndices = array_column($nutriDays, 'index');
+                    if (empty($nutriDays) || !in_array($selectedNutriIndex, $allIndices, true)) {
+                        $selectedNutriIndex = $nutriDays[0]['index'] ?? 0;
+                    }
                 @endphp
 
                 @if($nutriDays)
                     <div class="nv-view">
                         <div class="nv-heading">
                             <div>
-                                <span class="nv-eyebrow">Weekly meal plan</span>
+                                <span class="nv-eyebrow">Meal plan</span>
                                 <h2>Nutrition by day</h2>
                                 <p>Choose a day, then open a food to inspect its full nutrient breakdown.</p>
                             </div>
@@ -386,20 +462,24 @@
                         </div>
 
                         <div class="nv-day-switcher" role="tablist" aria-label="Meal plan days">
-                            @foreach($nutriDays as $dayName => $dayMeals)
-                                <button type="button" class="nv-day-button {{ $dayName === $selectedNutriDay ? 'active' : '' }}"
-                                        id="nv-day-tab-{{ strtolower($dayName) }}" role="tab"
-                                        aria-selected="{{ $dayName === $selectedNutriDay ? 'true' : 'false' }}"
-                                        aria-controls="nv-day-panel-{{ strtolower($dayName) }}"
-                                        data-nv-day="{{ $dayName }}">
-                                    <span>{{ substr($dayName, 0, 3) }}</span>
-                                    <small>{{ count($dayMeals) }} {{ count($dayMeals) === 1 ? 'meal' : 'meals' }}</small>
+                            @foreach($nutriDays as $nvDay)
+                                @php $nvIdx = $nvDay['index']; $nvLabel = $nvDay['label']; @endphp
+                                <button type="button" class="nv-day-button {{ $nvIdx === $selectedNutriIndex ? 'active' : '' }}"
+                                        id="nv-day-tab-{{ $nvIdx }}" role="tab"
+                                        aria-selected="{{ $nvIdx === $selectedNutriIndex ? 'true' : 'false' }}"
+                                        aria-controls="nv-day-panel-{{ $nvIdx }}"
+                                        data-nv-day="{{ $nvIdx }}">
+                                    <span>{{ substr($nvLabel, 0, 3) }}</span>
+                                    <small>{{ count($nvDay['meals']) }} {{ count($nvDay['meals']) === 1 ? 'meal' : 'meals' }}</small>
                                 </button>
                             @endforeach
                         </div>
 
-                        @foreach($nutriDays as $dayName => $dayMeals)
+                        @foreach($nutriDays as $nvDay)
                             @php
+                                $nvIdx     = $nvDay['index'];
+                                $nvLabel   = $nvDay['label'];
+                                $dayMeals  = $nvDay['meals'];
                                 $dayTotals = [];
                                 $dayFoodCount = 0;
                                 foreach ($dayMeals as $mealData) {
@@ -409,12 +489,12 @@
                                     $dayFoodCount += count($mealData['items'] ?? []);
                                 }
                             @endphp
-                            <section class="nv-day-panel" id="nv-day-panel-{{ strtolower($dayName) }}"
-                                     role="tabpanel" aria-labelledby="nv-day-tab-{{ strtolower($dayName) }}"
-                                     data-nv-panel="{{ $dayName }}" {{ $dayName === $selectedNutriDay ? '' : 'hidden' }}>
+                            <section class="nv-day-panel" id="nv-day-panel-{{ $nvIdx }}"
+                                     role="tabpanel" aria-labelledby="nv-day-tab-{{ $nvIdx }}"
+                                     data-nv-panel="{{ $nvIdx }}" {{ $nvIdx === $selectedNutriIndex ? '' : 'hidden' }}>
                                 <div class="nv-day-summary">
                                     <div>
-                                        <span class="nv-eyebrow">{{ $dayName }}</span>
+                                        <span class="nv-eyebrow">{{ $nvLabel }} · Day {{ $nvIdx + 1 }}</span>
                                         <h3>{{ $dayFoodCount }} planned {{ $dayFoodCount === 1 ? 'food' : 'foods' }}</h3>
                                     </div>
                                     <div class="nv-day-kcal">{{ round($dayTotals['energy_kcal'] ?? 0) }} <span>kcal planned</span></div>
@@ -471,25 +551,30 @@
             <div id="tab-calories" class="nutri-tab-content">
                 @php
                     $dailyPlanSummary = [];
-                    foreach (($sevenDayPlan ?? []) as $planDay => $planMeals) {
+                    foreach (($planDays ?? []) as $planDay) {
                         $totals = ['energy_kcal' => 0, 'protein_g' => 0, 'carb_g' => 0, 'fat_g' => 0];
-                        foreach ($planMeals as $planMeal) {
+                        foreach ($planDay['meals'] as $planMeal) {
                             foreach ($totals as $nutrient => $value) {
                                 $totals[$nutrient] += (float) ($planMeal['total_nutrients'][$nutrient] ?? 0);
                             }
                         }
-                        $dailyPlanSummary[$planDay] = $totals;
+                        $dailyPlanSummary[$planDay['date']] = array_merge($totals, [
+                            '_label' => $planDay['label'],
+                            '_index' => $planDay['index'],
+                        ]);
                     }
                     // Goal line: use todayTarget's energy value if available, else omit marker.
-                    $dailyGoalKcal = $hasTargets ? $targetCals : null;
+                    $dailyGoalKcal = $hasEnergy ? $targetCals : null;
                     $maxPlannedEnergy = max(array_merge(
                         [$dailyGoalKcal ?? 1],
                         array_map(fn ($totals) => (float) $totals['energy_kcal'], array_values($dailyPlanSummary))
                     ));
                     $todayConsumedCals = (float) ($initialConsumedCals ?? 0);
-                    $todayCaloriesProgress = ($hasTargets && $targetCals > 0) ? min(100, ($todayConsumedCals / $targetCals) * 100) : 0;
-                    $todayCaloriesRemaining = $hasTargets ? max(0, $targetCals - $todayConsumedCals) : null;
-                    $todayPlanMacros = $dailyPlanSummary[date('l')] ?? $dailyPlanSummary[array_key_first($dailyPlanSummary) ?? ''] ?? [];
+                    $todayCaloriesProgress = $hasEnergy ? min(100, ($todayConsumedCals / $targetCals) * 100) : 0;
+                    $todayCaloriesRemaining = $hasEnergy ? max(0, $targetCals - $todayConsumedCals) : null;
+                    // Today's plan macros: look up by today's date string (canonical key).
+                    $todayDateKey    = now()->toDateString();
+                    $todayPlanMacros = $dailyPlanSummary[$todayDateKey] ?? $dailyPlanSummary[array_key_first($dailyPlanSummary) ?? ''] ?? [];
                 @endphp
 
                 <div class="dc-view">
@@ -507,7 +592,7 @@
                                 <span class="dc-eyebrow">Calories consumed</span>
                                 <h3 id="dc-today-title">
                                     <span id="dailyCaloriesConsumed">{{ round($todayConsumedCals) }}</span>
-                                    @if($hasTargets)
+                                    @if($hasEnergy)
                                         <small>of {{ round($targetCals) }} kcal</small>
                                     @else
                                         <small>kcal</small>
@@ -515,7 +600,7 @@
                                 </h3>
                             </div>
                             <div class="dc-calorie-status" id="dailyCaloriesStatus">
-                                @if($hasTargets)
+                                @if($hasEnergy)
                                     @if($todayConsumedCals > $targetCals)
                                         {{ round($todayConsumedCals - $targetCals) }} kcal over goal
                                     @else
@@ -526,7 +611,7 @@
                                 @endif
                             </div>
                         </div>
-                        @if($hasTargets)
+                        @if($hasEnergy)
                         <div class="dc-progress-track" role="progressbar" aria-label="Calories consumed today" aria-valuemin="0" aria-valuemax="{{ round($targetCals) }}" aria-valuenow="{{ round($todayConsumedCals) }}">
                             <div class="dc-progress-fill" id="dailyCaloriesProgress" style="width: {{ $todayCaloriesProgress }}%;"></div>
                         </div>
@@ -566,15 +651,17 @@
                             </div>
                             <span class="dc-goal-key"><i></i> Daily goal</span>
                         </div>
-                        @forelse($dailyPlanSummary as $planDay => $totals)
+                        @forelse($dailyPlanSummary as $dcDate => $totals)
                             @php
                                 $plannedPct  = min(100, ($totals['energy_kcal'] / $maxPlannedEnergy) * 100);
-                                $dayGoal     = $dailyGoalKcal;          // same target every day
+                                $dayGoal     = $dailyGoalKcal;
                                 $dayGoalPct  = ($dayGoal !== null) ? min(100, ($dayGoal / $maxPlannedEnergy) * 100) : null;
+                                $dcIsToday   = ($dcDate === now()->toDateString());
+                                $dcLabel     = $totals['_label'] ?? substr($dcDate, -5); // "Mon" label from formatPlan
                             @endphp
-                            <div class="dc-week-row {{ $planDay === date('l') ? 'is-today' : '' }}">
+                            <div class="dc-week-row {{ $dcIsToday ? 'is-today' : '' }}">
                                 <div class="dc-week-label">
-                                    <strong>{{ substr($planDay, 0, 3) }}</strong>
+                                    <strong>{{ substr($dcLabel, 0, 3) }}</strong>
                                     <span>{{ round($totals['energy_kcal']) }}{{ $dayGoal !== null ? ' / '.round($dayGoal) : '' }} kcal</span>
                                 </div>
                                 <div class="dc-week-track">
@@ -790,7 +877,7 @@
                 </div>
 
                 @php
-                    $calsPct = ($hasTargets && $targetCals > 0) ? min(100, ($initialConsumedCals / $targetCals) * 100) : null;
+                    $calsPct = $hasEnergy ? min(100, ($initialConsumedCals / $targetCals) * 100) : null;
                     $energyStateBadge = ($calsPct === null) ? null : ($calsPct < 80 ? 'Needs a boost' : 'On track ✓');
                     $energyStateColor = ($calsPct === null) ? '#f3f4f6' : ($calsPct < 80 ? '#fef3c7' : '#ecfccb');
                     $energyStateText  = ($calsPct === null) ? '#6b7280' : ($calsPct < 80 ? '#b45309' : '#4d7c0f');
@@ -802,7 +889,7 @@
                         <div id="energyBadge" style="background: {{ $energyStateColor }}; color: {{ $energyStateText }}; font-weight: 700; font-size: 0.8rem; padding: 4px 12px; border-radius: 20px;">{{ $energyStateBadge }}</div>
                         @endif
                     </div>
-                    @if($hasTargets)
+                    @if($hasEnergy)
                     <div style="position: relative; height: 16px; margin-bottom: 12px; border-radius: 8px; background: #e5e7eb; overflow: hidden;">
                         <div id="energyBarFill" style="position: absolute; left: 0; top: 0; bottom: 0; width: {{ $calsPct }}%; background: var(--or); border-radius: 8px; transition: width 0.3s ease;"></div>
                     </div>
@@ -887,8 +974,9 @@
 
     /**
      * Activate a date chip by day_index.
-     * Finds the day label (weekday name) and triggers the global plan-day
-     * switching logic used by the Food View / Nutri View tabs.
+     * Dispatches a nutriDayChanged event carrying the numeric index so that
+     * nutrition.js can switch the correct food-day-panel (keyed by index, not
+     * weekday name) without any coupling to plan length.
      */
     function switchDay(dayIndex, weekNo) {
         var chips = dateSelectorBar.querySelectorAll('.nutri-date-item[data-day-index]');
@@ -896,19 +984,9 @@
             chip.classList.toggle('active', parseInt(chip.dataset.dayIndex, 10) === dayIndex);
         });
 
-        // Re-render the Food View meal list for the chosen day.
-        // The day label (weekday name) is stored as the chip's data-day-label attribute
-        // if present, otherwise we fall back to updating a global JS variable the
-        // existing nutrition.js reads on tab switch.
-        var activeDayLabel = null;
-        var activeChip = dateSelectorBar.querySelector('.nutri-date-item[data-day-index="' + dayIndex + '"]');
-        if (activeChip && activeChip.dataset.dayLabel) {
-            activeDayLabel = activeChip.dataset.dayLabel;
-        }
-
         // Emit a custom event so nutrition.js can react without coupling.
         document.dispatchEvent(new CustomEvent('nutriDayChanged', {
-            detail: { dayIndex: dayIndex, weekNo: weekNo, dayLabel: activeDayLabel }
+            detail: { dayIndex: dayIndex, weekNo: weekNo }
         }));
     }
 

@@ -242,15 +242,18 @@ class NutritionPageServiceTargetTest extends TestCase
     }
 
     /**
-     * With only the 7-9 band seeded:
-     * - The age-8 child must get 1700 kcal.
-     * - The age-5 child falls outside the seeded band; TargetEngine returns
-     *   the catch-all (first row = 7-9 band, 1700 kcal). The key point is
-     *   that neither child ever gets the old hardcoded 2100/152/61 constants.
+     * With only the 7-9 band seeded manually (plus the migration-seeded
+     * 4-6/all row: 1360 kcal, 16g protein, fat_g = 0):
+     * - The age-8 child lands in the 7-9 band → 1700 kcal, all nutrients present.
+     * - The age-5 child lands in the 4-6/all band. Per-nutrient handling keeps
+     *   energy (1360) and protein (16) available while fat (0) is "not available"
+     *   (null). The key point is that neither child ever gets the old hardcoded
+     *   2100/152/61 constants.
      */
     public function test_neither_child_gets_hardcoded_constants(): void
     {
-        // Only the 7-9 band is seeded.
+        // Only the 7-9 band is seeded manually; the 4-6/all row comes from the
+        // 2026_09_09_000001 migration (1360 kcal, 16g protein, fat_g = 0).
         $this->makeIcmrRow(7, 9, 1700, 23.3, 30.0);
 
         [$userId8, $childId8] = $this->makeChildWithoutPlan(
@@ -264,15 +267,24 @@ class NutritionPageServiceTargetTest extends TestCase
         $target8 = $service->build($userId8, $childId8)['viewData']['todayTarget'];
         $target5 = $service->build($userId5, $childId5)['viewData']['todayTarget'];
 
-        // Age-8 must get the correct ICMR value.
+        // Age-8 lands in the 7-9 band: all three nutrients present.
         $this->assertNotNull($target8);
         $this->assertSame(1700.0, $target8['energy_kcal']);
+        $this->assertSame(23.3,   $target8['protein_g']);
+        $this->assertSame(30.0,   $target8['fat_g']);
 
-        // Age-5 catch-all also returns a real ICMR row value, not the old constants.
-        $this->assertNotNull($target5);
+        // Age-5 lands in the 4-6/all band (fat_g = 0): todayTarget still resolves
+        // (the row exists) and must never be the old hardcoded constants.
+        $this->assertNotNull($target5, 'age-5 target must resolve (4-6 band exists)');
         $this->assertNotEquals(2100, $target5['energy_kcal'], 'must not be hardcoded 2100');
         $this->assertNotEquals(152,  $target5['protein_g'],   'must not be hardcoded 152');
         $this->assertNotEquals(61,   $target5['fat_g'],       'must not be hardcoded 61');
+
+        // Per-nutrient: energy and protein are real ICMR values; fat is
+        // "not available" (null) because its target is 0 — never the 61 constant.
+        $this->assertSame(1360.0, $target5['energy_kcal'], 'age-5 energy is the 4-6/all row value');
+        $this->assertSame(16.0,   $target5['protein_g'],   'age-5 protein is the 4-6/all row value');
+        $this->assertNull($target5['fat_g'], 'fat_g = 0 must be null (not available), not a constant');
     }
 
     /**

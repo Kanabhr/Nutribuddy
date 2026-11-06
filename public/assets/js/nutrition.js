@@ -3,14 +3,13 @@
 // ========================================
 // Global State
 // ========================================
-let totalCals = 2100;
+let totalCals = 0;      // set from blade data-target-cals; 0 = no target
 let consumedCals = 0;
 let currentProtein = 0, currentCarbs = 0, currentFats = 0;
 
-// Targets (blade se overwrite honge)
-let proteinTarget = 152;
-let carbsTarget = 236;
-let fatsTarget = 61;
+// Targets (overwritten from blade data attributes on DOMContentLoaded)
+let proteinTarget = 0;
+let fatsTarget = 0;
 
 // ========================================
 // Helper Functions (hoisted)
@@ -25,10 +24,12 @@ function updateCalories(addedCals) {
     if (!consumedEl || !remainingEl || !ringProgress) return;
 
     // 🔥 Target from blade data attribute
-    const bladeTarget = parseInt(ringContainer?.getAttribute('data-target-cals')) || 2100;
+    const bladeTarget = parseInt(ringContainer?.getAttribute('data-target-cals')) || 0;
     if (bladeTarget > 0) {
         totalCals = bladeTarget;
     }
+    // If totalCals is still 0 there are no targets; the ring/bars are hidden by
+    // the @if($hasTargets) branch in the blade so this function won't be called.
 
     consumedCals += addedCals;
     if (consumedCals < 0) consumedCals = 0;
@@ -98,20 +99,21 @@ function updateCalories(addedCals) {
 
 function updateMacros() {
     const pFill = document.querySelector('.macro-fill.protein');
-    const cFill = document.querySelector('.macro-fill.carbs');
     const fFill = document.querySelector('.macro-fill.fats');
 
-    const pText = document.querySelectorAll('.macro-val')[0];
-    const cText = document.querySelectorAll('.macro-val')[1];
-    const fText = document.querySelectorAll('.macro-val')[2];
+    const pText = document.getElementById('proteinVal');
+    const fText = document.getElementById('fatVal');
 
-    if (pFill) pFill.style.width = Math.min((currentProtein / proteinTarget) * 100, 100) + '%';
-    if (cFill) cFill.style.width = Math.min((currentCarbs / carbsTarget) * 100, 100) + '%';
-    if (fFill) fFill.style.width = Math.min((currentFats / fatsTarget) * 100, 100) + '%';
+    // Each macro is independent: a nutrient whose target is 0 is "not
+    // available" (the blade renders no fill element and a "target not
+    // available" label for it). Only update a bar/label when that nutrient's
+    // target is available, so we never divide by zero or overwrite the
+    // "not available" label with a meaningless "0 / 0g".
+    if (pFill && proteinTarget > 0) pFill.style.width = Math.min((currentProtein / proteinTarget) * 100, 100) + '%';
+    if (fFill && fatsTarget > 0) fFill.style.width = Math.min((currentFats / fatsTarget) * 100, 100) + '%';
 
-    if (pText) pText.innerText = Math.round(currentProtein) + ' / ' + proteinTarget + 'g';
-    if (cText) cText.innerText = Math.round(currentCarbs) + ' / ' + carbsTarget + 'g';
-    if (fText) fText.innerText = Math.round(currentFats) + ' / ' + fatsTarget + 'g';
+    if (pText && proteinTarget > 0) pText.innerText = Math.round(currentProtein) + ' / ' + proteinTarget + 'g';
+    if (fText && fatsTarget > 0) fText.innerText = Math.round(currentFats) + ' / ' + fatsTarget + 'g';
 
     const dailyProtein = document.getElementById('dailyProteinConsumed');
     const dailyCarbs = document.getElementById('dailyCarbsConsumed');
@@ -165,26 +167,19 @@ document.addEventListener('DOMContentLoaded', () => {
             totalCals = bladeTarget;
         }
     }
+    // Protein/Fat targets from data attributes on the ring container (set by blade).
+    // If no targets exist the ring container is absent and the bars are hidden.
+    if (ringContainer) {
+        const btp = parseInt(ringContainer.getAttribute('data-target-protein'));
+        const btf = parseInt(ringContainer.getAttribute('data-target-fat'));
+        if (btp > 0) proteinTarget = btp;
+        if (btf > 0) fatsTarget    = btf;
+    }
 
     // Initial check for swap button visibility across all meal sections
     document.querySelectorAll('.meal-section').forEach(section => {
         updateSwapBtnVisibility(section);
     });
-
-    // Protein/Fat targets from macro-val text (parse karo)
-    const macroVals = document.querySelectorAll('.macro-val');
-    if (macroVals[0]) {
-        const match = macroVals[0].innerText.match(/\/\s*(\d+)/);
-        if (match) proteinTarget = parseInt(match[1]);
-    }
-    if (macroVals[1]) {
-        const match = macroVals[1].innerText.match(/\/\s*(\d+)/);
-        if (match) carbsTarget = parseInt(match[1]);
-    }
-    if (macroVals[2]) {
-        const match = macroVals[2].innerText.match(/\/\s*(\d+)/);
-        if (match) fatsTarget = parseInt(match[1]);
-    }
 
     // ----------------------------------------
     // 1. Tab Switching
@@ -349,6 +344,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Click pe toggle + DB save
     mealItems.forEach(item => {
         item.addEventListener('click', async function (e) {
+            // Tracking is available for today only — don't allow toggling on
+            // non-today panels. The blade renders a "tracking is available for
+            // today only" note on those panels.
+            const panel = this.closest('.food-day-panel');
+            if (panel && panel.dataset.isToday === '0') {
+                return;
+            }
+
             const childId = this.getAttribute('data-child-id');
             const mealId = this.getAttribute('data-meal-id');
             const foodId = this.getAttribute('data-food-id');
@@ -470,6 +473,90 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // ✅ nutriDayChanged: switch the Food View to show the selected day's meals
+    // and recalculate the calorie ring / macro totals for that day.
+    // Panels are now keyed by numeric day INDEX (data-food-day="{index}"), not
+    // by weekday name.  Week 2+ days used to silently fall through to week 1
+    // because the old panel lookup compared e.g. "Monday" == "Monday" regardless
+    // of plan day.  Comparing integers fixes that.
+    document.addEventListener('nutriDayChanged', function (e) {
+        const { dayIndex } = e.detail;
+
+        // Show the matching food-day-panel, hide the rest.
+        const panels = document.querySelectorAll('.food-day-panel');
+        let activePanel = null;
+        panels.forEach(function (panel) {
+            const matches = parseInt(panel.dataset.foodDay, 10) === dayIndex;
+            panel.classList.toggle('active', matches);
+            if (matches) activePanel = panel;
+        });
+
+        // Nutri-view day switcher: also switch to the matching index-keyed panel.
+        const nvButtons = document.querySelectorAll('.nv-day-button');
+        const nvPanels  = document.querySelectorAll('.nv-day-panel');
+        nvButtons.forEach(function (btn) {
+            const matches = parseInt(btn.dataset.nvDay, 10) === dayIndex;
+            btn.classList.toggle('active', matches);
+            btn.setAttribute('aria-selected', String(matches));
+        });
+        nvPanels.forEach(function (panel) {
+            panel.hidden = parseInt(panel.dataset.nvPanel, 10) !== dayIndex;
+        });
+
+        // Reset consumed totals and recount from the newly visible panel's items.
+        consumedCals = 0;
+        currentProtein = 0;
+        currentCarbs = 0;
+        currentFats = 0;
+
+        if (activePanel) {
+            activePanel.querySelectorAll('.meal-item').forEach(function (item) {
+                if (item.classList.contains('meal-taken')) {
+                    consumedCals    += parseFloat(item.getAttribute('data-cals')) || 0;
+                    currentProtein  += parseFloat(item.getAttribute('data-p'))    || 0;
+                    currentCarbs    += parseFloat(item.getAttribute('data-c'))    || 0;
+                    currentFats     += parseFloat(item.getAttribute('data-f'))    || 0;
+                }
+            });
+            consumedCals = Math.round(consumedCals);
+        }
+
+        // Rewrite consumed totals into the ring without calling updateCalories(delta).
+        // Re-initialize swap button visibility for the active panel.
+        activePanel && activePanel.querySelectorAll('.meal-section').forEach(function (sec) {
+            updateSwapBtnVisibility(sec);
+        });
+
+        // Drive the ring/macros directly (bypass delta-based updateCalories).
+        const consumedEl = document.getElementById('calsConsumed');
+        const remainingEl = document.getElementById('calsRemaining');
+        const ringProgress = document.querySelector('.cal-ring-progress');
+        const ringContainer = document.querySelector('.cal-ring-container');
+
+        if (consumedEl) consumedEl.innerText = Math.round(consumedCals);
+        if (ringProgress && ringContainer) {
+        const bladeTarget = parseInt(ringContainer.getAttribute('data-target-cals')) || totalCals;
+            if (bladeTarget > 0) totalCals = bladeTarget;
+            const remaining = Math.max(0, totalCals - consumedCals);
+            if (remainingEl) remainingEl.innerText = Math.round(remaining);
+
+            const circumference = 251.3;
+            const percent = Math.min(consumedCals / totalCals, 1);
+            ringProgress.style.strokeDasharray = circumference;
+            ringProgress.style.strokeDashoffset = circumference - percent * circumference;
+
+            let ringColor = '#e5e7eb';
+            if (percent >= 0.8)       ringColor = '#22c55e';
+            else if (percent >= 0.5)  ringColor = '#facc15';
+            else if (percent > 0)     ringColor = '#f59e0b';
+            ringProgress.style.stroke = ringColor;
+        }
+
+        updateMacros();
+    });
+
+    // ----------------------------------------
+    // Nutri View day switcher
     const nutriDayButtons = document.querySelectorAll('.nv-day-button');
     const nutriDayPanels = document.querySelectorAll('.nv-day-panel');
 

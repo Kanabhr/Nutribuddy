@@ -153,10 +153,15 @@ class NutritionPageService
             ->first();
         $latestPlan = $plans->latest()->first();
 
-        // Resolve today's macro targets.
+        // Resolve today's macro targets, treating each nutrient independently.
         // Priority 1: flat nutrient_gaps summary already stored in plan_data.
         // Priority 2: TargetEngine live lookup for the child's age/sex.
-        // If neither is available todayTarget stays null — the view hides bars.
+        // A nutrient whose target is <= 0 (e.g. fat_g = 0 in a sparse ICMR row) is
+        // marked "not available" for that nutrient only — stored as null — so the
+        // view hides just that bar/ring while the other nutrients still show.
+        // todayTarget stays null only when no source covers this child at all (no
+        // plan gaps and no ICMR row); the view then shows the full
+        // "Target not available" state for every nutrient.
         $todayTarget = null;
 
         if ($dietPlan) {
@@ -173,9 +178,9 @@ class NutritionPageService
                 isset($gaps['fat_g']['target'])
             ) {
                 $todayTarget = [
-                    'energy_kcal' => (float) $gaps['energy_kcal']['target'],
-                    'protein_g'   => (float) $gaps['protein_g']['target'],
-                    'fat_g'       => (float) $gaps['fat_g']['target'],
+                    'energy_kcal' => $this->targetOrNull((float) $gaps['energy_kcal']['target']),
+                    'protein_g'   => $this->targetOrNull((float) $gaps['protein_g']['target']),
+                    'fat_g'       => $this->targetOrNull((float) $gaps['fat_g']['target']),
                 ];
             }
         }
@@ -185,26 +190,40 @@ class NutritionPageService
             $icmrTarget = app(\App\Services\Nutrition\TargetEngine::class)->getTargets($child);
             if ($icmrTarget) {
                 $todayTarget = [
-                    'energy_kcal' => (float) $icmrTarget->energy_kcal,
-                    'protein_g'   => (float) $icmrTarget->protein_g,
-                    'fat_g'       => (float) $icmrTarget->fat_g,
+                    'energy_kcal' => $this->targetOrNull((float) $icmrTarget->energy_kcal),
+                    'protein_g'   => $this->targetOrNull((float) $icmrTarget->protein_g),
+                    'fat_g'       => $this->targetOrNull((float) $icmrTarget->fat_g),
                 ];
             }
         }
-        // todayTarget remains null when no ICMR row covers this child's age.
-        // The view checks for null and shows 'Target not available' instead of bars.
+
+        // Each nutrient is resolved independently above. A null entry means
+        // "not available" for that nutrient only; the view hides just that bar
+        // or ring. The whole $todayTarget is null only when there is no source
+        // for this child at all.
 
         $viewData = compact('child', 'assessment', 'latestPlan', 'todayTarget');
         if (! $dietPlan) {
             return ['child' => $child, 'assessment' => $assessment, 'dietPlan' => null, 'viewData' => $viewData];
         }
 
-        $sevenDayPlan = $this->chartDisplay->formatSevenDayPlan(
+        // formatPlan() returns a flat list of day objects, one per plan day:
+        //   [ ['index'=>0,'label'=>'Monday','date'=>'…','week'=>1,'meals'=>[…]], … ]
+        // This replaces the old formatSevenDayPlan() call that collapsed every
+        // multi-week plan into 7 weekday-keyed entries and showed week 1 meals
+        // for every later week that shared the same weekday name.
+        $planDays = $this->chartDisplay->formatPlan(
             $dietPlan,
             $dietPlan->assessment ?? $assessment
         );
 
+        // $consumedItems is a flat array of food_id integers ticked as consumed
+        // for today, scoped to both user_id and child_id for defence-in-depth.
+        // (child_id alone is sufficient for ownership because every child belongs
+        // to exactly one user, but filtering by user_id too prevents any future
+        // data-model change from accidentally leaking another user's logs.)
         $consumedItems = MealItemLog::where('child_id', $child->id)
+            ->where('user_id', $child->user_id)
             ->where('log_date', Carbon::today()->toDateString())
             ->where('is_consumed', true)
             ->pluck('food_id')
@@ -215,7 +234,7 @@ class NutritionPageService
             'assessment' => $assessment,
             'dietPlan' => $dietPlan,
             'viewData' => compact(
-                'sevenDayPlan',
+                'planDays',
                 'dietPlan',
                 'child',
                 'assessment',
@@ -224,5 +243,14 @@ class NutritionPageService
                 'todayTarget'
             ),
         ];
+    }
+
+    /**
+     * A nutrient target <= 0 is "not available": return null so only that
+     * nutrient's bar/ring is hidden. Positive values pass through as floats.
+     */
+    private function targetOrNull(float $value): ?float
+    {
+        return $value > 0 ? $value : null;
     }
 }

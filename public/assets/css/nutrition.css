@@ -7,6 +7,47 @@
     margin: 0 auto;
 }
 
+/* Week Tabs (multi-week plans) */
+.nutri-week-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+
+.nutri-week-tab {
+    padding: 8px 20px;
+    background: #fff;
+    border: 1.5px solid var(--border);
+    border-radius: 20px;
+    font-weight: 800;
+    font-size: 0.85rem;
+    color: var(--muted);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.nutri-week-tab.active {
+    background: var(--pkl);
+    color: var(--pk);
+    border-color: var(--pk);
+}
+
+/* Hide date chips belonging to non-active weeks */
+.nutri-date-item.nutri-date-hidden {
+    display: none;
+}
+
+/* Food-view day panels — show only the active one */
+.food-day-panel {
+    display: none;
+}
+.food-day-panel.active {
+    display: block;
+}
+
 /* Date Selector */
 .nutri-date-selector {
     display: flex;
