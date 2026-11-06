@@ -123,6 +123,13 @@ async function qzSubmit(btn) {
         });
         const result = await res.json();
         if (result.success) {
+            // When the child already holds an active paid subscription for this plan,
+            // skip payment entirely and go straight to the meal plan page.
+            if (window.qzSkipPayment) {
+                const mealPlanBase = window.qzMealPlanBase || '/user/pages/nutrition/child';
+                window.location.href = mealPlanBase + '/' + encodeURIComponent(result.child_id);
+                return;
+            }
             qzInitiatePayment(data.plan_slug, data.cycle, result.child_id, btn);
         } else {
             alert(result.message || 'Error submitting questionnaire');

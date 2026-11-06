@@ -668,7 +668,7 @@
                         <button class="qz-btn-next" type="button" onclick="qzGo({{ $step }}, {{ $step + 1 }})">Continue &#8594;</button>
                     @else
                         <button class="qz-btn-submit" type="button" id="qzSubmitBtn" onclick="qzSubmit(this)">
-                            &#10024; Submit &amp; Pay
+                            &#10024; {{ isset($skipPayment) && $skipPayment ? 'Submit' : 'Submit &amp; Pay' }}
                         </button>
                     @endif
                 </div>
@@ -683,6 +683,8 @@
 <script>
     window.isUserLoggedIn = @json(auth()->check());
     window.loginUrlBase = "{{ route('api.nutrition.questionnaire.checkout.auth') }}";
+    window.qzSkipPayment = @json(isset($skipPayment) && $skipPayment);
+    window.qzMealPlanBase = "{{ url('/user/pages/nutrition/child/') }}";
 
     /* ============================================================
        Height state + logic — APPLY FIXED

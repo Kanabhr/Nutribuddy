@@ -68,7 +68,18 @@ class QuestionnaireController extends Controller
                 if ($higherQuestions->isNotEmpty()) {
                     $questions = $higherQuestions;
 
-                    return view('frontend.nutrition.questionnaire', compact('plan', 'cycle', 'questions', 'child'));
+                    // If the child already holds an active paid subscription that covers
+                    // this plan (or higher), do NOT initiate another payment — just save
+                    // the new answers and redirect to the meal plan.
+                    $skipPayment = \App\Models\DietSubscription::query()
+                        ->where('user_id', $request->user()->id)
+                        ->where('child_id', $child->id)
+                        ->usable()
+                        ->with('subscriptionPlan')
+                        ->get()
+                        ->contains(fn ($s) => PlanAccess::rank($s->subscriptionPlan?->slug) >= $newRank);
+
+                    return view('frontend.nutrition.questionnaire', compact('plan', 'cycle', 'questions', 'child', 'skipPayment'));
                 }
             }
         }
@@ -80,7 +91,9 @@ class QuestionnaireController extends Controller
             ->get()
             ->groupBy('section');
 
-        return view('frontend.nutrition.questionnaire', compact('plan', 'cycle', 'questions', 'child'));
+        $skipPayment = false;
+
+        return view('frontend.nutrition.questionnaire', compact('plan', 'cycle', 'questions', 'child', 'skipPayment'));
     }
 
     public function showForChild(Request $request, Child $child)

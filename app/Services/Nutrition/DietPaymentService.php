@@ -52,9 +52,18 @@ class DietPaymentService
             return ['success' => true, 'gateway' => 'free', 'subscription_id' => $subscription->id];
         }
 
-        // Paid plans: no downgrades. Same plan = renewal, higher plan = upgrade.
-        if (PlanAccess::rank($plan->slug) < PlanAccess::rank(PlanAccess::highestSlug($existing))) {
-            return ['success' => false, 'message' => 'This child already has a higher plan.', '_status' => 422];
+        // Paid plans: no downgrades, and no re-payment when the child already holds
+        // an active subscription at the same rank or higher.
+        // (Same rank = renewal attempt for a plan that has not expired yet.)
+        $newRank     = PlanAccess::rank($plan->slug);
+        $highestRank = PlanAccess::rank(PlanAccess::highestSlug($existing));
+
+        if ($newRank > 0 && $highestRank > 0 && $newRank <= $highestRank) {
+            return [
+                'success' => false,
+                'message' => 'This child already has an active subscription for this plan.',
+                '_status' => 422,
+            ];
         }
 
         [$priceColumn, $days] = match ($data['cycle']) {
@@ -233,6 +242,13 @@ class DietPaymentService
             'order_note' => 'Diet Subscription '.$plan->name,
         ]);
         if (! $response->successful()) {
+            // Log HTTP status and response body to help diagnose failures.
+            // Never log request headers, client IDs, secrets, or keys.
+            Log::error('Cashfree order creation failed.', [
+                'subscription_id'  => $subscription->id,
+                'http_status'      => $response->status(),
+                'response_body'    => $response->body(),
+            ]);
             throw new \RuntimeException('Cashfree order creation failed.');
         }
         $order = $response->json();
