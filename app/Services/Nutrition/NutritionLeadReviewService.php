@@ -2,9 +2,12 @@
 
 namespace App\Services\Nutrition;
 
+use App\Models\Nutrition\ChildAssessment;
 use App\Models\Nutrition\DietPlan;
 use App\Models\NutritionLead;
 use App\Models\Product;
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -12,6 +15,9 @@ use Illuminate\Support\Facades\DB;
  */
 class NutritionLeadReviewService
 {
+    /** Questionnaire sheet number of "Cooking oil / medium at home" (sort_order). */
+    private const COOKING_MEDIUM_ORDER = 11;
+
     public function __construct(
         private readonly FoodFilterPipeline $foodFilters,
         private readonly DietChartGeneratorService $chartGenerator,
@@ -44,10 +50,7 @@ class NutritionLeadReviewService
                 '2 + snacks' => 4,
                 default => 5,
             };
-            $dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-            $mealsByDay = $dietPlan->meals->sortBy('sort_order')->groupBy(
-                fn ($meal) => $dayNames[intdiv($meal->sort_order, $slotsPerDay)] ?? 'Day ' . (intdiv($meal->sort_order, $slotsPerDay) + 1)
-            );
+            $mealsByDay = $this->groupMealsByDay($dietPlan, $slotsPerDay);
         }
 
         $profile = $dietPlan?->plan_data['child_profile'] ?? [];
@@ -64,13 +67,67 @@ class NutritionLeadReviewService
             'dietType' => $profile['diet_type'] ?? $assessment?->diet_type ?? 'Not provided',
             'allergies' => $allergies,
             'mealPattern' => $profile['meal_pattern'] ?? $assessment?->meal_pattern ?? 'Not provided',
-            'cookingMedium' => $profile['cooking_medium'] ?? $assessment?->cooking_medium ?? 'Not provided',
+            'cookingMedium' => $this->firstFilled(
+                $profile['cooking_medium'] ?? null,
+                $assessment?->cooking_medium,
+                $this->answerText($assessment, self::COOKING_MEDIUM_ORDER)
+            ) ?? 'Not provided',
             'clinicalFlags' => $clinicalFlags,
             'hasUnavailableMeals' => $foodsByMeal->contains(fn ($eligibleFoods) => $eligibleFoods->isEmpty()),
             'products' => $dietPlan
                 ? Product::where('is_active', true)->orderBy('name')->get(['id', 'name'])
                 : collect(),
         ];
+    }
+
+    /**
+     * Group a plan's meals by plan day, labelled with the real date
+     * (start_date + day_index), e.g. "Sat, 8 Nov". Plans without day_index
+     * (old 7-day plans) fall back to position / slots-per-day, exactly as
+     * DietChartDisplayService::formatPlan() does.
+     *
+     * @return Collection<string, Collection<int, \App\Models\Nutrition\DietPlanMeal>>
+     */
+    private function groupMealsByDay(DietPlan $dietPlan, int $slotsPerDay): Collection
+    {
+        $planData = $dietPlan->plan_data;
+        $planData = is_array($planData) ? $planData : [];
+        $startDate = isset($planData['schedule']['start_date'])
+            ? Carbon::parse($planData['schedule']['start_date'])->startOfDay()
+            : Carbon::parse($dietPlan->created_at)->startOfDay();
+
+        return $dietPlan->meals->sortBy('sort_order')->values()->groupBy(
+            fn ($meal, $position) => $startDate
+                ->copy()
+                ->addDays((int) ($meal->day_index ?? intdiv($position, $slotsPerDay)))
+                ->format('D, j M')
+        );
+    }
+
+    /** First value that is not null or blank, as trimmed text. */
+    private function firstFilled(mixed ...$values): ?string
+    {
+        foreach ($values as $value) {
+            $text = is_array($value) ? implode(', ', $value) : trim((string) $value);
+            if ($text !== '') {
+                return $text;
+            }
+        }
+
+        return null;
+    }
+
+    /** The stored answer to the question with this sheet number, as text. */
+    private function answerText(?ChildAssessment $assessment, int $sortOrder): ?string
+    {
+        if (! $assessment) {
+            return null;
+        }
+
+        $assessment->loadMissing('answers.question');
+        $answer = $assessment->answers->first(fn ($a) => (int) $a->question?->sort_order === $sortOrder);
+
+        return $answer ? $this->firstFilled($answer->answer_value) : null;
     }
 
     /** @return array<string, mixed> */
