@@ -14,6 +14,23 @@ use RuntimeException;
 
 class RuleBasedDietPlanEngine
 {
+    // ------------------------------------------------------------------
+    // Slot calorie-share constants (must sum to 1.0)
+    // Breakfast 0.22, Morning Snack 0.13, Lunch 0.30,
+    // Evening Snack 0.13, Dinner 0.22.
+    // ------------------------------------------------------------------
+    private const SLOT_SHARES = [
+        'Breakfast'      => 0.22,
+        'Morning Snack'  => 0.13,
+        'Lunch'          => 0.30,
+        'Evening Snack'  => 0.13,
+        'Dinner'         => 0.22,
+    ];
+
+    // Bounded portion-scaling clamping range.
+    private const SCALE_MIN = 0.8;
+    private const SCALE_MAX = 1.3;
+
     public function __construct(
         private readonly ChildProfileService $profiles,
         private readonly FoodFilterPipeline $filters,
@@ -26,7 +43,7 @@ class RuleBasedDietPlanEngine
             mt_srand((int) $answers['_seed']);
         }
 
-        $profile = $this->profiles->normalize($assessment, $answers);
+        $profile       = $this->profiles->normalize($assessment, $answers);
         $clinicalFlags = app(RiskFlaggingEngine::class)->generateFlags($assessment, $profile);
         if ($clinicalFlags->isNotEmpty()) {
             $profile['professional_review_required'] = true;
@@ -56,6 +73,17 @@ class RuleBasedDietPlanEngine
 
         $targetValues = $target->toNutrientArray();
 
+        // Compute daily energy target (energy_kcal from ICMR row).
+        // Used to derive per-slot calorie budgets.
+        $dailyEnergyTarget = (float) ($targetValues['energy_kcal'] ?? 0);
+
+        // Pre-compute slot budgets for the child's actual meal pattern.
+        // Budget is zero when no energy target is available (keeps legacy behaviour).
+        $slotBudgets = $this->computeSlotBudgets(
+            $this->slots($profile['meal_pattern']),
+            $dailyEnergyTarget
+        );
+
         // $history[food_id] => last day_index it was used (for gap scoring).
         // $allUses[food_id] => list of day_indices it has appeared (for variety penalty).
         $history  = [];
@@ -64,7 +92,7 @@ class RuleBasedDietPlanEngine
         $debug    = ['profile' => $profile, 'eligible_food_count' => $foods->count(), 'meals' => []];
 
         for ($dayIndex = 0; $dayIndex < $N; $dayIndex++) {
-            $date       = $start->copy()->addDays($dayIndex);
+            $date        = $start->copy()->addDays($dayIndex);
             $weekdayName = $date->format('l'); // Monday … Sunday (repeats)
 
             $dailyTotals = array_fill_keys(array_keys($targetValues), 0.0);
@@ -75,26 +103,65 @@ class RuleBasedDietPlanEngine
                     throw new RuntimeException("No safe food is configured for {$slot}.");
                 }
 
-                $ranked   = $this->rank($candidates, $slot, $profile, $targetValues, $dailyTotals, $history, $allUses, $dayIndex, $nutrientCache);
-                $selected = $this->pick($ranked);
-                $schedule[$dayIndex][$slot] = $this->plate($selected, $slot, $nutrientCache);
+                $slotBudget = $slotBudgets[$slot] ?? 0.0;
 
-                $this->addNutrition($dailyTotals, $selected, $nutrientCache);
+                // -------------------------------------------------------
+                // Lunch & Dinner: try to pick MAIN + optional SIDE.
+                // All other slots: single-dish as before.
+                // -------------------------------------------------------
+                if (in_array($slot, ['Lunch', 'Dinner'], true)) {
+                    $plate = $this->pickLunchDinner(
+                        $candidates,
+                        $slot,
+                        $slotBudget,
+                        $profile,
+                        $targetValues,
+                        $dailyTotals,
+                        $history,
+                        $allUses,
+                        $dayIndex,
+                        $nutrientCache,
+                        $debug
+                    );
+                } else {
+                    // Single-dish slot (Breakfast, snacks).
+                    $ranked   = $this->rank($candidates, $slot, $profile, $targetValues, $dailyTotals, $history, $allUses, $dayIndex, $nutrientCache);
+                    $selected = $this->pick($ranked);
 
-                $history[$selected->id]   = $dayIndex;
-                $allUses[$selected->id][] = $dayIndex;
+                    $debug['meals'][] = [
+                        'day_index'        => $dayIndex,
+                        'day'              => $weekdayName,
+                        'slot'             => $slot,
+                        'selected_food_id' => $selected->id,
+                        'candidate_scores' => $ranked->take(5)->map(fn ($r) => [
+                            'food_id' => $r['food']->id,
+                            'score'   => $r['score'],
+                            'reasons' => $r['reasons'],
+                        ])->values()->all(),
+                    ];
 
-                $debug['meals'][] = [
-                    'day_index'        => $dayIndex,
-                    'day'              => $weekdayName,
-                    'slot'             => $slot,
-                    'selected_food_id' => $selected->id,
-                    'candidate_scores' => $ranked->take(5)->map(fn ($r) => [
-                        'food_id' => $r['food']->id,
-                        'score'   => $r['score'],
-                        'reasons' => $r['reasons'],
-                    ])->values()->all(),
-                ];
+                    $plate = $this->plateSingle($selected, $slot, $nutrientCache);
+                    // Record history for single dish.
+                    $history[$selected->id]   = $dayIndex;
+                    $allUses[$selected->id][] = $dayIndex;
+                }
+
+                // -------------------------------------------------------
+                // E. Bounded portion scaling for every slot.
+                // After dish(es) are picked, scale portion_g by
+                //   f = slot_budget / sum(dish kcal), clamped to [0.8, 1.3].
+                // If slot_budget == 0 keep f = 1 (legacy behaviour).
+                // -------------------------------------------------------
+                $plate = $this->applyPortionScaling($plate, $slotBudget, $nutrientCache);
+
+                $schedule[$dayIndex][$slot] = $plate;
+
+                // Accumulate scaled nutrients into daily totals.
+                foreach ($plate['items'] as $item) {
+                    foreach (array_keys($dailyTotals) as $key) {
+                        $dailyTotals[$key] += (float) ($item['nutrients'][$key] ?? 0);
+                    }
+                }
             }
 
             $schedule[$dayIndex]['_daily_nutrition'] = $dailyTotals;
@@ -114,16 +181,314 @@ class RuleBasedDietPlanEngine
         $plan = $this->save($assessment, $schedule, $dailyNutrition, $dailyGaps, $gapSummary, $profile, $debug, $start, $N);
 
         return [
-            'success'                    => true,
-            'child_id'                   => $assessment->child_id,
-            'assessment_id'              => $assessment->id,
-            'diet_plan_id'               => $plan->id,
-            'child_profile'              => $profile,
-            'daily_nutrients'            => $dailyNutrition,
-            'nutrient_gaps'              => $gapSummary,
+            'success'                      => true,
+            'child_id'                     => $assessment->child_id,
+            'assessment_id'                => $assessment->id,
+            'diet_plan_id'                 => $plan->id,
+            'child_profile'                => $profile,
+            'daily_nutrients'              => $dailyNutrition,
+            'nutrient_gaps'                => $gapSummary,
             'professional_review_required' => $profile['professional_review_required'],
-            'generated_at'               => now()->toIso8601String(),
+            'generated_at'                 => now()->toIso8601String(),
         ];
+    }
+
+    // ------------------------------------------------------------------
+    // Slot budget helpers
+    // ------------------------------------------------------------------
+
+    /**
+     * Compute per-slot calorie budget = (slot share / sum of active shares) * daily target.
+     *
+     * @param  string[]    $activeSlots  The slots actually used for this child's pattern.
+     * @param  float       $dailyTarget  Child's daily energy target (kcal). 0 = not available.
+     * @return array<string, float>      Slot name => budget in kcal.
+     */
+    private function computeSlotBudgets(array $activeSlots, float $dailyTarget): array
+    {
+        if ($dailyTarget <= 0) {
+            return array_fill_keys($activeSlots, 0.0);
+        }
+
+        $totalShare = 0.0;
+        foreach ($activeSlots as $slot) {
+            $totalShare += self::SLOT_SHARES[$slot] ?? 0.0;
+        }
+
+        if ($totalShare <= 0) {
+            return array_fill_keys($activeSlots, 0.0);
+        }
+
+        $budgets = [];
+        foreach ($activeSlots as $slot) {
+            $share          = self::SLOT_SHARES[$slot] ?? 0.0;
+            $budgets[$slot] = ($share / $totalShare) * $dailyTarget;
+        }
+        return $budgets;
+    }
+
+    // ------------------------------------------------------------------
+    // Lunch / Dinner two-dish selection
+    // ------------------------------------------------------------------
+
+    /**
+     * Pick a MAIN for Lunch/Dinner, then optionally a SIDE if the main's
+     * kcal is below 85 % of the slot budget. Falls back to single-dish
+     * behaviour when no MAIN is available.
+     *
+     * History is updated inside this method for both dishes.
+     * Debug entries are also written here.
+     */
+    private function pickLunchDinner(
+        Collection $candidates,
+        string     $slot,
+        float      $slotBudget,
+        array      $profile,
+        array      $targetValues,
+        array      $dailyTotals,
+        array      &$history,
+        array      &$allUses,
+        int        $dayIndex,
+        array      $nutrientCache,
+        array      &$debug,
+    ): array {
+        $weekdayName = ''; // populated in main loop via _weekday; we use day_index here
+
+        // Filter MAIN and SIDE pools from the already-safety-filtered candidates.
+        $mainPool = $candidates->filter(fn (FoodMaster $f) => FoodRole::isMain($f))->values();
+        $sidePool = $candidates->filter(fn (FoodMaster $f) => FoodRole::isSide($f)
+            && ! FoodRole::isSoleBanned($f))->values();
+
+        // Fall back to single-dish if no MAIN available.
+        if ($mainPool->isEmpty()) {
+            // Use full candidates (not filtered to side-only) as fallback,
+            // excluding sole-banned foods only when alternatives exist.
+            $fallbackPool = $candidates->filter(fn (FoodMaster $f) => ! FoodRole::isSoleBanned($f))->values();
+            if ($fallbackPool->isEmpty()) {
+                $fallbackPool = $candidates; // last resort: even sole-banned
+            }
+
+            $ranked   = $this->rank($fallbackPool, $slot, $profile, $targetValues, $dailyTotals, $history, $allUses, $dayIndex, $nutrientCache);
+            $selected = $this->pick($ranked);
+
+            $debug['meals'][] = [
+                'day_index'        => $dayIndex,
+                'day'              => $this->weekdayFromIndex($dayIndex),
+                'slot'             => $slot,
+                'selected_food_id' => $selected->id,
+                'role'             => 'main',
+                'main_fallback'    => true,
+                'candidate_scores' => $ranked->take(5)->map(fn ($r) => [
+                    'food_id' => $r['food']->id,
+                    'score'   => $r['score'],
+                    'reasons' => $r['reasons'],
+                ])->values()->all(),
+            ];
+
+            $history[$selected->id]   = $dayIndex;
+            $allUses[$selected->id][] = $dayIndex;
+
+            return $this->plateSingle($selected, $slot, $nutrientCache);
+        }
+
+        // 1. Pick MAIN.
+        $rankedMain = $this->rank($mainPool, $slot, $profile, $targetValues, $dailyTotals, $history, $allUses, $dayIndex, $nutrientCache);
+        $main       = $this->pick($rankedMain);
+
+        $debug['meals'][] = [
+            'day_index'        => $dayIndex,
+            'day'              => $this->weekdayFromIndex($dayIndex),
+            'slot'             => $slot,
+            'selected_food_id' => $main->id,
+            'role'             => 'main',
+            'candidate_scores' => $rankedMain->take(5)->map(fn ($r) => [
+                'food_id' => $r['food']->id,
+                'score'   => $r['score'],
+                'reasons' => $r['reasons'],
+            ])->values()->all(),
+        ];
+
+        $history[$main->id]   = $dayIndex;
+        $allUses[$main->id][] = $dayIndex;
+
+        // 2. Decide whether to add a SIDE.
+        $mainKcal = (float) (($nutrientCache[$main->id] ?? $main->nutrients)->energy_kcal ?? 0);
+        $needSide = $slotBudget > 0 && $mainKcal < 0.85 * $slotBudget;
+
+        if (! $needSide || $sidePool->isEmpty()) {
+            return $this->plateSingle($main, $slot, $nutrientCache);
+        }
+
+        // 3. Pick SIDE: exclude main's food_id, prefer a different food_group
+        //    when an alternative exists.
+        $sidePool = $sidePool->filter(fn (FoodMaster $f) => $f->id !== $main->id);
+        if ($sidePool->isEmpty()) {
+            return $this->plateSingle($main, $slot, $nutrientCache);
+        }
+
+        // Try to avoid same food_group as main.
+        $differentGroup = $sidePool->filter(fn (FoodMaster $f) => $f->food_group !== $main->food_group)->values();
+        $sideRankPool   = $differentGroup->isNotEmpty() ? $differentGroup : $sidePool->values();
+
+        $rankedSide = $this->rank($sideRankPool, $slot, $profile, $targetValues, $dailyTotals, $history, $allUses, $dayIndex, $nutrientCache);
+        $side       = $this->pick($rankedSide);
+
+        $history[$side->id]   = $dayIndex;
+        $allUses[$side->id][] = $dayIndex;
+
+        $debug['meals'][] = [
+            'day_index'        => $dayIndex,
+            'day'              => $this->weekdayFromIndex($dayIndex),
+            'slot'             => $slot,
+            'selected_food_id' => $side->id,
+            'role'             => 'side',
+            'candidate_scores' => $rankedSide->take(5)->map(fn ($r) => [
+                'food_id' => $r['food']->id,
+                'score'   => $r['score'],
+                'reasons' => $r['reasons'],
+            ])->values()->all(),
+        ];
+
+        return $this->plateDouble($main, $side, $slot, $nutrientCache);
+    }
+
+    /**
+     * Minimal helper — day_index → weekday name.
+     * The engine generates starting from now()->startOfDay(), and this
+     * helper is only used for the debug log; the _weekday key in schedule
+     * is set by the main loop. We accept it may be approximate here.
+     */
+    private function weekdayFromIndex(int $dayIndex): string
+    {
+        // The start is now()->startOfDay() when called from generate(); we
+        // approximate by using the current date as day 0 for the debug label.
+        return now()->startOfDay()->copy()->addDays($dayIndex)->format('l');
+    }
+
+    // ------------------------------------------------------------------
+    // Plate helpers
+    // ------------------------------------------------------------------
+
+    private function plateSingle(FoodMaster $food, string $slot, array $nutrientCache): array
+    {
+        $cached    = $nutrientCache[$food->id] ?? $food->nutrients;
+        $nutrients = [];
+        foreach ($this->nutrientKeys() as $key) {
+            $nutrients[$key] = (float) ($cached->{$key} ?? 0);
+        }
+
+        return [
+            'slot'            => $slot,
+            'items'           => [[
+                'food_id'   => $food->id,
+                'dish_id'   => $food->dish_id,
+                'food_name' => $food->dish_name,
+                'portion_g' => $food->serving_g,
+                'nutrients' => $nutrients,
+            ]],
+            'total_nutrients' => $nutrients,
+        ];
+    }
+
+    private function plateDouble(FoodMaster $main, FoodMaster $side, string $slot, array $nutrientCache): array
+    {
+        $makeItem = function (FoodMaster $food) use ($nutrientCache): array {
+            $cached    = $nutrientCache[$food->id] ?? $food->nutrients;
+            $nutrients = [];
+            foreach ($this->nutrientKeys() as $key) {
+                $nutrients[$key] = (float) ($cached->{$key} ?? 0);
+            }
+            return [
+                'food_id'   => $food->id,
+                'dish_id'   => $food->dish_id,
+                'food_name' => $food->dish_name,
+                'portion_g' => $food->serving_g,
+                'nutrients' => $nutrients,
+            ];
+        };
+
+        $mainItem = $makeItem($main);
+        $sideItem = $makeItem($side);
+
+        $total = [];
+        foreach ($this->nutrientKeys() as $key) {
+            $total[$key] = ($mainItem['nutrients'][$key] ?? 0) + ($sideItem['nutrients'][$key] ?? 0);
+        }
+
+        return [
+            'slot'            => $slot,
+            'items'           => [$mainItem, $sideItem],
+            'total_nutrients' => $total,
+        ];
+    }
+
+    // ------------------------------------------------------------------
+    // E. Bounded portion scaling
+    // ------------------------------------------------------------------
+
+    /**
+     * Scale all items in a plate toward the slot budget.
+     *
+     * f = slot_budget / sum(item kcal) clamped to [SCALE_MIN, SCALE_MAX].
+     * Applied uniformly to every item in the slot.
+     * portion_g is stored as a float (will be formatted as "Xg" in save()).
+     * When slot_budget is 0 or total kcal is 0, f = 1 (no scaling).
+     *
+     * Items whose portion_g is null or <= 0 are left untouched (portion and
+     * nutrients kept as-is; they contribute their nominal kcal to the sum but
+     * are not themselves scaled).
+     */
+    private function applyPortionScaling(array $plate, float $slotBudget, array $nutrientCache): array
+    {
+        if ($slotBudget <= 0) {
+            return $plate;
+        }
+
+        $totalKcal = 0.0;
+        foreach ($plate['items'] as $item) {
+            $totalKcal += (float) ($item['nutrients']['energy_kcal'] ?? 0);
+        }
+
+        if ($totalKcal <= 0) {
+            return $plate;
+        }
+
+        $f = $slotBudget / $totalKcal;
+        $f = max(self::SCALE_MIN, min(self::SCALE_MAX, $f));
+
+        $scaledItems = [];
+        foreach ($plate['items'] as $item) {
+            // Skip scaling for items with a missing or zero portion_g.
+            // Such items have no serving size; applying a factor would produce
+            // meaningless (or "0g") portions in the stored plan.
+            $portionG = $item['portion_g'] ?? null;
+            if ($portionG === null || (float) $portionG <= 0) {
+                $scaledItems[] = $item;
+                continue;
+            }
+
+            $scaledNutrients = [];
+            foreach ($item['nutrients'] as $key => $value) {
+                $scaledNutrients[$key] = (float) $value * $f;
+            }
+            $scaledItems[] = array_merge($item, [
+                'portion_g' => (float) $portionG * $f,
+                'nutrients' => $scaledNutrients,
+            ]);
+        }
+
+        $scaledTotal = [];
+        foreach ($this->nutrientKeys() as $key) {
+            $scaledTotal[$key] = 0.0;
+            foreach ($scaledItems as $item) {
+                $scaledTotal[$key] += (float) ($item['nutrients'][$key] ?? 0);
+            }
+        }
+
+        return array_merge($plate, [
+            'items'           => $scaledItems,
+            'total_nutrients' => $scaledTotal,
+        ]);
     }
 
     // ------------------------------------------------------------------
@@ -182,7 +547,7 @@ class RuleBasedDietPlanEngine
                 $score -= 4;
             }
 
-            // Repeat-gap penalty: the food's own repeat_gap_days (default 3) — unchanged from original.
+            // Repeat-gap penalty: the food's own repeat_gap_days (default 3).
             $lastUsed = $history[$food->id] ?? null;
             $gap      = max(1, (int) ($food->repeat_gap_days ?: 3));
             if ($lastUsed !== null && $dayIndex - $lastUsed < $gap) {
@@ -190,8 +555,7 @@ class RuleBasedDietPlanEngine
                 $reasons[] = 'repetition_penalty';
             }
 
-            // Variety scoring: -8 if the dish appeared in the previous 7 days,
-            // and an additional -2 for each earlier use in this plan.
+            // Variety scoring.
             $uses = $allUses[$food->id] ?? [];
             if (! empty($uses)) {
                 $recentUses = array_filter($uses, fn (int $d) => $dayIndex - $d <= 7);
@@ -206,7 +570,7 @@ class RuleBasedDietPlanEngine
             return ['food' => $food, 'score' => max(0.1, $score + 15), 'reasons' => $reasons];
         })->sortByDesc('score')->values();
 
-        // Prefer candidates respecting the repeat gap; relax only if the database has no alternatives.
+        // Prefer candidates respecting the repeat gap; relax only if no alternatives exist.
         $fresh = $ranked->filter(fn ($item) => ! in_array('repetition_penalty', $item['reasons'], true));
 
         return $fresh->isNotEmpty() ? $fresh : $ranked;
@@ -227,35 +591,6 @@ class RuleBasedDietPlanEngine
         return $top->first()['food'];
     }
 
-    private function plate(FoodMaster $food, string $slot, array $nutrientCache): array
-    {
-        $nutrients = [];
-        $cached    = $nutrientCache[$food->id] ?? $food->nutrients;
-        foreach ($this->nutrientKeys() as $key) {
-            $nutrients[$key] = (float) ($cached->{$key} ?? 0);
-        }
-
-        return [
-            'slot'             => $slot,
-            'items'            => [[
-                'food_id'   => $food->id,
-                'dish_id'   => $food->dish_id,
-                'food_name' => $food->dish_name,
-                'portion_g' => $food->serving_g,
-                'nutrients' => $nutrients,
-            ]],
-            'total_nutrients'  => $nutrients,
-        ];
-    }
-
-    private function addNutrition(array &$totals, FoodMaster $food, array $nutrientCache): void
-    {
-        $cached = $nutrientCache[$food->id] ?? $food->nutrients;
-        foreach (array_keys($totals) as $key) {
-            $totals[$key] += (float) ($cached->{$key} ?? 0);
-        }
-    }
-
     /**
      * Per-day nutrient gaps keyed by day_index.
      * Stored in plan_data['daily_gaps'].
@@ -266,8 +601,8 @@ class RuleBasedDietPlanEngine
             return collect($targets)
                 ->filter(fn ($target) => $target > 0)
                 ->map(fn ($target, $key) => [
-                    'target'          => $target,
-                    'achieved'        => $totals[$key] ?? 0,
+                    'target'           => $target,
+                    'achieved'         => $totals[$key] ?? 0,
                     'adequacy_percent' => round(($totals[$key] ?? 0) / $target * 100, 2),
                 ])
                 ->all();
@@ -276,9 +611,6 @@ class RuleBasedDietPlanEngine
 
     /**
      * Roll the per-day gaps up to a single summary per nutrient.
-     * adequacy_percent is averaged across days; gap_category is derived from that average.
-     * Nutrients with target <= 0 are skipped.
-     * Stored in plan_data['nutrient_gaps'].
      */
     private function summariseGaps(array $dailyGaps, array $targets): array
     {
@@ -291,13 +623,13 @@ class RuleBasedDietPlanEngine
             if ($totals->isEmpty()) {
                 continue;
             }
-            $avgAchieved   = $totals->avg('achieved');
-            $avgAdequacy   = $totals->avg('adequacy_percent');
+            $avgAchieved = $totals->avg('achieved');
+            $avgAdequacy = $totals->avg('adequacy_percent');
             $summary[$nutrient] = [
-                'target'          => $target,
-                'absorbed_amount' => round($avgAchieved, 4),
+                'target'           => $target,
+                'absorbed_amount'  => round($avgAchieved, 4),
                 'adequacy_percent' => round($avgAdequacy, 2),
-                'gap_category'    => $this->gapCategory($avgAdequacy),
+                'gap_category'     => $this->gapCategory($avgAdequacy),
             ];
         }
 
@@ -320,8 +652,10 @@ class RuleBasedDietPlanEngine
                 if (in_array($slot, ['_daily_nutrition', '_date', '_weekday'], true)) {
                     continue;
                 }
-                if (empty($plate['items']) || ! in_array($plate['items'][0]['food_id'], $ids, true)) {
-                    throw new RuntimeException('Generated plan failed safety validation.');
+                foreach ($plate['items'] as $item) {
+                    if (! in_array($item['food_id'], $ids, true)) {
+                        throw new RuntimeException('Generated plan failed safety validation.');
+                    }
                 }
             }
         }
@@ -378,10 +712,18 @@ class RuleBasedDietPlanEngine
                     'day_index'    => $dayIndex,
                 ]);
                 foreach ($plate['items'] as $item) {
+                    // Store the scaled portion rounded to the nearest gram.
+                    // When portion_g is null or <= 0 (food has no serving size),
+                    // fall back to null so the column stays empty rather than "0g".
+                    $rawPortion = $item['portion_g'] ?? null;
+                    $portionSize = null;
+                    if ($rawPortion !== null && (float) $rawPortion > 0) {
+                        $portionSize = ((int) round((float) $rawPortion)) . 'g';
+                    }
                     DietPlanItem::create([
                         'diet_plan_meal_id' => $meal->id,
                         'food_id'           => $item['food_id'],
-                        'portion_size'      => $item['portion_g'].'g',
+                        'portion_size'      => $portionSize,
                     ]);
                 }
             }

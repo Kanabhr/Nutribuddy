@@ -8,6 +8,7 @@ use App\Models\Nutrition\ChildAssessment;
 use App\Models\Nutrition\DietPlan;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use App\Services\Nutrition\PortionScaler;
 
 class DietChartDisplayService
 {
@@ -80,15 +81,19 @@ class DietChartDisplayService
                 $items          = [];
 
                 foreach ($meal->items ?? [] as $item) {
-                    $food      = $item->food;
-                    $nutrients = $food->nutrients;
+                    $food    = $item->food;
+                    // Use the stored portion_size (e.g. "217g") so scaled values
+                    // are shown. PortionScaler returns ratio=1 when serving_g is
+                    // missing or the portion cannot be parsed (safe fallback).
+                    $portionG = $item->portion_size ?? ($food->serving_g ?? 150);
+                    $scaledNutrients = PortionScaler::scale($food, $portionG);
 
                     $foodItem = [
                         'food_id'       => $food->id,
                         'food_name'     => $food->food_name,
                         'regional_name' => $food->regional_name,
-                        'portion_g'     => $item->portion_size ?? ($food->serving_g ?? 150),
-                        'nutrients'     => $this->extractNutrients($nutrients),
+                        'portion_g'     => $portionG,
+                        'nutrients'     => $this->extractNutrientsFromArray($scaledNutrients),
                         'pairing_notes' => $this->generatePairingNotes($food, $assessment),
                     ];
 
@@ -390,6 +395,38 @@ class DietChartDisplayService
             'b6_mg'         => $nutrients->b6_mg         ?? 0,
             'folate_ug'     => $nutrients->folate_ug     ?? 0,
             'b12_ug'        => $nutrients->b12_ug        ?? 0,
+        ];
+    }
+
+    /**
+     * Same as extractNutrients() but accepts a pre-computed array
+     * (e.g. the output of PortionScaler::scale()) instead of an object.
+     * Uses the same new column-name keys.
+     */
+    private function extractNutrientsFromArray(array $nutrients): array
+    {
+        return [
+            'energy_kcal'   => (float) ($nutrients['energy_kcal']   ?? 0),
+            'protein_g'     => (float) ($nutrients['protein_g']     ?? 0),
+            'carb_g'        => (float) ($nutrients['carb_g']        ?? 0),
+            'fat_g'         => (float) ($nutrients['fat_g']         ?? 0),
+            'fibre_total_g' => (float) ($nutrients['fibre_total_g'] ?? 0),
+            'free_sugar_g'  => (float) ($nutrients['free_sugar_g']  ?? 0),
+            'sfa_g'         => (float) ($nutrients['sfa_g']         ?? 0),
+            'mufa_g'        => (float) ($nutrients['mufa_g']        ?? 0),
+            'pufa_g'        => (float) ($nutrients['pufa_g']        ?? 0),
+            'calcium_mg'    => (float) ($nutrients['calcium_mg']    ?? 0),
+            'iron_mg'       => (float) ($nutrients['iron_mg']       ?? 0),
+            'zinc_mg'       => (float) ($nutrients['zinc_mg']       ?? 0),
+            'magnesium_mg'  => (float) ($nutrients['magnesium_mg']  ?? 0),
+            'vit_c_mg'      => (float) ($nutrients['vit_c_mg']      ?? 0),
+            'vit_d_ug'      => (float) ($nutrients['vit_d_ug']      ?? 0),
+            'b1_mg'         => (float) ($nutrients['b1_mg']         ?? 0),
+            'b2_mg'         => (float) ($nutrients['b2_mg']         ?? 0),
+            'b3_mg'         => (float) ($nutrients['b3_mg']         ?? 0),
+            'b6_mg'         => (float) ($nutrients['b6_mg']         ?? 0),
+            'folate_ug'     => (float) ($nutrients['folate_ug']     ?? 0),
+            'b12_ug'        => (float) ($nutrients['b12_ug']        ?? 0),
         ];
     }
 
