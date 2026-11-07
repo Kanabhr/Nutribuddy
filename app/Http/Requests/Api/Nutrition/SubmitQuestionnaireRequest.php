@@ -104,22 +104,49 @@ class SubmitQuestionnaireRequest extends FormRequest
                 $options = preg_split('/\s+\/\s+/', (string) $question->options_scale, -1, PREG_SPLIT_NO_EMPTY) ?: [];
                 $options = array_values(array_filter(array_map('trim', $options), fn ($option) => $option !== '—'));
 
-                if ($question->is_optional
-                    || str_contains($label, 'height')
-                    || str_contains($label, 'weight')
-                    || (str_contains(strtolower((string) $question->only_ask_if), 'vegan') && $isVegan)) {
-                    if (str_contains($label, 'height')) {
-                        $rules[$key] = ['nullable', function (string $attribute, mixed $value, \Closure $fail): void {
-                            if ($value !== null && $value !== '' && ((! is_string($value) && ! is_numeric($value))
-                                || strlen((string) $value) > 80
-                                || app(\App\Services\Nutrition\ChildProfileService::class)->heightInCentimeters($value) === null)) {
-                                $fail('Enter height in cm or ft/in.');
-                            }
-                        }];
-                    } elseif (str_contains($label, 'weight')) {
-                        $rules[$key] = ['nullable', 'numeric', 'min:0', 'max:300'];
-                    }
+                // Height (sort_order 5, "Current height") and weight (sort_order 4,
+                // "Current weight") are "always asked" questions that use custom
+                // widgets on the front-end.  They are REQUIRED when the question is
+                // marked always-asked (is_optional = false, matching the real seeder)
+                // and nullable when explicitly optional (is_optional = true).  The
+                // previous code special-cased them as always-nullable, which is why a
+                // missing height silently passed validation and was never saved.
+                //
+                // Sanity limits (stated here in code):
+                //  - Height: parsed via ChildProfileService::heightInCentimeters();
+                //    must resolve to 30–250 cm (covers newborns ~46 cm through the
+                //    tallest adults ~251 cm).
+                //  - Weight: numeric, 0.5–300 kg (covers infants through extreme
+                //    obesity; 0 is not a positive number).
+                if (str_contains($label, 'height')) {
+                    $presence = $question->is_optional ? 'nullable' : 'required';
+                    $rules[$key] = [$presence, function (string $attribute, mixed $value, \Closure $fail): void {
+                        // 'required'/'nullable' already handle presence — only validate
+                        // format and range when a value is actually present.
+                        if ($value === null || $value === '') {
+                            return;
+                        }
+                        if ((! is_string($value) && ! is_numeric($value)) || strlen((string) $value) > 80) {
+                            $fail('Enter height in cm or ft/in.');
+                            return;
+                        }
+                        $cm = app(\App\Services\Nutrition\ChildProfileService::class)->heightInCentimeters($value);
+                        if ($cm === null) {
+                            $fail('Enter height in cm or ft/in.');
+                        } elseif ($cm < 30 || $cm > 250) {
+                            $fail('Height must be between 30 and 250 cm.');
+                        }
+                    }];
+                    continue;
+                }
+                if (str_contains($label, 'weight')) {
+                    $presence = $question->is_optional ? 'nullable' : 'required';
+                    $rules[$key] = [$presence, 'numeric', 'min:0.5', 'max:300'];
+                    continue;
+                }
 
+                if ($question->is_optional
+                    || (str_contains(strtolower((string) $question->only_ask_if), 'vegan') && $isVegan)) {
                     continue;
                 }
 

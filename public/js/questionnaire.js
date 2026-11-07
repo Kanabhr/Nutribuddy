@@ -46,7 +46,33 @@ function qzUpdateStepper(to) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Height auto-apply
+// ---------------------------------------------------------------------------
+// The height widget stores its value in a hidden input (#h_hid_<qid>) that is
+// only populated when the user picks a dropdown option OR clicks the "Apply"
+// button after typing a custom value.  If the user typed a custom height but
+// forgot to click Apply, the hidden field stayed empty and the height answer
+// was never posted — the root cause of the "height not saved" bug.
+//
+// qzAutoApplyHeights() runs before step-navigation and submission validation.
+// For every height question whose custom-entry row is active but whose hidden
+// field is still empty, it calls qzApplyCustomHeight() so the typed value is
+// captured.  It is idempotent: dropdown selections and already-applied values
+// are left untouched.
+function qzAutoApplyHeights() {
+    if (typeof qzHeightState === 'undefined') return;
+    Object.keys(qzHeightState).forEach(function (qid) {
+        var state = qzHeightState[qid];
+        if (!state || !state.customActive) return;
+        var hidEl = document.getElementById('h_hid_' + qid);
+        if (hidEl && hidEl.value && hidEl.value.trim() !== '') return;
+        if (typeof qzApplyCustomHeight === 'function') qzApplyCustomHeight(qid);
+    });
+}
+
 function qzGo(from, to) {
+    qzAutoApplyHeights();
     const panel = document.getElementById('qzPanel' + from);
     let valid = true;
     panel.querySelectorAll('.qz-form-field[required]').forEach(f => {
@@ -64,6 +90,7 @@ function qzGo(from, to) {
 }
 
 function qzCollect() {
+    qzAutoApplyHeights();
     const form = document.getElementById('questionnaireForm');
     const data = {
         plan_slug: form.querySelector('input[name="plan_slug"]').value,
@@ -85,6 +112,7 @@ function qzCollect() {
 }
 
 async function qzSubmit(btn) {
+    qzAutoApplyHeights();
     const QZ_STEPS = getQZSteps();
     const panel = document.getElementById('qzPanel' + QZ_STEPS);
     let valid = true;

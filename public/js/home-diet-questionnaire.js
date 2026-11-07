@@ -21,11 +21,14 @@ function initHomeDietQuestionnaire() {
 
     function writeHeightAnswer(control, cm) {
         const state = heightStates.get(control.dataset.homeHeightControl);
+        if (!state) return;
         state.cm = cm;
+        const answer = control.querySelector('[data-home-height-answer]');
+        if (!answer) return;
         const totalInches = Math.round(cm / 2.54);
         const feet = Math.floor(totalInches / 12);
         const inches = totalInches % 12;
-        control.querySelector('[data-home-height-answer]').value = state.mode === 'cm'
+        answer.value = state.mode === 'cm'
             ? `${cm} cm`
             : `${feet}ft ${inches}in (${cm}cm)`;
         updateHeightSuggestion();
@@ -34,6 +37,7 @@ function initHomeDietQuestionnaire() {
     function renderHeightOptions(control) {
         const state = heightStates.get(control.dataset.homeHeightControl);
         const select = control.querySelector('[data-home-height-select]');
+        if (!state || !select) return;
         select.replaceChildren(new Option(state.mode === 'cm' ? 'Select height (cm)' : 'Select height (ft / in)', ''));
         for (let cm = 91; cm <= 213; cm++) {
             select.add(new Option(heightLabel(cm, state.mode), String(cm), false, state.cm === cm));
@@ -64,28 +68,36 @@ function initHomeDietQuestionnaire() {
         control.querySelector('[data-home-height-unit]').addEventListener('change', (event) => {
             state.mode = event.target.value;
             renderHeightOptions(control);
-            control.querySelector('[data-home-height-custom]').hidden = true;
+            const custom = control.querySelector('[data-home-height-custom]');
+            if (custom) custom.hidden = true;
         });
         control.querySelector('[data-home-height-select]').addEventListener('change', (event) => {
             const custom = event.target.value === '__custom__';
             const customWrap = control.querySelector('[data-home-height-custom]');
-            customWrap.hidden = !custom;
-            customWrap.classList.remove('has-error');
+            if (customWrap) {
+                customWrap.hidden = !custom;
+                customWrap.classList.remove('has-error');
+            }
             if (custom) {
-                control.querySelector('[data-home-height-custom-cm]').hidden = state.mode !== 'cm';
-                control.querySelector('[data-home-height-custom-ftin]').hidden = state.mode === 'cm';
+                const cmWrap = control.querySelector('[data-home-height-custom-cm]');
+                const ftinWrap = control.querySelector('[data-home-height-custom-ftin]');
+                if (cmWrap) cmWrap.hidden = state.mode !== 'cm';
+                if (ftinWrap) ftinWrap.hidden = state.mode === 'cm';
                 return;
             }
             if (event.target.value) writeHeightAnswer(control, Number(event.target.value));
         });
         control.querySelector('[data-home-height-apply]').addEventListener('click', () => {
             let cm;
+            const customWrap = control.querySelector('[data-home-height-custom]');
             if (state.mode === 'cm') {
-                const value = Number(control.querySelector('[data-home-height-cm]').value);
-                if (value >= 30 && value <= 250) cm = Math.round(value);
+                const cmInput = control.querySelector('[data-home-height-cm]');
+                const value = Number(cmInput?.value);
+                if (cmInput && value >= 30 && value <= 250) cm = Math.round(value);
             } else {
                 const feetInput = control.querySelector('[data-home-height-ft]');
                 const inchesInput = control.querySelector('[data-home-height-in]');
+                if (!feetInput || !inchesInput) return;
                 const feet = feetInput.value === '' ? 0 : Number(feetInput.value);
                 const inches = inchesInput.value === '' ? 0 : Number(inchesInput.value);
                 if ((feetInput.value !== '' || inchesInput.value !== '') && feet >= 0 && feet <= 8 && inches >= 0 && inches <= 11) {
@@ -94,12 +106,12 @@ function initHomeDietQuestionnaire() {
                 }
             }
             if (cm == null) {
-                control.querySelector('[data-home-height-custom]').classList.add('has-error');
+                customWrap?.classList.add('has-error');
                 return;
             }
-            control.querySelector('[data-home-height-custom]').classList.remove('has-error');
+            customWrap?.classList.remove('has-error');
             writeHeightAnswer(control, cm);
-            control.querySelector('[data-home-height-custom]').hidden = true;
+            if (customWrap) customWrap.hidden = true;
             renderHeightOptions(control);
         });
         } catch (error) {
@@ -181,8 +193,10 @@ function initHomeDietQuestionnaire() {
     });
 
     document.getElementById('homeDietBack')?.addEventListener('click', () => {
-        checkoutMessage.hidden = true;
-        checkoutMessage.textContent = '';
+        if (checkoutMessage) {
+            checkoutMessage.hidden = true;
+            checkoutMessage.textContent = '';
+        }
         showStep('questions');
     });
 
@@ -232,7 +246,7 @@ function initHomeDietQuestionnaire() {
                     window.homeDietIsLoggedIn = true;
                     beginPurchase();
                 });
-            } else {
+            } else if (checkoutMessage) {
                 checkoutMessage.textContent = 'Please log in to save your answers and continue to checkout.';
                 checkoutMessage.hidden = false;
             }
@@ -243,8 +257,23 @@ function initHomeDietQuestionnaire() {
     // template's no-JS fallback can then safely distinguish an initialized form.
     form.dataset.enhanced = 'true';
 
+    // Show server-side validation errors next to the relevant fields (e.g. the
+    // height or weight control) instead of only a generic banner.  Each error
+    // key is "q_<id>"; the matching field container has data-home-diet-question.
+    function showFieldErrors(errors) {
+        for (const [key, messages] of Object.entries(errors || {})) {
+            const match = key.match(/^q_(\d+)$/);
+            if (!match) continue;
+            const field = form.querySelector(`[data-home-diet-question="${match[1]}"]`);
+            if (!field) continue;
+            field.classList.add('has-error');
+            const errorEl = field.querySelector('.home-diet-field-error');
+            if (errorEl) errorEl.textContent = Array.isArray(messages) ? messages[0] : (messages || '');
+        }
+    }
+
     async function saveAnswersAndCheckout(planSlug, cycle, button) {
-        checkoutMessage.hidden = true;
+        if (checkoutMessage) checkoutMessage.hidden = true;
         button.disabled = true;
         const originalText = button.textContent;
         button.textContent = childId ? 'Opening checkout…' : 'Saving answers…';
@@ -272,6 +301,9 @@ function initHomeDietQuestionnaire() {
                 });
                 const result = await response.json().catch(() => ({}));
                 if (!response.ok || !result.success || !result.child_id) {
+                    if (response.status === 422 && result.errors) {
+                        showFieldErrors(result.errors);
+                    }
                     const validation = result.errors ? Object.values(result.errors).flat()[0] : null;
                     throw new Error(validation || result.message || 'We could not save the answers. Please try again.');
                 }
@@ -285,8 +317,10 @@ function initHomeDietQuestionnaire() {
             button.disabled = false;
             await window.startDietCheckout(planSlug, button, childId, cycle);
         } catch (error) {
-            checkoutMessage.textContent = error.message || 'Unable to continue. Please try again.';
-            checkoutMessage.hidden = false;
+            if (checkoutMessage) {
+                checkoutMessage.textContent = error.message || 'Unable to continue. Please try again.';
+                checkoutMessage.hidden = false;
+            }
             button.textContent = originalText;
             button.disabled = false;
         }
