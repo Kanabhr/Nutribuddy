@@ -3,18 +3,6 @@
 @section('panel-page-class', 'panel-coupons')
 @section('panel-content')
 
-<div class="inner-topbar">
-    <button class="sidebar-toggle" onclick="toggleSidebar()">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="3" y1="18" x2="21" y2="18" />
-        </svg>
-    </button>
-    <span class="it-title">My Coupons</span>
-    <div style="width:36px"></div>
-</div>
-
 <div class="page">
     <p style="color: #64748b; margin-bottom: 24px; font-size: 1.05rem;">
         Coupons you have already used on your NutriBuddy orders.

@@ -7885,30 +7885,16 @@
 }
 
 .ud-mobile-nav-trigger {
-  display: none;
+  display: none !important;
 }
 
 @media (max-width: 900px) {
   .ud-mobile-nav-trigger.is-visible {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 9px;
-    min-height: 42px;
-    margin: 0 16px 12px;
-    padding: 8px 14px;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: #fff;
-    color: var(--dk);
-    font: 700 .82rem 'Nunito', sans-serif;
-    cursor: pointer;
+    display: none !important;
   }
 
   .ud-mobile-nav-trigger svg {
-    width: 18px;
-    height: 18px;
-    flex: 0 0 auto;
+    display: none !important;
   }
 }
 

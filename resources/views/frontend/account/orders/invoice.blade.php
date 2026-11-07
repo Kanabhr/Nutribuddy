@@ -48,16 +48,6 @@
     $totalTax = collect($taxSummary)->sum('tax_amount');
 @endphp
 
-    <div class="inner-topbar">
-        <button class="sidebar-toggle" onclick="toggleSidebar()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
-        </button>
-        <span class="it-title">Invoice Details 🧾</span>
-        <div style="width:36px"></div>
     </div>
 
     <div class="page">
@@ -103,7 +93,6 @@
 
                         <div class="inv-title-block">
                             <div class="inv-word">TAX INVOICE</div>
-                            <div class="inv-num">#INV-{{ $order->order_number }}</div>
                             <div class="inv-num">{{ $invoiceNumber ?? ($order->invoice_number ?: ('#INV-' . $order->order_number)) }}</div>
                             <div class="inv-date">
                                 Issued: {{ optional($order->placed_at)->format('d M Y') ?? $order->created_at->format('d M Y') }}

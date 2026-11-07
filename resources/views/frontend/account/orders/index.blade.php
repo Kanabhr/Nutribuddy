@@ -2,18 +2,6 @@
 @section('title', 'My Orders — NutriBuddy Kids')
 @section('panel-page-class', 'panel-order')
 @section('panel-content')
-    <div class="inner-topbar">
-        <button class="sidebar-toggle" onclick="toggleSidebar()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
-        </button>
-        <span class="it-title">My Orders 📋</span>
-        <div style="width:36px"></div>
-    </div>
-    <!-- Wrapper removed to match ud-layout -->
     <!-- Cancel Confirm Modal -->
     <div class="modal-backdrop" id="cancelModal">
         <div class="modal">
@@ -144,22 +132,7 @@
     </div><!-- /page -->
     @push('scripts')
         <script>
-            // sidebar
-            function toggleSidebar() {
-                document.getElementById('sidebar').classList.toggle('open');
-                document.getElementById('overlay').classList.toggle('show');
-            }
-
-            function closeSidebar() {
-                document.getElementById('sidebar').classList.remove('open');
-                document.getElementById('overlay').classList.remove('show');
-            }
-
-            function setActive(el) {
-                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-                el.classList.add('active');
-            }
-
+            // API configuration
             const apiConfig = {
                 listUrl: @json(route('user.orders.index')),
                 invoiceUrlTemplate: @json(route('user.orders.invoice', ['order' => '__ORDER_ID__'])),

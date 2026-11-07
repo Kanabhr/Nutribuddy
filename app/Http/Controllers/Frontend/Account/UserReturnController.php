@@ -85,4 +85,25 @@ class UserReturnController extends Controller
 
         return redirect()->route('user.orders.detail-page', $order)->with('success', 'Return request submitted successfully.');
     }
+
+    public function updateStatus(Request $request, OrderReturn $orderReturn)
+    {
+        // Verify user owns this return
+        abort_unless((int) $orderReturn->order->user_id === (int) $request->user()->id, 403);
+
+        $validated = $request->validate([
+            'status' => ['required', 'in:pending,approved,in_transit,received,completed,rejected'],
+        ]);
+
+        $orderReturn->update(['status' => $validated['status']]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'message' => 'Return status updated successfully.',
+                'return' => $orderReturn,
+            ], 200);
+        }
+
+        return back()->with('success', 'Return status updated successfully.');
+    }
 }

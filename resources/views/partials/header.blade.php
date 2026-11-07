@@ -22,6 +22,18 @@
         <li><a href="{{ route('diet_chart') }}">Personalized Diet Chart</a></li>
         <li><a href="{{ route('testimonials') }}">Testimonials</a></li>
         <li><a href="{{ route('ingredients') }}">Ingredients</a></li>
+        @auth
+            @if(request()->is('user/*') || request()->routeIs('userdashboard', 'meal-plan', 'supplement', 'child-profile', 'growth-signal', 'check-in', 'order', 'wallet', 'nutrition.index', 'user.assessment.*', 'user.orders.*', 'user.invoices.*', 'user.reviews.*', 'user.support-tickets', 'personal-info', 'change-password', 'subscription', 'my-coupons'))
+            <li class="divider">|</li>
+            <li><a href="{{ route('userdashboard') }}">Overview</a></li>
+            <li><a href="{{ route('meal-plan') }}">Meal Plan</a></li>
+            <li><a href="{{ route('supplement') }}">Supplement</a></li>
+            <li><a href="{{ route('child-profile') }}">Child Profile</a></li>
+            <li><a href="{{ route('growth-signal') }}">Growth Signals</a></li>
+            <li><a href="{{ route('check-in') }}">Quarterly Check-in</a></li>
+            <li><a href="{{ route('order') }}">Order</a></li>
+            @endif
+        @endauth
     </ul>
 
     <div class="nav-actions">
@@ -211,6 +223,30 @@
             max-width: calc(100vw - 24px);
         }
     }
+
+    /* User panel menu items styling */
+    .nav-links li.divider {
+        display: none;
+        opacity: 0.3;
+        padding: 0 12px;
+    }
+
+    @media (min-width: 1200px) {
+        .nav-links li.divider {
+            display: block;
+        }
+        
+        .nav-links li.divider::before {
+            content: "•";
+            color: #ccc;
+        }
+    }
+
+    @media (max-width: 900px) {
+        .nav-links li.divider {
+            display: none !important;
+        }
+    }
 </style>
 
 <div class="menu-overlay" id="menuOverlay"></div>
@@ -232,40 +268,67 @@
 <div class="mobile-menu" id="mobileMenu" aria-hidden="true">
     <ul>
         @if(isset($isUserPanel) && $isUserPanel)
+            {{-- MAIN SECTION --}}
             <li class="mob-cat-title"
                 style="font-family:'Fredoka One',cursive;font-size:.7rem;color:var(--pk);padding:10px 6%;letter-spacing:1px;text-transform:uppercase;">
-                Main</li>
+                MAIN</li>
             <li><a href="{{ route('userdashboard') }}">Overview</a></li>
             <li><a href="{{ route('meal-plan') }}">Meal Plan</a></li>
+            <li><a href="{{ route('nutrition.index') }}">Nutrition</a></li>
             <li><a href="{{ route('supplement') }}">Supplement</a></li>
             <li><a href="{{ route('child-profile') }}">Child Profile</a></li>
             <li><a href="{{ route('growth-signal') }}">Growth Signals</a></li>
             <li><a href="{{ route('check-in') }}">Quarterly Check-in</a></li>
             <li><a href="{{ route('order') }}">Order</a></li>
 
+            {{-- DIET CHART SECTION --}}
             <li class="mob-cat-title"
-                style="font-family:'Fredoka One',cursive;font-size:.7rem;color:var(--pk);padding:10px 6%;letter-spacing:1px;text-transform:uppercase;">
-                Account</li>
+                style="font-family:'Fredoka One',cursive;font-size:.7rem;color:var(--pk);padding:10px 6%;letter-spacing:1px;text-transform:uppercase;margin-top:12px;">
+                DIET CHART</li>
+            <li><a href="{{ route('meal-plan') }}">Meal Plan</a></li>
+            <li><a href="{{ route('supplement') }}">Supplement</a></li>
+            <li><a href="{{ route('child-profile') }}">Child Profile</a></li>
+
+            {{-- HEALTH ASSESSMENT SECTION --}}
+            <li class="mob-cat-title"
+                style="font-family:'Fredoka One',cursive;font-size:.7rem;color:var(--pk);padding:10px 6%;letter-spacing:1px;text-transform:uppercase;margin-top:12px;">
+                HEALTH ASSESSMENT</li>
+            <li><a href="{{ route('user.assessment.index') }}">Start Assessment</a></li>
+            <li><a href="{{ route('user.assessment.history') }}">Assessment History</a></li>
+
+            {{-- ORDERS & PRODUCTS SECTION --}}
+            <li class="mob-cat-title"
+                style="font-family:'Fredoka One',cursive;font-size:.7rem;color:var(--pk);padding:10px 6%;letter-spacing:1px;text-transform:uppercase;margin-top:12px;">
+                ORDERS & PRODUCTS</li>
+            <li><a href="{{ route('wallet') }}">NB Coins Wallet</a></li>
+            <li><a href="{{ route('order') }}">Order</a></li>
+            <li><a href="{{ route('user.orders.returns.index') }}">Returns</a></li>
+            <li><a href="{{ route('user.invoices.index') }}">Invoices</a></li>
+            <li><a href="{{ route('user.reviews.index') }}">My Reviews</a></li>
+            <li><a href="{{ route('user.support-tickets') }}">Support Tickets</a></li>
+
+            {{-- ACCOUNT SECTION --}}
+            <li class="mob-cat-title"
+                style="font-family:'Fredoka One',cursive;font-size:.7rem;color:var(--pk);padding:10px 6%;letter-spacing:1px;text-transform:uppercase;margin-top:12px;">
+                ACCOUNT</li>
             <li><a href="{{ route('personal-info') }}">Personal Info</a></li>
-            <li><a href="#">Address</a></li>
-            <li><a href="#">Wishlist</a></li>
             <li><a href="{{ route('change-password') }}">Change Password</a></li>
             <li><a href="{{ route('subscription') }}">Subscription</a></li>
-            <li><a href="#">My Coupons</a></li>
+            <li><a href="{{ route('my-coupons') }}">My Coupons</a></li>
 
             <li>
-                <hr style="border:0; border-top:1px solid rgba(0,0,0,0.1); margin: 8px 6%;">
+                <hr style="border:0; border-top:1px solid rgba(0,0,0,0.1); margin: 12px 6%;">
             </li>
-            <li class="mob-cat-title"
-                style="font-family:'Fredoka One',cursive;font-size:.7rem;color:var(--pk);padding:10px 6%;letter-spacing:1px;text-transform:uppercase;">
-                Global Nav</li>
         @endif
-        <li><a href="{{ route('home') }}"><span class="link-emoji"></span> Home</a></li>
-        <li><a href="{{ route('about') }}"><span class="link-emoji"></span> About Us</a></li>
-        <li><a href="{{ route('product') }}"><span class="link-emoji"></span> Products</a></li>
-        <li><a href="{{ route('diet_chart') }}"><span class="link-emoji"></span> Personalized Diet Chart</a></li>
-        <li><a href="{{ route('testimonials') }}"><span class="link-emoji"></span> Testimonials</a></li>
-        <li><a href="{{ route('ingredients') }}"><span class="link-emoji"></span> Ingredients</a></li>
+        <li class="mob-cat-title"
+            style="font-family:'Fredoka One',cursive;font-size:.7rem;color:var(--pk);padding:10px 6%;letter-spacing:1px;text-transform:uppercase;">
+            GLOBAL</li>
+        <li><a href="{{ route('home') }}">Home</a></li>
+        <li><a href="{{ route('about') }}">About Us</a></li>
+        <li><a href="{{ route('product') }}">Products</a></li>
+        <li><a href="{{ route('diet_chart') }}">Personalized Diet Chart</a></li>
+        <li><a href="{{ route('testimonials') }}">Testimonials</a></li>
+        <li><a href="{{ route('ingredients') }}">Ingredients</a></li>
     </ul>
     <div class="mobile-cta-wrap">
         <a href="{{ route('contact') }}">Contact Us</a>

@@ -20,13 +20,6 @@
         </aside>
 
         <main class="ud-main">
-            <button type="button" class="ud-mobile-nav-trigger" data-user-panel-nav-trigger
-                    aria-controls="sidebar" aria-expanded="false" aria-label="Open account navigation">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <path d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-                <span>Account menu</span>
-            </button>
             <div class="ud-panel-content @yield('panel-page-class')">
                 @include('partials.user-panel-page-hero')
                 @yield('panel-content')
