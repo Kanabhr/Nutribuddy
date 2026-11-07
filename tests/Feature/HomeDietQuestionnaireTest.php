@@ -165,4 +165,94 @@ class HomeDietQuestionnaireTest extends TestCase
         $this->assertDatabaseCount('children', 0);
         $this->assertDatabaseCount('child_assessments', 0);
     }
+
+    // ------------------------------------------------------------------
+    // C8-FIX-2: verify the home-diet height markup places every element the
+    // script scopes to (via control.querySelector) INSIDE the control div.
+    // Before the fix these were siblings of the control, causing null crashes
+    // ("Cannot set properties of null") and the height value was never stored.
+    // ------------------------------------------------------------------
+    public function test_home_diet_height_markup_places_elements_inside_control(): void
+    {
+        QuestionnaireQuestion::create([
+            'model' => '1 Basic', 'section' => 'A · Child & Growth',
+            'question' => "Child's name", 'answer_type' => 'Text',
+            'options_scale' => '—', 'only_ask_if' => 'always',
+            'is_optional' => false, 'sort_order' => 1,
+        ]);
+        QuestionnaireQuestion::create([
+            'model' => '1 Basic', 'section' => 'A · Child & Growth',
+            'question' => 'Current weight', 'answer_type' => 'Number (kg)',
+            'options_scale' => 'e.g. 22', 'is_optional' => false, 'sort_order' => 4,
+        ]);
+        QuestionnaireQuestion::create([
+            'model' => '1 Basic', 'section' => 'A · Child & Growth',
+            'question' => 'Current height', 'answer_type' => 'Number (cm)',
+            'options_scale' => 'e.g. 120', 'is_optional' => false, 'sort_order' => 5,
+        ]);
+        SubscriptionPlan::create([
+            'name' => 'Basic', 'slug' => 'basic', 'price' => 0,
+            'monthly_price' => 199, 'is_active' => true, 'level' => 'basic',
+        ]);
+
+        $response = $this->get(route('home'));
+        $response->assertOk();
+
+        $dom = new \DOMDocument();
+        @$dom->loadHTML($response->getContent());
+        $xpath = new \DOMXPath($dom);
+
+        $controls = $xpath->query('//*[@data-home-height-control]');
+        $this->assertGreaterThan(0, $controls->length, 'a data-home-height-control element exists');
+
+        $control = $controls->item(0);
+        $this->assertGreaterThan(0, $xpath->query('.//*[@data-home-height-select]', $control)->length, 'height select is inside the control');
+        $this->assertGreaterThan(0, $xpath->query('.//*[@data-home-height-unit]', $control)->length, 'unit select is inside the control');
+        $this->assertGreaterThan(0, $xpath->query('.//*[@data-home-height-custom]', $control)->length, 'custom block is inside the control');
+        $this->assertGreaterThan(0, $xpath->query('.//*[@data-home-height-answer]', $control)->length, 'answer input is inside the control');
+        $this->assertGreaterThan(0, $xpath->query('.//*[@data-home-height-suggestion]', $control)->length, 'suggestion is inside the control');
+    }
+
+    // ------------------------------------------------------------------
+    // C8-FIX-2: a submit with a valid height in cm mode saves the parsed
+    // value to child_assessments.current_height_cm.
+    // ------------------------------------------------------------------
+    public function test_home_diet_submit_with_valid_cm_height_saves_current_height_cm(): void
+    {
+        $questions = collect([
+            [1, "Child's name", 'Text', null],
+            [2, 'Age / date of birth', 'Date', null],
+            [3, 'Sex', 'Choice', 'Boy / Girl'],
+            [4, 'Current weight', 'Number (kg)', null],
+            [5, 'Current height', 'Number (cm)', null],
+            [6, 'Diet type', 'Choice', 'Veg / Vegan / Non-Veg / Eggetarian / Jain'],
+            [7, 'Allergies', 'Multi', 'Dairy/Lactose / Nuts & seeds / Gluten-wheat / Egg / None'],
+        ])->map(fn ($item) => QuestionnaireQuestion::create([
+            'model' => '1 Basic',
+            'section' => 'Basic',
+            'question' => $item[1],
+            'answer_type' => $item[2],
+            'options_scale' => $item[3],
+            'sort_order' => $item[0],
+            'is_optional' => false,
+        ]));
+        $parent = User::factory()->create();
+
+        $response = $this->actingAs($parent)->postJson(route('api.nutrition.questionnaire.submit'), [
+            'plan_slug' => 'basic',
+            'cycle' => 'monthly',
+            'q_'.$questions[0]->id => 'Mira',
+            'q_'.$questions[1]->id => '2018-04-12',
+            'q_'.$questions[2]->id => 'Girl',
+            'q_'.$questions[3]->id => '21',
+            'q_'.$questions[4]->id => '120 cm',
+            'q_'.$questions[5]->id => 'Veg',
+            'q_'.$questions[6]->id => ['None'],
+        ]);
+
+        $response->assertOk()->assertJsonPath('success', true);
+        $assessment = ChildAssessment::with('answers')->where('child_id', $response->json('child_id'))->firstOrFail();
+        $this->assertSame(120.0, (float) $assessment->current_height_cm);
+        $this->assertSame(21.0, (float) $assessment->current_weight_kg);
+    }
 }

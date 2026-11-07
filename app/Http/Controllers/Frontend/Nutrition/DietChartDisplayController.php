@@ -57,19 +57,25 @@ class DietChartDisplayController extends Controller
                 $planData = [];
             }
 
-            $sevenDayPlan = $this->chartDisplay->formatSevenDayPlan($dietPlan, $assessment);
-            $nutrientGaps = $planData['nutrient_gaps'] ?? [];
+            $formattedPlan = $this->chartDisplay->formatPlan($dietPlan, $assessment);
+            $sevenDayPlan  = $this->chartDisplay->formatSevenDayPlan($dietPlan, $assessment);
+
+            // Use the stored summary when present; average per-day gaps for old plans.
+            $rawGaps      = $planData['nutrient_gaps'] ?? ($planData['daily_gaps'] ?? []);
+            $nutrientGaps = \App\Services\Nutrition\DietChartDisplayService::summarizeGaps($rawGaps);
+
             $clinicalTips = $this->chartDisplay->getClinicalTips($assessment, $nutrientGaps);
 
             return view('child-profile.diet-chart-display', [
-                'child' => $child,
-                'assessment' => $assessment,
-                'dietPlan' => $dietPlan,
-                'hasPlan' => true,
+                'child'          => $child,
+                'assessment'     => $assessment,
+                'dietPlan'       => $dietPlan,
+                'hasPlan'        => true,
                 'purchasedPlans' => $purchasedPlans,
-                'sevenDayPlan' => $sevenDayPlan,
-                'nutrientGaps' => $nutrientGaps,
-                'clinicalTips' => $clinicalTips,
+                'formattedPlan'  => $formattedPlan,
+                'sevenDayPlan'   => $sevenDayPlan,
+                'nutrientGaps'   => $nutrientGaps,
+                'clinicalTips'   => $clinicalTips,
                 'dailyNutrients' => $planData['daily_nutrients'] ?? [],
             ]);
 

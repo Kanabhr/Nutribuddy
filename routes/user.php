@@ -51,9 +51,29 @@ Route::middleware('auth')->group(function () {
         Route::get('/personal-info', [UserAddressController::class, 'index'])->name('personal-info');
         Route::get('/coupons', [UserCouponController::class, 'index'])->name('my-coupons');
         Route::get('/subscriptions', function () {
-            $subscriptions = auth()->user()->dietSubscriptions()->with('child', 'product')->latest()->get();
+            $user          = auth()->user();
+            $subscriptions = $user->dietSubscriptions()->with('child', 'subscriptionPlan', 'product')->latest()->get();
 
-            return view('frontend.account.subscriptions', compact('subscriptions'));
+            // Rule 5: find subscriptions where the child still needs to answer the questionnaire.
+            $pendingQuestionnaires = $subscriptions
+                ->filter(function ($sub) {
+                    if (! $sub->child) {
+                        return false;
+                    }
+                    $assessment = $sub->child->assessments()->latest()->first();
+                    $planSlug   = $sub->subscriptionPlan?->slug;
+
+                    return \App\Support\PlanAccess::rank($planSlug) > \App\Support\PlanAccess::rank('basic')
+                        && ! \App\Support\PlanAccess::assessmentCoversPlan($assessment?->model_level, $planSlug);
+                })
+                ->map(fn ($sub) => [
+                    'subscription' => $sub,
+                    'url'          => route('frontend.nutrition.questionnaire.child', $sub->child_id)
+                                      . '?plan=' . urlencode((string) $sub->subscriptionPlan?->slug),
+                ])
+                ->values();
+
+            return view('frontend.account.subscriptions', compact('subscriptions', 'pendingQuestionnaires'));
         })->name('subscription');
         Route::view('/returns', 'frontend.account.returns.show')->name('user-return');
         Route::view('/dashboard', 'frontend.account.dashboard')->name('userdashboard');

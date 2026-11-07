@@ -80,6 +80,12 @@ class ChildProfileService
             // No growth reference table exists yet, so no medical threshold is inferred.
             'growth_profile' => 'unknown',
             'professional_review_required' => $this->requiresReview($medicalCondition),
+            // Answer 17: favourite / must-have foods (free text, comma/slash-separated).
+            // Used only as a ranking boost — never a guarantee.
+            'favourite_foods' => $this->foodList($answers[17] ?? null),
+            // Answer 18: disliked / refused foods (free text, comma/slash-separated).
+            // Used as a soft exclusion with fallback when a slot would be emptied.
+            'disliked_foods'  => $this->foodList($answers[18] ?? null),
         ];
 
         $assessment->fill([
@@ -165,10 +171,21 @@ class ChildProfileService
         $values = is_array($value) ? $value : preg_split('/[,|]/', (string) $value);
 
         return collect($values)->map(fn ($item) => strtolower(trim((string) $item)))->map(function ($item) {
+            // IMPORTANT: sesame, soy, and honey must be checked BEFORE the nuts/seeds
+            // arm so that strings like "Sesame seeds" or "Soya" match their specific
+            // token rather than falling through to 'nuts'.  The questionnaire option
+            // "Nuts & seeds" does not contain 'sesame', 'soy', or 'honey', so it still
+            // maps to 'nuts' correctly.
             return match (true) {
-                str_contains($item, 'lactose') => 'lactose', str_contains($item, 'dairy') => 'dairy',
-                str_contains($item, 'nut') || str_contains($item, 'seed') => 'nuts', str_contains($item, 'gluten') || str_contains($item, 'wheat') => 'gluten',
-                str_contains($item, 'egg') => 'egg', default => null,
+                str_contains($item, 'lactose')                             => 'lactose',
+                str_contains($item, 'dairy')                               => 'dairy',
+                str_contains($item, 'gluten') || str_contains($item, 'wheat') => 'gluten',
+                str_contains($item, 'egg')                                 => 'egg',
+                str_contains($item, 'sesame')                              => 'sesame',
+                str_contains($item, 'soy')                                 => 'soy',
+                str_contains($item, 'honey')                               => 'honey',
+                str_contains($item, 'nut') || str_contains($item, 'seed') => 'nuts',
+                default                                                    => null,
             };
         })->filter()->unique()->values()->all();
     }
@@ -229,5 +246,39 @@ class ChildProfileService
         $value = is_array($value) ? implode(', ', $value) : trim((string) $value);
 
         return $value === '' ? null : $value;
+    }
+
+    /**
+     * Parse a free-text food list (answer 17 or 18).
+     *
+     * Splits on commas, slashes, or pipes; trims whitespace; lowercases each token.
+     * Drops:
+     *   - empty strings
+     *   - terms under 3 characters (too ambiguous: "no", "na", "ok" …)
+     *   - explicit no-op words: none, no, nil, nothing, n/a, na
+     *
+     * Returns an empty array when the value is absent, blank, or entirely
+     * composed of ignored terms (e.g. the answer "None").
+     *
+     * @return list<string>
+     */
+    public function foodList(mixed $value): array
+    {
+        if ($value === null || $value === '' || (is_array($value) && $value === [])) {
+            return [];
+        }
+
+        $raw = is_array($value) ? implode(',', $value) : (string) $value;
+
+        $ignored = ['none', 'no', 'nil', 'nothing', 'n/a', 'na'];
+
+        return collect(preg_split('/[,\/|]+/', $raw))
+            ->map(fn ($item) => strtolower(trim($item)))
+            ->filter(fn ($item) => $item !== '')
+            ->filter(fn ($item) => strlen($item) >= 3)
+            ->filter(fn ($item) => ! in_array($item, $ignored, true))
+            ->unique()
+            ->values()
+            ->all();
     }
 }

@@ -427,8 +427,7 @@
                         @if($isHeight)
                             <div class="qz-h-block" id="h_block_{{ $q->id }}">
                                 <label class="qz-field-label">
-                                    📏 {{ $q->question }}
-                                    <span class="qz-opt-tag">Optional</span>
+                                    📏 {{ $q->question }} <span style="color:#e84040">*</span>
                                 </label>
 
                                 <div class="qz-h-helper">Enter your current height</div>
@@ -484,15 +483,19 @@
 
                                 <div class="qz-h-warn" id="h_warn_{{ $q->id }}"></div>
 
-                                <input type="hidden" class="qz-form-field" data-qid="{{ $q->id }}" id="h_hid_{{ $q->id }}">
+                                {{-- required: JS step-validation checks .qz-form-field[required] before allowing
+                                     Next/Submit. The value is written by qzHeightChanged (dropdown pick) or
+                                     qzApplyCustomHeight (custom entry). qzSubmit also calls qzApplyCustomHeight
+                                     automatically when customActive is true, so clicking Submit without Apply
+                                     still captures the typed value. --}}
+                                <input type="hidden" class="qz-form-field" data-qid="{{ $q->id }}" id="h_hid_{{ $q->id }}" required>
                             </div>
 
                         {{-- WEIGHT --}}
                         @elseif($isWeight)
                             <div class="qz-h-block" id="w_block_{{ $q->id }}">
                                 <label class="qz-field-label">
-                                    ⚖️ {{ $q->question }}
-                                    <span class="qz-opt-tag">Optional</span>
+                                    ⚖️ {{ $q->question }} <span style="color:#e84040">*</span>
                                 </label>
                                 <div class="qz-h-helper">Enter weight in kilograms</div>
                                 <div class="qz-w-wrap">
@@ -500,7 +503,8 @@
                                            class="qz-w-input qz-form-field qz-weight-input"
                                            data-qid="{{ $q->id }}"
                                            id="w_val_{{ $q->id }}"
-                                           placeholder="e.g. 22">
+                                           placeholder="e.g. 22"
+                                           required>
                                     <span class="qz-w-suffix">kg</span>
                                 </div>
                             </div>
@@ -668,7 +672,7 @@
                         <button class="qz-btn-next" type="button" onclick="qzGo({{ $step }}, {{ $step + 1 }})">Continue &#8594;</button>
                     @else
                         <button class="qz-btn-submit" type="button" id="qzSubmitBtn" onclick="qzSubmit(this)">
-                            &#10024; Submit &amp; Pay
+                            &#10024; {{ isset($skipPayment) && $skipPayment ? 'Submit' : 'Submit &amp; Pay' }}
                         </button>
                     @endif
                 </div>
@@ -683,6 +687,8 @@
 <script>
     window.isUserLoggedIn = @json(auth()->check());
     window.loginUrlBase = "{{ route('api.nutrition.questionnaire.checkout.auth') }}";
+    window.qzSkipPayment = @json(isset($skipPayment) && $skipPayment);
+    window.qzMealPlanBase = "{{ url('/user/pages/nutrition/child/') }}";
 
     /* ============================================================
        Height state + logic — APPLY FIXED

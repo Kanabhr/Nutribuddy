@@ -2,11 +2,13 @@
 
 namespace App\Services\Nutrition;
 
+use App\Models\DietSubscription;
 use App\Models\Nutrition\Child;
 use App\Models\Nutrition\ChildAssessment;
 use App\Models\Nutrition\QuestionnaireAnswer;
 use App\Models\Nutrition\QuestionnaireQuestion;
 use App\Models\User;
+use App\Support\PlanAccess;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -15,7 +17,7 @@ class QuestionnaireSubmissionService
     /** @param array<string, mixed> $validated */
     public function submit(User $user, array $validated): array
     {
-        return DB::transaction(function () use ($user, $validated): array {
+        $result = DB::transaction(function () use ($user, $validated): array {
             $child = isset($validated['child_id'])
                 ? $user->children()->findOrFail($validated['child_id'])
                 : null;
@@ -47,6 +49,29 @@ class QuestionnaireSubmissionService
             ]);
 
             $previousAssessment = $child->assessments()->with('answers')->latest()->first();
+
+            // Merge carried-over answers into $answersByOrder so every profile
+            // column derived from answers (height, weight, diet_type, allergies,
+            // region, activity_level, main_goal, budget, picky_level) is set on
+            // the new assessment from the complete picture — new answers take
+            // priority, and any sort-order not covered by the new submission is
+            // filled from the previous assessment.  Without this, an upgrade
+            // submission that only sends the new plan's answers leaves height
+            // (and every other column from a Basic answer) as NULL even though
+            // the carried-over answer row exists in questionnaire_answers.
+            if ($previousAssessment && $previousAssessment->answers->isNotEmpty()) {
+                $prevQuestionIds = $previousAssessment->answers->pluck('question_id')->all();
+                $prevSortOrders = QuestionnaireQuestion::query()
+                    ->whereIn('id', $prevQuestionIds)
+                    ->pluck('sort_order', 'id');
+                foreach ($previousAssessment->answers as $prevAnswer) {
+                    $order = $prevSortOrders[$prevAnswer->question_id] ?? $prevAnswer->question_id;
+                    if (! $answersByOrder->has($order)) {
+                        $answersByOrder[$order] = $prevAnswer->answer_value;
+                    }
+                }
+            }
+
             $assessment = ChildAssessment::create([
                 'child_id' => $child->id,
                 'model_level' => $validated['plan_slug'] ?? 'basic',
@@ -62,6 +87,8 @@ class QuestionnaireSubmissionService
                 'current_season' => $this->currentIndianSeason(),
             ]);
 
+            // Rule 3: carry all answers from the previous assessment forward so the
+            // engine sees the full picture (e.g. Basic answers when upgrading to Plus).
             foreach ($previousAssessment?->answers ?? [] as $answer) {
                 QuestionnaireAnswer::create([
                     'child_assessment_id' => $assessment->id,
@@ -71,6 +98,13 @@ class QuestionnaireSubmissionService
             }
 
             foreach ($answers as $questionId => $value) {
+                // Skip null, empty-string, and empty-array answers so the NOT NULL
+                // constraint on answer_value is never violated for optional questions.
+                // Any previous answer copied forward from an earlier assessment is kept.
+                if ($value === null || $value === '' || $value === []) {
+                    continue;
+                }
+
                 QuestionnaireAnswer::updateOrCreate(
                     ['child_assessment_id' => $assessment->id, 'question_id' => $questionId],
                     ['answer_value' => $value],
@@ -79,6 +113,41 @@ class QuestionnaireSubmissionService
 
             return ['child_id' => $child->id, 'assessment_id' => $assessment->id];
         });
+
+        // Rule 4: after a successful submit, generate the chart if the child's active
+        // subscription now covers the plan answered.  This runs OUTSIDE the transaction
+        // so the new assessment row is fully committed and visible.
+        $this->maybeGenerateChartAfterSubmit($user, $result['child_id'], $validated['plan_slug'] ?? 'basic');
+
+        return $result;
+    }
+
+    /**
+     * If the child holds an active paid subscription at or below the just-submitted
+     * plan level, and no chart exists yet for the new assessment, generate it now.
+     */
+    private function maybeGenerateChartAfterSubmit(User $user, int $childId, string $planSlug): void
+    {
+        // Only triggered for paid plans (plus / pro / premium).
+        if (PlanAccess::rank($planSlug) <= PlanAccess::rank('basic')) {
+            return;
+        }
+
+        $subscription = DietSubscription::query()
+            ->where('user_id', $user->id)
+            ->where('child_id', $childId)
+            ->usable()
+            ->with('subscriptionPlan')
+            ->get()
+            ->sortByDesc(fn ($s) => PlanAccess::rank($s->subscriptionPlan?->slug))
+            ->first();
+
+        if (! $subscription) {
+            return;
+        }
+
+        // PostPaymentChartService is idempotent — safe to call even if already done.
+        app(PostPaymentChartService::class)->generateIfReady($subscription);
     }
 
     private function answerText(mixed $value, ?string $default = null): ?string

@@ -5,6 +5,7 @@ namespace App\Services\Nutrition;
 use App\Models\DietSubscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
+use App\Support\PlanAccess;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -18,6 +19,53 @@ class DietPaymentService
         $plan = SubscriptionPlan::where('slug', $data['plan_slug'])
             ->where('is_active', true)
             ->firstOrFail();
+
+        // What does this child already have? (skipped when no child is attached yet)
+        $existing = ! empty($data['child_id'])
+            ? DietSubscription::query()
+                ->where('user_id', $user->id)
+                ->where('child_id', $data['child_id'])
+                ->usable()
+                ->with('subscriptionPlan')
+                ->get()
+            : collect();
+
+        // FREE plan (Basic): no billing cycle, never expires, one per child.
+        if ($plan->slug === 'basic') {
+            if ($existing->isNotEmpty()) {
+                return ['success' => true, 'gateway' => 'free', 'subscription_id' => $existing->first()->id];
+            }
+
+            $subscription = DietSubscription::create([
+                'user_id' => $user->id,
+                'child_id' => $data['child_id'] ?? null,
+                'subscription_plan_id' => $plan->id,
+                'model' => $plan->name,
+                'status' => 'pending',
+                'payment_status' => 'pending',
+                'amount_paid' => 0,
+                'starts_at' => now(),
+                'expires_at' => null,
+            ]);
+            $this->activateFree($subscription);
+
+            return ['success' => true, 'gateway' => 'free', 'subscription_id' => $subscription->id];
+        }
+
+        // Paid plans: no downgrades, and no re-payment when the child already holds
+        // an active subscription at the same rank or higher.
+        // (Same rank = renewal attempt for a plan that has not expired yet.)
+        $newRank     = PlanAccess::rank($plan->slug);
+        $highestRank = PlanAccess::rank(PlanAccess::highestSlug($existing));
+
+        if ($newRank > 0 && $highestRank > 0 && $newRank <= $highestRank) {
+            return [
+                'success' => false,
+                'message' => 'This child already has an active subscription for this plan.',
+                '_status' => 422,
+            ];
+        }
+
         [$priceColumn, $days] = match ($data['cycle']) {
             'monthly' => ['monthly_price', 30],
             'quarterly' => ['quarterly_price', 90],
@@ -95,9 +143,15 @@ class DietPaymentService
         }
 
         $subscription = $this->markPaid($subscription, $data['razorpay_payment_id']);
-        $this->activateRelatedServices($subscription);
+        $needsQuestionnaire = $this->activateRelatedServices($subscription);
 
-        return ['success' => true, 'message' => 'Subscription activated successfully!'];
+        return [
+            'success'            => true,
+            'message'            => 'Subscription activated successfully!',
+            'needs_questionnaire' => $needsQuestionnaire,
+            'child_id'           => $subscription->child_id,
+            'plan_slug'          => $subscription->subscriptionPlan?->slug,
+        ];
     }
 
     public function confirmCashfreeReturn(?string $orderId, ?string $subscriptionId): array
@@ -129,9 +183,14 @@ class DietPaymentService
             }
 
             $subscription = $this->markPaid($subscription, $order['cf_order_id'] ?? null);
-            $this->activateRelatedServices($subscription);
+            $needsQuestionnaire = $this->activateRelatedServices($subscription);
 
-            return ['success' => true, 'child_id' => $subscription->child_id];
+            return [
+                'success' => true,
+                'child_id' => $subscription->child_id,
+                'needs_questionnaire' => $needsQuestionnaire,
+                'plan_slug' => $subscription->subscriptionPlan?->slug,
+            ];
         } catch (\Throwable $exception) {
             Log::error('Cashfree diet payment verification failed.', ['exception' => $exception]);
 
@@ -174,7 +233,7 @@ class DietPaymentService
                 'customer_id' => 'user_'.$user->id,
                 'customer_name' => $user->name,
                 'customer_email' => $user->email,
-                'customer_phone' => '9999999999',
+                'customer_phone' => $this->customerPhone($user),
             ],
             'order_meta' => [
                 'return_url' => route('diet.payment.cashfree.return')
@@ -183,6 +242,13 @@ class DietPaymentService
             'order_note' => 'Diet Subscription '.$plan->name,
         ]);
         if (! $response->successful()) {
+            // Log HTTP status and response body to help diagnose failures.
+            // Never log request headers, client IDs, secrets, or keys.
+            Log::error('Cashfree order creation failed.', [
+                'subscription_id'  => $subscription->id,
+                'http_status'      => $response->status(),
+                'response_body'    => $response->body(),
+            ]);
             throw new \RuntimeException('Cashfree order creation failed.');
         }
         $order = $response->json();
@@ -193,6 +259,40 @@ class DietPaymentService
             'order_id' => $order['order_id'], 'subscription_id' => $subscription->id,
             'mode' => \App\Services\Payments\CashfreePaymentService::resolveEnvironment(),
         ];
+    }
+
+    private function activateFree(DietSubscription $subscription): void
+    {
+        $subscription->update([
+            'status' => 'active',
+            'payment_status' => 'free',
+            'starts_at' => now(),
+            'expires_at' => null,
+        ]);
+
+        $subscription = $subscription->fresh();
+        $this->notifications->subscriptionActivated($subscription);
+        // Basic is always free and the answers always cover it — generate immediately.
+        $this->activateRelatedServices($subscription);
+    }
+
+    private function supersedeLowerPlans(DietSubscription $subscription): void
+    {
+        if (! $subscription->child_id) {
+            return;
+        }
+
+        $newRank = PlanAccess::rank($subscription->subscriptionPlan?->slug);
+
+        DietSubscription::query()
+            ->where('user_id', $subscription->user_id)
+            ->where('child_id', $subscription->child_id)
+            ->where('id', '!=', $subscription->id)
+            ->usable()
+            ->with('subscriptionPlan')
+            ->get()
+            ->filter(fn (DietSubscription $old) => PlanAccess::rank($old->subscriptionPlan?->slug) < $newRank)
+            ->each(fn (DietSubscription $old) => $old->update(['status' => 'cancelled', 'cancelled_at' => now()]));
     }
 
     private function activate(DietSubscription $subscription): void
@@ -223,33 +323,36 @@ class DietPaymentService
             ]);
 
             $subscription = $subscription->fresh();
+            $this->supersedeLowerPlans($subscription);
             $this->notifications->subscriptionActivated($subscription);
 
             return $subscription;
         });
     }
 
-    private function activateRelatedServices(DietSubscription $subscription): void
+    /**
+     * After payment is confirmed, decide whether to generate the chart immediately
+     * or defer to a post-questionnaire step.
+     *
+     * Returns true  → the child must still answer the higher-plan questions;
+     *                 chart generation is deferred.
+     * Returns false → everything is ready; chart was (or already had been) generated.
+     */
+    private function activateRelatedServices(DietSubscription $subscription): bool
     {
-        app(NutritionLeadService::class)->createForSubscription($subscription);
-        $assessment = $subscription->child?->assessments()->latest()->first();
-        if (! $assessment || $assessment->dietPlans()->exists()) {
-            return;
-        }
-        $answers = $assessment->answers()->pluck('answer_value', 'question_id')
-            ->map(fn ($value) => is_string($value) ? json_decode($value, true) : $value)->all();
-        try {
-            $result = app(DietChartGeneratorService::class)->generateDietChart($assessment, $answers);
-            if (! ($result['success'] ?? false)) {
-                throw new \RuntimeException($result['message'] ?? 'Diet chart generation failed.');
-            }
-            $subscription->nutritionLead?->update(['status' => 'awaiting_review']);
-        } catch (\Throwable $exception) {
-            Log::error('Paid diet chart generation failed.', [
-                'subscription_id' => $subscription->id,
-                'exception' => $exception,
-            ]);
-        }
+        // NutritionLead is always created at this point (idempotent inside the service).
+        // Chart generation is attempted only when the assessment covers the plan level.
+        $ready = app(PostPaymentChartService::class)->generateIfReady($subscription);
+
+        // ready=false means the assessment does NOT yet cover the purchased plan.
+        return ! $ready; // needs_questionnaire = true when NOT ready
+    }
+
+    private function customerPhone(User $user): string
+    {
+        $digits = preg_replace('/\D+/', '', (string) ($user->phone ?? ''));
+
+        return strlen($digits) >= 10 ? substr($digits, -10) : '9999999999';
     }
 
     private function cashfreeHeaders(): array

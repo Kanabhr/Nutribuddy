@@ -40,6 +40,19 @@ class DietSubscription extends Model
         ];
     }
 
+    /**
+     * A subscription that currently grants access:
+     * active, paid (or free), and not expired. Free plans have expires_at = null.
+     */
+    public function scopeUsable($query)
+    {
+        return $query->where('status', 'active')
+            ->whereIn('payment_status', ['paid', 'free'])
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            });
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

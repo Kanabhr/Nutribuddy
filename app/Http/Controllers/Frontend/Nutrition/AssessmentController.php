@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Frontend\StoreAssessmentRequest;
 use App\Models\AssessmentAttempt;
 use App\Services\AssessmentService;
+use App\Support\PlanAccess;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -21,23 +22,16 @@ class AssessmentController extends Controller
     public function index(Request $request): View
     {
         $childId = $request->route('child') ?? $request->query('child_id');
-        $limit = null;
 
+        $slug = null;
         if ($childId) {
             $child = $request->user()->children()->find($childId);
             if ($child) {
-                $activeSub = $child->dietSubscriptions()->where('status', 'active')->first();
-                if ($activeSub) {
-                    $limit = match ($activeSub->model) {
-                        'Basic' => 12,
-                        'Plus' => 21,
-                        'Pro' => 29,
-                        'Premium' => 37,
-                        default => 12,
-                    };
-                }
+                $slug = PlanAccess::slugForChild($child);
             }
         }
+        $slug ??= PlanAccess::slugForUser($request->user());
+        $limit = $slug ? PlanAccess::questionLimit($slug) : null;
 
         $questionsGrouped = $this->service->getActiveQuestionsGrouped($limit);
         $questions = $this->service->getActiveQuestions($limit);

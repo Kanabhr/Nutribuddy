@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Nutrition\Child;
 use App\Models\Nutrition\QuestionnaireQuestion;
 use App\Models\SubscriptionPlan;
+use App\Support\PlanAccess;
 use Illuminate\Http\Request;
 
 class QuestionnaireController extends Controller
@@ -35,34 +36,90 @@ class QuestionnaireController extends Controller
             $child = $request->user()->children()->first();
         }
 
-        // We will fetch questions dynamically on the frontend via API,
-        // or we can pass them here. Let's pass them here for easier Blade rendering.
+        $modelsToFetch = PlanAccess::questionModels($planSlug);
 
-        // Map plan slug to models we need to fetch
-        $modelsToFetch = $child
-            ? match ($planSlug) {
-                'plus' => ['2 Plus'], 'pro' => ['3 Pro'], 'premium' => ['4 Premium'], default => ['1 Basic']
+        // For an existing child, only ask questions whose model level is ABOVE the
+        // level they were last assessed at – so upgrading Basic → Premium shows only
+        // Plus, Pro, and Premium questions (the ones the child has never answered).
+        //
+        // If the new plan is the same rank or lower than the previous assessment
+        // (e.g. re-submitting Basic), or if there happen to be no higher-level
+        // questions for the chosen plan, we fall back to showing the full question
+        // set for the plan so parents can update all their answers.
+        if ($child) {
+            $previousSlug = $child->assessments()->latest()->value('model_level');
+            $previousRank = PlanAccess::rank($previousSlug);
+            $newRank      = PlanAccess::rank($planSlug);
+
+            if ($previousRank > 0 && $newRank > $previousRank) {
+                // Collect only the model tiers strictly above the previous assessment.
+                $higherModels = array_values(array_filter(
+                    PlanAccess::QUESTION_MODELS,
+                    fn (int $rank) => $rank > $previousRank && $rank <= $newRank,
+                    ARRAY_FILTER_USE_KEY
+                ));
+
+                $higherQuestions = QuestionnaireQuestion::whereIn('model', $higherModels)
+                    ->orderBy('sort_order')
+                    ->get()
+                    ->groupBy('section');
+
+                // Only use the narrower set when there are actually higher-level questions.
+                if ($higherQuestions->isNotEmpty()) {
+                    $questions = $higherQuestions;
+
+                    // If the child already holds an active paid subscription that covers
+                    // this plan (or higher), do NOT initiate another payment — just save
+                    // the new answers and redirect to the meal plan.
+                    $skipPayment = \App\Models\DietSubscription::query()
+                        ->where('user_id', $request->user()->id)
+                        ->where('child_id', $child->id)
+                        ->usable()
+                        ->with('subscriptionPlan')
+                        ->get()
+                        ->contains(fn ($s) => PlanAccess::rank($s->subscriptionPlan?->slug) >= $newRank);
+
+                    return view('frontend.nutrition.questionnaire', compact('plan', 'cycle', 'questions', 'child', 'skipPayment'));
+                }
             }
-        : match ($planSlug) {
-            'plus' => ['1 Basic', '2 Plus'], 'pro' => ['1 Basic', '2 Plus', '3 Pro'], 'premium' => ['1 Basic', '2 Plus', '3 Pro', '4 Premium'], default => ['1 Basic']
-        };
+        }
 
-        // Fetch questions for these models
+        // Default: show all questions for the chosen plan (new child, same plan, or
+        // downgrade path – the last case is not expected in normal flow).
         $questions = QuestionnaireQuestion::whereIn('model', $modelsToFetch)
             ->orderBy('sort_order')
             ->get()
             ->groupBy('section');
 
-        return view('frontend.nutrition.questionnaire', compact('plan', 'cycle', 'questions', 'child'));
+        $skipPayment = false;
+
+        return view('frontend.nutrition.questionnaire', compact('plan', 'cycle', 'questions', 'child', 'skipPayment'));
     }
 
     public function showForChild(Request $request, Child $child)
     {
         $child = $request->user()->children()->findOrFail($child->id);
-        $planSlug = $child->assessments()->latest()->value('model_level');
 
-        if ($planSlug && SubscriptionPlan::where('slug', $planSlug)->exists()) {
-            $request->query->set('plan', $planSlug);
+        // Only supply a default plan slug when the caller did not provide one.
+        // If the request already carries ?plan=premium (an upgrade link), preserve it
+        // so the upgrade-filter logic in show() can compare the two ranks correctly.
+        //
+        // The default is the higher of (a) the child's highest usable paid plan and
+        // (b) the level of the child's latest assessment. A family that has paid for
+        // Plus but only answered Basic therefore lands on the Plus upgrade questions.
+        if (! $request->filled('plan') && ! $request->filled('payload')) {
+            $candidates = array_filter([
+                PlanAccess::slugForChild($child),
+                $child->assessments()->latest()->value('model_level'),
+            ]);
+            usort($candidates, fn ($a, $b) => PlanAccess::rank($b) <=> PlanAccess::rank($a));
+
+            foreach ($candidates as $planSlug) {
+                if (SubscriptionPlan::where('slug', $planSlug)->exists()) {
+                    $request->query->set('plan', $planSlug);
+                    break;
+                }
+            }
         }
 
         return $this->show($request, $child);

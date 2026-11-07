@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\AssessmentAttempt;
 use App\Models\Nutrition\Child;
 use App\Models\Nutrition\ChildAssessment;
+use App\Models\Nutrition\IcmrNutritionTarget;
 use App\Models\Nutrition\MealItemLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -127,6 +128,8 @@ class NutritionOwnershipRegressionTest extends TestCase
             'user_id' => $parent->id,
             'name' => 'Assessed child',
             'sex' => 'girl',
+            // 5 years old — falls in the ICMR 4-6 band we seed below.
+            'dob' => now()->subYears(5)->toDateString(),
         ]);
         ChildAssessment::create([
             'child_id' => $child->id,
@@ -136,11 +139,39 @@ class NutritionOwnershipRegressionTest extends TestCase
             'diet_type' => 'vegetarian',
         ]);
 
+        // Seed/update an ICMR target row that TargetEngine will pick up for a
+        // 5-year-old girl. We use updateOrCreate because the migration
+        // 2026_09_09_000001 already seeds a 4-6/all row with fat_g = 0; we must
+        // overwrite that row (not create a duplicate) so TargetEngine returns
+        // our non-zero values instead of the migrated fat_g = 0 row.
+        \App\Models\Nutrition\IcmrNutritionTarget::updateOrCreate(
+            ['age_min' => 4, 'age_max' => 6, 'sex' => 'all'],
+            [
+                'energy_kcal'  => 1360.0,
+                'protein_g'    => 16.0,
+                'fat_g'        => 25.0,   // non-zero so the view shows progress bars
+                'fiber_g'      => 20.0,
+                'calcium_mg'   => 550.0,
+                'iron_mg'      => 11.0,
+                'zinc_mg'      => 4.5,
+                'magnesium_mg' => 125.0,
+                'vitamin_a_mcg'     => 510.0,
+                'vitamin_c_mg'      => 35.0,
+                'vitamin_d_mcg'     => 15.0,
+                'thiamin_b1_mg'     => 0.9,
+                'riboflavin_b2_mg'  => 1.3,
+                'niacin_b3_mg'      => 9.0,
+                'vitamin_b6_mg'     => 1.2,
+                'folate_mcg'        => 135.0,
+                'vitamin_b12_mcg'   => 2.2,
+            ]
+        );
+
         $this->actingAs($parent)
             ->get(route('nutrition.index'))
             ->assertOk()
             ->assertViewHas('latestPlan', null)
-            ->assertViewHas('todayTarget', ['energy_kcal' => 2100, 'protein_g' => 152, 'fat_g' => 61]);
+            ->assertViewHas('todayTarget', ['energy_kcal' => 1360.0, 'protein_g' => 16.0, 'fat_g' => 25.0]);
 
         $this->get(route('nutrition.backup'))
             ->assertOk()

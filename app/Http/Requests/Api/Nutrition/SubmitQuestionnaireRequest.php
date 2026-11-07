@@ -8,12 +8,18 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 
+// NOTE: prepareForValidation coerces single-string answers into arrays for every
+// multi-answer question (identified by answer_type containing 'multi' or sort_order = 8).
+// This allows browsers that submit a single checkbox tick as a plain string to pass
+// the ['array', 'min:1'] rule without a client-side fix.
+
 class SubmitQuestionnaireRequest extends FormRequest
 {
     protected function prepareForValidation(): void
     {
         $input = $this->all();
 
+        // Step 1 – normalise legacy "q_N[]" browser keys to "q_N".
         foreach (array_keys($input) as $key) {
             if (! preg_match('/^q_([1-9]\d*)\[\]$/', (string) $key, $matches)) {
                 continue;
@@ -25,6 +31,33 @@ class SubmitQuestionnaireRequest extends FormRequest
             if (! array_key_exists($normalizedKey, $input)) {
                 $input[$normalizedKey] = $input[$key];
                 unset($input[$key]);
+            }
+        }
+
+        // Step 2 – for every question whose answer_type contains 'multi' (case-insensitive)
+        // or whose sort_order is 8 (the Allergies question), a plain string posted from a
+        // browser that ticked exactly one checkbox must become a single-element array so the
+        // ['array', 'min:1'] rule does not reject it.  An empty string collapses to [].
+        $questionIds = collect(array_keys($input))
+            ->map(fn ($k) => preg_match('/^q_([1-9]\d*)$/', (string) $k, $m) ? (int) $m[1] : null)
+            ->filter()
+            ->values()
+            ->all();
+
+        if ($questionIds !== []) {
+            $multiIds = QuestionnaireQuestion::whereIn('id', $questionIds)
+                ->where(function ($query): void {
+                    $query->whereRaw('LOWER(answer_type) LIKE ?', ['%multi%'])
+                        ->orWhere('sort_order', 8);
+                })
+                ->pluck('id')
+                ->all();
+
+            foreach ($multiIds as $id) {
+                $key = 'q_'.$id;
+                if (array_key_exists($key, $input) && is_string($input[$key])) {
+                    $input[$key] = $input[$key] === '' ? [] : [$input[$key]];
+                }
             }
         }
 
@@ -71,22 +104,49 @@ class SubmitQuestionnaireRequest extends FormRequest
                 $options = preg_split('/\s+\/\s+/', (string) $question->options_scale, -1, PREG_SPLIT_NO_EMPTY) ?: [];
                 $options = array_values(array_filter(array_map('trim', $options), fn ($option) => $option !== '—'));
 
-                if ($question->is_optional
-                    || str_contains($label, 'height')
-                    || str_contains($label, 'weight')
-                    || (str_contains(strtolower((string) $question->only_ask_if), 'vegan') && $isVegan)) {
-                    if (str_contains($label, 'height')) {
-                        $rules[$key] = ['nullable', function (string $attribute, mixed $value, \Closure $fail): void {
-                            if ($value !== null && $value !== '' && ((! is_string($value) && ! is_numeric($value))
-                                || strlen((string) $value) > 80
-                                || app(\App\Services\Nutrition\ChildProfileService::class)->heightInCentimeters($value) === null)) {
-                                $fail('Enter height in cm or ft/in.');
-                            }
-                        }];
-                    } elseif (str_contains($label, 'weight')) {
-                        $rules[$key] = ['nullable', 'numeric', 'min:0', 'max:300'];
-                    }
+                // Height (sort_order 5, "Current height") and weight (sort_order 4,
+                // "Current weight") are "always asked" questions that use custom
+                // widgets on the front-end.  They are REQUIRED when the question is
+                // marked always-asked (is_optional = false, matching the real seeder)
+                // and nullable when explicitly optional (is_optional = true).  The
+                // previous code special-cased them as always-nullable, which is why a
+                // missing height silently passed validation and was never saved.
+                //
+                // Sanity limits (stated here in code):
+                //  - Height: parsed via ChildProfileService::heightInCentimeters();
+                //    must resolve to 30–250 cm (covers newborns ~46 cm through the
+                //    tallest adults ~251 cm).
+                //  - Weight: numeric, 0.5–300 kg (covers infants through extreme
+                //    obesity; 0 is not a positive number).
+                if (str_contains($label, 'height')) {
+                    $presence = $question->is_optional ? 'nullable' : 'required';
+                    $rules[$key] = [$presence, function (string $attribute, mixed $value, \Closure $fail): void {
+                        // 'required'/'nullable' already handle presence — only validate
+                        // format and range when a value is actually present.
+                        if ($value === null || $value === '') {
+                            return;
+                        }
+                        if ((! is_string($value) && ! is_numeric($value)) || strlen((string) $value) > 80) {
+                            $fail('Enter height in cm or ft/in.');
+                            return;
+                        }
+                        $cm = app(\App\Services\Nutrition\ChildProfileService::class)->heightInCentimeters($value);
+                        if ($cm === null) {
+                            $fail('Enter height in cm or ft/in.');
+                        } elseif ($cm < 30 || $cm > 250) {
+                            $fail('Height must be between 30 and 250 cm.');
+                        }
+                    }];
+                    continue;
+                }
+                if (str_contains($label, 'weight')) {
+                    $presence = $question->is_optional ? 'nullable' : 'required';
+                    $rules[$key] = [$presence, 'numeric', 'min:0.5', 'max:300'];
+                    continue;
+                }
 
+                if ($question->is_optional
+                    || (str_contains(strtolower((string) $question->only_ask_if), 'vegan') && $isVegan)) {
                     continue;
                 }
 

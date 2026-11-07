@@ -16,6 +16,7 @@ class DietPlanMeal extends Model
         'timing',
         'focus',
         'sort_order',
+        'day_index',
     ];
 
     /**

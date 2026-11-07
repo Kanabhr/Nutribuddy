@@ -48,27 +48,34 @@
 
                                             @if ($isHeight)
                                                 <div class="home-diet-measurement-help">Choose a height or enter it manually.</div>
-                                                <div class="home-diet-height-row" data-home-height-control="{{ $question->id }}">
-                                                    <select class="home-diet-cycle" aria-label="Height" data-home-height-select>
-                                                        <option value="">Select height</option>
-                                                    </select>
-                                                    <select class="home-diet-cycle" aria-label="Height unit" data-home-height-unit>
-                                                        <option value="ft">ft / in</option>
-                                                        <option value="cm">cm</option>
-                                                    </select>
-                                                </div>
-                                                <div class="home-diet-height-custom" data-home-height-custom hidden>
-                                                    <div data-home-height-custom-cm>
-                                                        <input type="number" min="30" max="250" step="1" placeholder="e.g. 173" aria-label="Height in centimeters" data-home-height-cm>
+                                                {{-- The data-home-height-control wrapper MUST contain the select row,
+                                                    the custom-entry block, the hidden answer input and the suggestion
+                                                    paragraph. home-diet-questionnaire.js scopes every element lookup to
+                                                    this control via control.querySelector(...), so all of these elements
+                                                    must be descendants of it. --}}
+                                                <div data-home-height-control="{{ $question->id }}">
+                                                    <div class="home-diet-height-row">
+                                                        <select class="home-diet-cycle" aria-label="Height" data-home-height-select>
+                                                            <option value="">Select height</option>
+                                                        </select>
+                                                        <select class="home-diet-cycle" aria-label="Height unit" data-home-height-unit>
+                                                            <option value="ft">ft / in</option>
+                                                            <option value="cm">cm</option>
+                                                        </select>
                                                     </div>
-                                                    <div class="home-diet-height-ftin" data-home-height-custom-ftin hidden>
-                                                        <label>Feet<input type="number" min="0" max="8" step="1" placeholder="5" data-home-height-ft></label>
-                                                        <label>Inches<input type="number" min="0" max="11" step="1" placeholder="7" data-home-height-in></label>
+                                                    <div class="home-diet-height-custom" data-home-height-custom hidden>
+                                                        <div data-home-height-custom-cm>
+                                                            <input type="number" min="30" max="250" step="1" placeholder="e.g. 173" aria-label="Height in centimeters" data-home-height-cm>
+                                                        </div>
+                                                        <div class="home-diet-height-ftin" data-home-height-custom-ftin hidden>
+                                                            <label>Feet<input type="number" min="0" max="8" step="1" placeholder="5" data-home-height-ft></label>
+                                                            <label>Inches<input type="number" min="0" max="11" step="1" placeholder="7" data-home-height-in></label>
+                                                        </div>
+                                                        <button type="button" class="home-diet-height-apply" data-home-height-apply>Apply</button>
                                                     </div>
-                                                    <button type="button" class="home-diet-height-apply" data-home-height-apply>Apply</button>
+                                                    <input type="hidden" name="q_{{ $question->id }}" data-home-height-answer>
+                                                    <p class="home-diet-height-suggestion" data-home-height-suggestion hidden></p>
                                                 </div>
-                                                <input type="hidden" name="q_{{ $question->id }}" data-home-height-answer>
-                                                <p class="home-diet-height-suggestion" data-home-height-suggestion hidden></p>
                                             @elseif ($isWeight)
                                                 <div class="home-diet-measurement-help">Enter weight in kilograms.</div>
                                                 <div class="home-diet-weight-wrap">
