@@ -103,11 +103,22 @@ class QuestionnaireController extends Controller
         // Only supply a default plan slug when the caller did not provide one.
         // If the request already carries ?plan=premium (an upgrade link), preserve it
         // so the upgrade-filter logic in show() can compare the two ranks correctly.
+        //
+        // The default is the higher of (a) the child's highest usable paid plan and
+        // (b) the level of the child's latest assessment. A family that has paid for
+        // Plus but only answered Basic therefore lands on the Plus upgrade questions.
         if (! $request->filled('plan') && ! $request->filled('payload')) {
-            $planSlug = $child->assessments()->latest()->value('model_level');
+            $candidates = array_filter([
+                PlanAccess::slugForChild($child),
+                $child->assessments()->latest()->value('model_level'),
+            ]);
+            usort($candidates, fn ($a, $b) => PlanAccess::rank($b) <=> PlanAccess::rank($a));
 
-            if ($planSlug && SubscriptionPlan::where('slug', $planSlug)->exists()) {
-                $request->query->set('plan', $planSlug);
+            foreach ($candidates as $planSlug) {
+                if (SubscriptionPlan::where('slug', $planSlug)->exists()) {
+                    $request->query->set('plan', $planSlug);
+                    break;
+                }
             }
         }
 
