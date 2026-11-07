@@ -55,9 +55,28 @@ class RuleBasedDietPlanEngine
             throw new RuntimeException('No ICMR nutrition target is configured for this child.');
         }
 
-        $foods = $this->filters->getEligibleFoods($assessment);
-        if ($foods->isEmpty()) {
+        // Build the eligible food pool.
+        //
+        // Two pools are maintained:
+        //   $safePool  – diet + allergy safe only (no dislike filter).
+        //                Used as a per-slot fallback when dislikes would empty a slot.
+        //   $foods     – $safePool with soft dislike exclusion applied
+        //                (+ ICMR food-group protection built into getEligibleFoods).
+        //
+        // Dislikes come from answer 18 (sort_order 18), already parsed by
+        // ChildProfileService::normalize() into $profile['disliked_foods'].
+        $dislikedFoods = $profile['disliked_foods'] ?? [];
+
+        $safePool = $this->filters->getEligibleFoods($assessment);   // no dislikes
+        if ($safePool->isEmpty()) {
             throw new RuntimeException('No foods meet this child\'s safety and dietary restrictions.');
+        }
+
+        $foods = $this->filters->getEligibleFoods($assessment, $dislikedFoods); // with dislikes
+        if ($foods->isEmpty()) {
+            // Entire safe pool was wiped by group-protection failure (shouldn't happen,
+            // but guard defensively).
+            $foods = $safePool;
         }
 
         // Resolve plan length from the child's active subscription.
@@ -66,8 +85,9 @@ class RuleBasedDietPlanEngine
         $N     = PlanAccess::planDays($slug, $start);
 
         // Cache each food's nutrients once so the accessor is not rebuilt per call.
+        // Covers both safePool and filtered foods (same underlying records).
         $nutrientCache = [];
-        foreach ($foods as $food) {
+        foreach ($safePool as $food) {
             $nutrientCache[$food->id] = $food->nutrients;
         }
 
@@ -89,7 +109,14 @@ class RuleBasedDietPlanEngine
         $history  = [];
         $allUses  = [];
         $schedule = [];
-        $debug    = ['profile' => $profile, 'eligible_food_count' => $foods->count(), 'meals' => []];
+        $debug    = [
+            'profile'              => $profile,
+            'eligible_food_count'  => $foods->count(),
+            'safe_pool_count'      => $safePool->count(),
+            'disliked_foods'       => $dislikedFoods,
+            'favourite_foods'      => $profile['favourite_foods'] ?? [],
+            'meals'                => [],
+        ];
 
         for ($dayIndex = 0; $dayIndex < $N; $dayIndex++) {
             $date        = $start->copy()->addDays($dayIndex);
@@ -98,7 +125,16 @@ class RuleBasedDietPlanEngine
             $dailyTotals = array_fill_keys(array_keys($targetValues), 0.0);
 
             foreach ($this->slots($profile['meal_pattern']) as $slot) {
+                // Build the slot-level candidate pool.
+                //
+                // Primary: foods from the dislike-filtered (and group-protected) pool.
+                // Fallback: if dislikes would leave a slot empty, use the full safe pool
+                //           for that slot — a dislike must never cancel an entire slot.
                 $candidates = $this->filters->forSlot($foods, $slot);
+                if ($candidates->isEmpty()) {
+                    // Per-slot fallback: use the safety-only pool for this slot.
+                    $candidates = $this->filters->forSlot($safePool, $slot);
+                }
                 if ($candidates->isEmpty()) {
                     throw new RuntimeException("No safe food is configured for {$slot}.");
                 }
@@ -169,7 +205,7 @@ class RuleBasedDietPlanEngine
             $schedule[$dayIndex]['_weekday']         = $weekdayName;
         }
 
-        $this->validate($schedule, $foods, $profile);
+        $this->validate($schedule, $safePool, $profile);
 
         $dailyNutrition = collect($schedule)->mapWithKeys(
             fn ($meals, $idx) => [$idx => $meals['_daily_nutrition']]
@@ -545,6 +581,28 @@ class RuleBasedDietPlanEngine
             }
             if (($profile['dairy_glasses'] ?? 0) >= 2 && $this->flag($food, 'contains_dairy')) {
                 $score -= 4;
+            }
+
+            // Favourite-food boost (answer 17).
+            // A small +3 boost per matching term (max +6 total) nudges favourites
+            // up the ranking without guaranteeing them every day.
+            // The variety/repetition penalties still apply, so a favourite cannot
+            // dominate every slot over a multi-week plan.
+            $favourites = $profile['favourite_foods'] ?? [];
+            if ($favourites !== []) {
+                $name  = strtolower((string) $food->dish_name);
+                $group = strtolower((string) ($food->food_group ?? ''));
+                $boost = 0;
+                foreach ($favourites as $term) {
+                    $term = strtolower(trim((string) $term));
+                    if ($term !== '' && (FoodFilterPipeline::wordMatches($term, $name) || FoodFilterPipeline::wordMatches($term, $group))) {
+                        $boost += 3;
+                    }
+                }
+                if ($boost > 0) {
+                    $score   += min(6, $boost);
+                    $reasons[] = 'favourite_boost';
+                }
             }
 
             // Repeat-gap penalty: the food's own repeat_gap_days (default 3).

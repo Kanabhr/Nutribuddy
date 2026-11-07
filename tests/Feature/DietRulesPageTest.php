@@ -30,7 +30,7 @@ class DietRulesPageTest extends TestCase
             ->assertSee('Diet and allergy safety')
             ->assertSee('How foods are ranked')
             ->assertSee('Flags and approval gate')
-            ->assertSee('active generator currently calls it without the child’s dislikes')
+            ->assertSee('generator now reads questionnaire answer 18 and excludes disliked foods')
             ->assertSee('has no lactose-specific exclusion')
             ->assertSee('an unset allergen flag is not treated as a match');
     }
