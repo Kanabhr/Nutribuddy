@@ -92,40 +92,6 @@
                 </table>
             </div>
 
-            <!-- MOBILE CARDS VIEW -->
-            <div class="mobile-orders">
-                @forelse($orders as $order)
-                    <div class="m-order-card">
-                        <div class="m-card-top">
-                            <div>
-                                <div class="m-id">
-                                    <a href="{{ route('user.orders.invoice-page', $order) }}" style="color: var(--pk); text-decoration: none;">
-                                        {{ $order->invoice_number ?: ('INV-' . $order->order_number) }}
-                                    </a>
-                                </div>
-                                <div class="m-date">{{ optional($order->placed_at)->format('d/m/Y') ?? $order->created_at->format('d/m/Y') }} · #{{ $order->order_number }}</div>
-                            </div>
-                            <span class="status-badge {{ $order->payment_status === 'paid' ? 's-delivered' : 's-pending' }}">
-                                {{ strtoupper($order->payment_status) }}
-                            </span>
-                        </div>
-                        <div class="m-card-mid">
-                            <div class="m-amount">₹{{ number_format($order->grand_total, 2) }}</div>
-                        </div>
-                        <div class="m-card-actions">
-                            <a href="{{ route('user.orders.invoice-page', $order) }}" class="act-btn act-view" style="padding: 6px 12px; font-size: 0.75rem;">View</a>
-                            <a href="{{ route('user.orders.invoice-download', $order) }}" class="act-btn act-review" style="padding: 6px 12px; font-size: 0.75rem; background: var(--pul); color: var(--pu);">PDF</a>
-                        </div>
-                    </div>
-                @empty
-                    <div style="text-align: center; padding: 60px 20px; width: 100%;">
-                        <div style="font-size: 3rem; margin-bottom: 15px;">📑</div>
-                        <h3 style="color: var(--dk);">No Invoices Yet</h3>
-                        <p style="color: var(--muted);">Once you place an order, your official invoices will appear here.</p>
-                    </div>
-                @endforelse
-            </div>
-
             <!-- MOBILE CARDS -->
             <div class="mobile-orders">
                 @forelse($orders as $order)
