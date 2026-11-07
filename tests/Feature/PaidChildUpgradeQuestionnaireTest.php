@@ -449,4 +449,101 @@ class PaidChildUpgradeQuestionnaireTest extends TestCase
         $viewData = $response->viewData('skipPayment');
         $this->assertFalse((bool) $viewData, 'skipPayment must be false for a new child with no subscription.');
     }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // C8-FIX-3: carried-over profile columns on upgrade submissions
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Create a child with a Basic assessment that has height/weight answer rows
+     * and the corresponding profile columns set, so the carry-forward merge in
+     * QuestionnaireSubmissionService has real data to work with on an upgrade.
+     */
+    private function makeChildWithBasicHeightWeight(): array
+    {
+        [$user, $child] = $this->makeUserWithChildAndBasicAssessment();
+
+        $weightQ = QuestionnaireQuestion::create([
+            'model' => '1 Basic', 'section' => 'A', 'question' => 'Current weight',
+            'answer_type' => 'Number (kg)', 'sort_order' => 4, 'is_optional' => false,
+        ]);
+        $heightQ = QuestionnaireQuestion::create([
+            'model' => '1 Basic', 'section' => 'A', 'question' => 'Current height',
+            'answer_type' => 'Number (cm)', 'sort_order' => 5, 'is_optional' => false,
+        ]);
+
+        $basicAssessment = $child->assessments()->latest()->first();
+        $basicAssessment->update([
+            'current_height_cm' => 112.0,
+            'current_weight_kg' => 28.0,
+        ]);
+        QuestionnaireAnswer::create([
+            'child_assessment_id' => $basicAssessment->id,
+            'question_id' => $heightQ->id,
+            'answer_value' => '3ft 8in (112cm)',
+        ]);
+        QuestionnaireAnswer::create([
+            'child_assessment_id' => $basicAssessment->id,
+            'question_id' => $weightQ->id,
+            'answer_value' => '28',
+        ]);
+
+        return [$user, $child, $heightQ, $weightQ];
+    }
+
+    /**
+     * An upgrade submission that sends only the new plan's answers must still
+     * produce an assessment whose current_height_cm and current_weight_kg equal
+     * the earlier Basic values — the columns are derived from the merged answers
+     * (new + carried-over), not just the new submission.
+     */
+    public function test_upgrade_preserves_carried_over_height_and_weight_columns(): void
+    {
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+
+        [$user, $child] = $this->makeChildWithBasicHeightWeight();
+        $plusQuestion = $this->seedPlusQuestions();
+
+        // Submit the upgrade — only the new plan's answer (no height/weight sent).
+        $response = $this->actingAs($user)
+            ->postJson(route('api.nutrition.questionnaire.submit'), [
+                'plan_slug' => 'plus',
+                'child_id' => $child->id,
+                'q_' . $plusQuestion->id => 'active',
+            ]);
+
+        $response->assertOk()->assertJsonPath('success', true);
+
+        $newAssessment = $child->fresh()->assessments()->orderByDesc('id')->first();
+        $this->assertSame('plus', $newAssessment->model_level);
+        $this->assertSame(112.0, (float) $newAssessment->current_height_cm, 'carried-over height column must equal the earlier value');
+        $this->assertSame(28.0, (float) $newAssessment->current_weight_kg, 'carried-over weight column must equal the earlier value');
+    }
+
+    /**
+     * An upgrade that sends a new height value must override the carried-over
+     * one — new answers take priority over carried-over answers in the merge.
+     */
+    public function test_upgrade_with_new_height_overrides_carried_over_height(): void
+    {
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+
+        [$user, $child, $heightQ] = $this->makeChildWithBasicHeightWeight();
+        $plusQuestion = $this->seedPlusQuestions();
+
+        // Submit the upgrade WITH a new height value (q_<heightQ->id> = '130 cm').
+        $response = $this->actingAs($user)
+            ->postJson(route('api.nutrition.questionnaire.submit'), [
+                'plan_slug' => 'plus',
+                'child_id' => $child->id,
+                'q_' . $plusQuestion->id => 'active',
+                'q_' . $heightQ->id => '130 cm',
+            ]);
+
+        $response->assertOk()->assertJsonPath('success', true);
+
+        $newAssessment = $child->fresh()->assessments()->orderByDesc('id')->first();
+        $this->assertSame(130.0, (float) $newAssessment->current_height_cm, 'new height must override the carried-over value');
+        $this->assertSame(28.0, (float) $newAssessment->current_weight_kg, 'weight must still come from the carried-over value');
+    }
 }

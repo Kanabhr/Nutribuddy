@@ -49,6 +49,29 @@ class QuestionnaireSubmissionService
             ]);
 
             $previousAssessment = $child->assessments()->with('answers')->latest()->first();
+
+            // Merge carried-over answers into $answersByOrder so every profile
+            // column derived from answers (height, weight, diet_type, allergies,
+            // region, activity_level, main_goal, budget, picky_level) is set on
+            // the new assessment from the complete picture — new answers take
+            // priority, and any sort-order not covered by the new submission is
+            // filled from the previous assessment.  Without this, an upgrade
+            // submission that only sends the new plan's answers leaves height
+            // (and every other column from a Basic answer) as NULL even though
+            // the carried-over answer row exists in questionnaire_answers.
+            if ($previousAssessment && $previousAssessment->answers->isNotEmpty()) {
+                $prevQuestionIds = $previousAssessment->answers->pluck('question_id')->all();
+                $prevSortOrders = QuestionnaireQuestion::query()
+                    ->whereIn('id', $prevQuestionIds)
+                    ->pluck('sort_order', 'id');
+                foreach ($previousAssessment->answers as $prevAnswer) {
+                    $order = $prevSortOrders[$prevAnswer->question_id] ?? $prevAnswer->question_id;
+                    if (! $answersByOrder->has($order)) {
+                        $answersByOrder[$order] = $prevAnswer->answer_value;
+                    }
+                }
+            }
+
             $assessment = ChildAssessment::create([
                 'child_id' => $child->id,
                 'model_level' => $validated['plan_slug'] ?? 'basic',
