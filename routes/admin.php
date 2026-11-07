@@ -165,6 +165,8 @@ Route::prefix('admin/ecommerce')->name('admin.ecommerce.')->middleware('auth:adm
 
     // -- Customers & Support --
     Route::middleware('permission:view customers|manage customers,admin')->group(function () {
+        // IMPORTANT: This route must come BEFORE the resource route
+        Route::get('customers/cities', [\App\Http\Controllers\Admin\CRM\CustomerController::class, 'getCities'])->name('customers.cities');
         Route::resource('customers', \App\Http\Controllers\Admin\CRM\CustomerController::class)->only(['index', 'show']);
         Route::resource('support-tickets', AdminSupportTicketController::class)->only(['index', 'show']);
     });

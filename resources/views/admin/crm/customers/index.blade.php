@@ -14,17 +14,46 @@
             <h5 class="card-title mb-0">Customer List</h5>
         </div>
         <div class="card-body">
-            <!-- Filter Form -->
             <form method="GET" action="{{ route('admin.ecommerce.customers.index') }}" class="row g-3 mb-4">
                 <div class="col-md-3">
-                    <input type="text" name="city" class="form-control" placeholder="Filter by City" value="{{ request('city') }}">
+                    <label class="form-label">Filter by State</label>
+                    <select name="state" class="form-control" onchange="updateCitiesDropdown(this.value)">
+                        <option value="">All States</option>
+                        @php
+                            $stateCityService = app(\App\Services\Checkout\StateCityService::class);
+                            $states = $stateCityService->checkoutStates();
+                        @endphp
+                        @foreach($states as $state)
+                            <option value="{{ $state['code'] }}" {{ request('state') === $state['code'] ? 'selected' : '' }}>
+                                {{ $state['name'] }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
                 <div class="col-md-3">
-                    <input type="text" name="state" class="form-control" placeholder="Filter by State" value="{{ request('state') }}">
+                    <label class="form-label">Filter by District</label>
+                    <select name="city" class="form-control" id="cityFilter">
+                        <option value="">All Districts</option>
+                        @php
+                            $selectedState = request('state');
+                            $cities = [];
+                            
+                            if ($selectedState) {
+                                $cities = $stateCityService->checkoutCitiesForState($selectedState) ?? [];
+                            }
+                        @endphp
+                        @foreach($cities as $city)
+                            <option value="{{ $city }}" {{ request('city') === $city ? 'selected' : '' }}>
+                                {{ $city }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
                 <div class="col-md-4">
-                    <button type="submit" class="btn btn-primary-600">Filter</button>
-                    <a href="{{ route('admin.ecommerce.customers.index') }}" class="btn btn-outline-secondary">Reset</a>
+                    <div style="margin-top: 32px;">
+                        <button type="submit" class="btn btn-primary-600">🔍 Filter</button>
+                        <a href="{{ route('admin.ecommerce.customers.index') }}" class="btn btn-outline-secondary">↻ Reset</a>
+                    </div>
                 </div>
             </form>
             
@@ -206,5 +235,34 @@
                 });
             }
         });
+
+        // Update districts dropdown when state changes
+        function updateCitiesDropdown(selectedState) {
+            const districtFilter = document.getElementById('cityFilter');
+            
+            // Get all available districts for the selected state
+            fetch(`/admin/ecommerce/customers/cities?state=${encodeURIComponent(selectedState)}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                districtFilter.innerHTML = '<option value="">All Districts</option>';
+                if (data.cities && data.cities.length > 0) {
+                    data.cities.forEach(district => {
+                        const option = document.createElement('option');
+                        option.value = district;
+                        option.textContent = district;
+                        districtFilter.appendChild(option);
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching districts:', error);
+            });
+        }
     </script>
 @endsection

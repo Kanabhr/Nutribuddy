@@ -5,16 +5,6 @@
 @section('panel-content')
 
 {{-- ══ MOBILE TOPBAR ══ --}}
-<div class="inner-topbar" id="innerTopbar">
-    <button class="sidebar-toggle" onclick="toggleSidebar()">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="3" y1="18" x2="21" y2="18" />
-        </svg>
-    </button>
-    <span class="it-title">Growth Signals</span>
-    <div style="width:36px"></div>
 </div>
 
 {{-- ══ PAGE ══ --}}
@@ -208,20 +198,6 @@
 @push('scripts')
 <script>
 /* ── Sidebar toggle ── */
-function toggleSidebar() {
-    document.getElementById('sidebar').classList.toggle('open');
-    document.getElementById('overlay').classList.toggle('show');
-}
-function closeSidebar() {
-    document.getElementById('sidebar').classList.remove('open');
-    document.getElementById('overlay').classList.remove('show');
-}
-function setActive(el) {
-    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-    el.classList.add('active');
-    if (window.innerWidth <= 900) closeSidebar();
-}
-
 /* ── Quarterly check-in CTA ── */
 function handleGsCheckin() {
     const btns = document.querySelectorAll('.gs-checkin-btn, .gs-update-btn');

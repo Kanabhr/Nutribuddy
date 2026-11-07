@@ -120,6 +120,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/user/orders/{order}/invoice-download', [UserInvoiceController::class, 'download'])->name('user.orders.invoice-download');
     Route::patch('/user/orders/{order}/cancel', [UserOrderController::class, 'cancel'])->name('user.orders.cancel');
     Route::post('/user/orders/{order}/returns', [UserReturnController::class, 'store'])->name('user.orders.returns.store');
+    Route::patch('/user/orders/returns/{orderReturn}/status', [UserReturnController::class, 'updateStatus'])->name('user.orders.returns.updateStatus');
     Route::post('/support-tickets', [UserSupportTicketController::class, 'store'])->name('user.support-tickets.store');
     Route::post('/support-tickets/{ticket}/reply', [UserSupportTicketController::class, 'reply'])->name('user.support-tickets.reply');
     Route::post('/product/{product}/reviews', [ProductReviewController::class, 'store'])->name('reviews.store');

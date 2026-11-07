@@ -2,17 +2,6 @@
 @section('title', 'My Returns — NutriBuddy Kids')
 @section('panel-page-class', 'panel-returns')
 @section('panel-content')
-    <div class="inner-topbar">
-        <button class="sidebar-toggle" onclick="toggleSidebar()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
-        </button>
-        <span class="it-title">Return History ↩️</span>
-        <div style="width:36px"></div>
-    </div>
 
     <div class="page">
         @if(session('success'))
@@ -34,9 +23,35 @@
                         <div>
                             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
                                 <span style="font-family: 'Fredoka One', cursive; font-size: 1.3rem; color: var(--dk);">#{{ $return->return_number }}</span>
-                                <span class="status-badge {{ $return->status === 'completed' ? 's-delivered' : ($return->status === 'rejected' ? 's-cancelled' : 's-pending') }}" style="font-size: 0.75rem; padding: 6px 14px; border-radius: 50px; font-weight: 800; letter-spacing: 0.5px;">
-                                    {{ strtoupper($return->status) }}
-                                </span>
+                                <!-- Status Dropdown -->
+                                <div style="position: relative; display: inline-block;">
+                                    <button type="button" onclick="toggleStatusDropdown(this)" 
+                                        class="status-badge {{ $return->status === 'completed' ? 's-delivered' : ($return->status === 'rejected' ? 's-cancelled' : 's-pending') }}" 
+                                        style="font-size: 0.75rem; padding: 6px 14px; border-radius: 50px; font-weight: 800; letter-spacing: 0.5px; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; background: inherit; color: inherit;">
+                                        {{ strtoupper($return->status) }}
+                                        <span style="font-size: 0.6rem;">▼</span>
+                                    </button>
+                                    <div class="status-dropdown" style="display: none; position: absolute; top: 100%; right: 0; background: white; border: 1.5px solid var(--border); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); min-width: 200px; z-index: 1000; margin-top: 8px;">
+                                        <div style="padding: 12px 0;">
+                                            <div class="status-option" data-status="pending" style="padding: 12px 20px; cursor: pointer; transition: all 0.2s; {{ $return->status === 'pending' ? 'background: var(--pkl); color: var(--pk);' : 'color: #555;' }}" onmouseover="this.style.background='var(--cr)'" onmouseout="this.style.background='{{ $return->status === 'pending' ? 'var(--pkl)' : 'transparent' }}'">
+                                                📅 Pending
+                                                <span style="display: block; font-size: 0.7rem; color: #999; margin-top: 2px;">Waiting for approval</span>
+                                            </div>
+                                            <div class="status-option" data-status="approved" style="padding: 12px 20px; cursor: pointer; transition: all 0.2s; {{ $return->status === 'approved' ? 'background: var(--mnl); color: var(--mn);' : 'color: #555;' }}" onmouseover="this.style.background='var(--cr)'" onmouseout="this.style.background='{{ $return->status === 'approved' ? 'var(--mnl)' : 'transparent' }}'">
+                                                ✅ Approved
+                                                <span style="display: block; font-size: 0.7rem; color: #999; margin-top: 2px;">Return approved & in progress</span>
+                                            </div>
+                                            <div class="status-option" data-status="rejected" style="padding: 12px 20px; cursor: pointer; transition: all 0.2s; {{ $return->status === 'rejected' ? 'background: #ffebee; color: #e11d48;' : 'color: #555;' }}" onmouseover="this.style.background='var(--cr)'" onmouseout="this.style.background='{{ $return->status === 'rejected' ? '#ffebee' : 'transparent' }}'">
+                                                ❌ Rejected
+                                                <span style="display: block; font-size: 0.7rem; color: #999; margin-top: 2px;">Return request rejected</span>
+                                            </div>
+                                            <div class="status-option" data-status="completed" style="padding: 12px 20px; cursor: pointer; transition: all 0.2s; {{ $return->status === 'completed' ? 'background: var(--mnl); color: var(--mn);' : 'color: #555;' }}" onmouseover="this.style.background='var(--cr)'" onmouseout="this.style.background='{{ $return->status === 'completed' ? 'var(--mnl)' : 'transparent' }}'">
+                                                💳 Refund Processed
+                                                <span style="display: block; font-size: 0.7rem; color: #999; margin-top: 2px;">Completed & refund sent</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 6px;">
                                 <p style="margin: 0; color: #555; font-size: 0.95rem; font-weight: 600;">
@@ -56,6 +71,63 @@
                     </div>
 
                     <div style="background: #fdfdfd; border-radius: 18px; padding: 20px; margin-bottom: 20px; border: 1.5px solid var(--border); position: relative;">
+                        <!-- Return Status Timeline with Dropdown -->
+                        <div style="margin-bottom: 20px;">
+                            <strong style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #aaa; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 0.5px;">
+                                <span>📍</span> Return Progress
+                            </strong>
+                            <div style="background: white; border: 1.5px solid var(--border); border-radius: 14px; padding: 20px; position: relative;">
+                                <!-- Dropdown Select -->
+                                <div style="margin-bottom: 20px;">
+                                    <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #666; margin-bottom: 10px;">Current Status:</label>
+                                    <select id="returnStatusSelect-{{ $return->id }}" style="width: 100%; padding: 12px 16px; border: 2px solid var(--border); border-radius: 10px; font-size: 1rem; font-weight: 700; color: var(--dk); background: white; cursor: pointer; transition: all 0.2s;" onchange="updateReturnStatus({{ $return->id }}, this.value)">
+                                        <option value="pending" {{ $return->status === 'pending' ? 'selected' : '' }}>📅 Pickup Scheduled</option>
+                                        <option value="approved" {{ $return->status === 'approved' ? 'selected' : '' }}>✅ Pickup Done</option>
+                                        <option value="in_transit" {{ $return->status === 'in_transit' ? 'selected' : '' }}>🚚 In Transit</option>
+                                        <option value="received" {{ $return->status === 'received' ? 'selected' : '' }}>📦 Product Received</option>
+                                        <option value="completed" {{ $return->status === 'completed' ? 'selected' : '' }}>💳 Refund Processed</option>
+                                    </select>
+                                </div>
+
+                                <!-- Visual Timeline -->
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+                                    @php
+                                        $stages = [
+                                            'pending' => ['name' => 'Pickup Scheduled', 'icon' => '📅', 'color' => '#fff3cd'],
+                                            'approved' => ['name' => 'Pickup Done', 'icon' => '✅', 'color' => '#d1e7dd'],
+                                            'in_transit' => ['name' => 'In Transit', 'icon' => '🚚', 'color' => '#cfe2ff'],
+                                            'received' => ['name' => 'Product Received', 'icon' => '📦', 'color' => '#e2e3e5'],
+                                            'completed' => ['name' => 'Refund Processed', 'icon' => '💳', 'color' => '#d1e7dd'],
+                                        ];
+                                        $stageOrder = ['pending', 'approved', 'in_transit', 'received', 'completed'];
+                                        $currentIndex = array_search($return->status, $stageOrder);
+                                    @endphp
+                                    
+                                    @foreach($stageOrder as $index => $stage)
+                                        @php
+                                            $stageInfo = $stages[$stage];
+                                            $isCompleted = $index <= $currentIndex;
+                                            $isCurrent = $index === $currentIndex;
+                                        @endphp
+                                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; position: relative;">
+                                            <!-- Stage Circle -->
+                                            <div style="width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; background: {{ $isCompleted ? $stageInfo['color'] : '#f0f0f0' }}; border: 2.5px solid {{ $isCompleted ? ($isCurrent ? 'var(--pk)' : 'var(--mn)') : '#ddd' }}; margin-bottom: 10px; box-shadow: {{ $isCurrent ? '0 0 15px rgba(255, 77, 143, 0.3)' : 'none' }}; transition: all 0.3s; cursor: pointer;" onclick="document.getElementById('returnStatusSelect-{{ $return->id }}').value = '{{ $stage }}'; updateReturnStatus({{ $return->id }}, '{{ $stage }}');" title="Click to set status">
+                                                {{ $stageInfo['icon'] }}
+                                            </div>
+                                            <!-- Stage Label -->
+                                            <span style="font-size: 0.75rem; font-weight: {{ $isCompleted ? '800' : '600' }}; color: {{ $isCompleted ? 'var(--dk)' : '#999' }}; text-align: center; max-width: 90px; line-height: 1.3;">
+                                                {{ $stageInfo['name'] }}
+                                            </span>
+                                            <!-- Connector Line -->
+                                            @if($index < count($stageOrder) - 1)
+                                                <div style="position: absolute; top: 25px; left: 60%; width: 40%; height: 3px; background: {{ $index < $currentIndex ? 'var(--mn)' : '#ddd' }}; z-index: -1;"></div>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+
                         <div style="margin-bottom: 15px;">
                             <strong style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #aaa; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">
                                 <span>💬</span> Reason & Comments
@@ -117,3 +189,61 @@
         </div>
     </div>
 @endsection
+
+<script>
+    function toggleStatusDropdown(button) {
+        const dropdown = button.nextElementSibling;
+        const isOpen = dropdown.style.display !== 'none';
+        
+        // Close all dropdowns first
+        document.querySelectorAll('.status-dropdown').forEach(d => {
+            d.style.display = 'none';
+        });
+        
+        // Toggle current dropdown
+        if (!isOpen) {
+            dropdown.style.display = 'block';
+        }
+    }
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(event) {
+        if (!event.target.closest('.status-dropdown') && !event.target.closest('.status-badge')) {
+            document.querySelectorAll('.status-dropdown').forEach(d => {
+                d.style.display = 'none';
+            });
+        }
+    });
+
+    // Update return status
+    function updateReturnStatus(returnId, newStatus) {
+        // Show loading
+        nbToast('Updating return status...', 'info');
+        
+        // Make API request
+        fetch(`/user/orders/returns/${returnId}/status`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                status: newStatus
+            })
+        })
+        .then(response => {
+            if (response.ok) {
+                nbToast('Return status updated successfully!', 'success');
+                // Reload page to reflect changes
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                nbToast('Failed to update status. Please try again.', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            nbToast('An error occurred. Please try again.', 'error');
+        });
+    }
+</script>
