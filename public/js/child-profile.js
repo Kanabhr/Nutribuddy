@@ -308,68 +308,6 @@ function doCheckin() {
   }, 1400);
 }
 
-/* ── ONBOARDING HELPERS ── */
-const pDesc = {
-  '1': '<strong>Phase 1 — Early childhood (4–6 yrs)</strong><br>Calcium bone foundation · Iron for brain · Probiotics for gut immunity · Soft textures, mild flavours',
-  '2': '<strong>Phase 2 — Middle childhood (7–9 yrs)</strong><br>Omega-3 for brain growth · Zinc for immunity · Complex carbs for energy · Variety building',
-  '3': '<strong>Phase 3 — Late childhood (10–12 yrs)</strong><br>Iron for girls · Protein for growth spurts · Calcium peak window · Sports nutrition',
-  '4': '<strong>Phase 4 — Early teen (13–15 yrs)</strong><br>Hormonal support · B-vitamins for energy · Protein for muscle · Iron replacement',
-  '5': '<strong>Phase 5 — Late teen (16–17 yrs)</strong><br>Bone density final window · Stress & focus support · Heart health foundations'
-};
-
-function selG(b) {
-  document.querySelectorAll('.gbtn').forEach(x => x.classList.remove('sel'));
-  b.classList.add('sel');
-}
-
-function selP(b) {
-  document.querySelectorAll('.pp').forEach(x => x.classList.remove('sel'));
-  b.classList.add('sel');
-  const pNoteEl = document.getElementById('pNote');
-  if (pNoteEl) {
-    pNoteEl.innerHTML = pDesc[b.dataset.p] || '';
-  }
-}
-
-function autoPhase() {
-  const a = parseInt(document.getElementById('oAge').value);
-  const p = a <= 6 ? '1' : a <= 9 ? '2' : a <= 12 ? '3' : a <= 15 ? '4' : '5';
-  const pill = document.querySelector(`.pp[data-p="${p}"]`);
-  if (pill) {
-    selP(pill);
-  }
-}
-
-function selO(el, sel, cls) {
-  document.querySelectorAll(sel).forEach(c => c.classList.remove(cls));
-  el.classList.add(cls);
-}
-
-function togCC(el) {
-  el.classList.toggle('sel');
-}
-
-function togG(el) {
-  el.classList.toggle('sel');
-}
-
-function togP(el) {
-  el.classList.toggle('sel');
-}
-
-function pickPlan(b, plan) {
-  b.textContent = '✓ Selected!';
-  b.style.background = 'var(--g)';
-  b.style.color = '#fff';
-  b.style.borderColor = 'var(--g)';
-  setTimeout(() => {
-    b.textContent = plan === 'Champion' ? 'Start 7-day trial →' : 'Choose ' + plan;
-    b.style.background = '';
-    b.style.color = '';
-    b.style.borderColor = '';
-  }, 2000);
-}
-
 /* ── UTILS ── */
 function cu(id, target, suffix, dur) {
   const el = document.getElementById(id);
@@ -394,7 +332,3 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('on'), 3400);
 }
 
-/* ── INIT ── */
-window.addEventListener('DOMContentLoaded', () => {
-  setTimeout(() => cu('scoreVal', 75, '', 1300), 300);
-});

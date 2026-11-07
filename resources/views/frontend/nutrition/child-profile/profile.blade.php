@@ -12,19 +12,17 @@
 @section('panel-content')
 
 @php
-    $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    $slotsPerDay = $dietPlan?->meals->count() ? max(1, (int) ($dietPlan->meals->count() / 7)) : 5;
-    $mealsByDay = $dietPlan?->meals->sortBy('sort_order')->values()->chunk($slotsPerDay) ?? collect();
+    $nutrientGaps = $nutrientGaps ?? [];
+    $gapTotal = count($nutrientGaps);
+    $gapMet = collect($nutrientGaps)->where('class', 'met')->count();
+    $childAge = $child && $child->dob ? \Carbon\Carbon::parse($child->dob)->age : null;
+    $notProvided = 'Not provided';
 @endphp
 
 <!-- NAV -->
 <nav class="nav">
-  <!-- <a href="#" class="nav-logo">
-    <div class="nav-logo-dot">🌿</div>
-    NutriBuddy <span class="nav-logo-sub">KIDS</span>
-  </a> -->
   <div class="nav-r">
-    <button class="btn-nav-back" id="navBack" hidden onclick="backToProfile()">← Back to Profile</button>
+    <button class="btn-nav-back" id="navBack" hidden onclick="backToProfile()">&larr; Back to Profile</button>
   </div>
 </nav>
 
@@ -37,20 +35,28 @@
     <div class="ph">
       <h1 class="ph-title" id="profTitle">{{ $child->name }}'s Profile</h1>
     </div>
+    @php
+        $metaParts = array_values(array_filter([
+            $childAge !== null ? $childAge . ' years' : null,
+            $child->sex ? ucfirst($child->sex) : null,
+            $assessment?->diet_type ? ucfirst($assessment->diet_type) : null,
+            $assessment?->region,
+        ]));
+    @endphp
     <p class="ph-meta" id="profMeta">
-      {{ \Carbon\Carbon::parse($child->dob)->age }} years <span class="ph-meta-dot">·</span>
-      {{ ucfirst($child->sex) }} <span class="ph-meta-dot">·</span>
-      {{ $assessment->diet_type ?? 'Vegetarian' }} <span class="ph-meta-dot">·</span>
-      {{ $assessment->region ?? 'India' }}
+      @foreach($metaParts as $part)
+        @if(! $loop->first)<span class="ph-meta-dot">&middot;</span>@endif
+        {{ $part }}
+      @endforeach
     </p>
   </div>
 
   <!-- METRICS -->
   <div class="tiles a2">
-    <div class="tile"><div class="tv cg" id="scoreVal">{{ $assessment->health_score ?? 0 }}</div><div class="tl">Health Score</div></div>
-    <div class="tile"><div class="tv co" id="weightTile">{{ $assessment->current_weight_kg ?? '0' }} <span class="tu">kg</span></div><div class="tl">Weight</div></div>
-    <div class="tile"><div class="tv cp" id="heightTile">{{ $assessment->current_height_cm ?? '0' }} <span class="tu">cm</span></div><div class="tl">Height</div></div>
-    <div class="tile"><div class="tv cr">{{ $assessment->times_sick_last_quarter ?? '0' }}<span class="tu">×</span></div><div class="tl">Sick This Qtr</div></div>
+    <div class="tile"><div class="tv cg" id="scoreVal">{{ $gapTotal > 0 ? $gapMet . '/' . $gapTotal : "\u{2014}" }}</div><div class="tl">Nutrients Met</div></div>
+    <div class="tile"><div class="tv co" id="weightTile">{{ $assessment?->current_weight_kg ?? "\u{2014}" }} @if($assessment?->current_weight_kg)<span class="tu">kg</span>@endif</div><div class="tl">Weight</div></div>
+    <div class="tile"><div class="tv cp" id="heightTile">{{ $assessment?->current_height_cm ?? "\u{2014}" }} @if($assessment?->current_height_cm)<span class="tu">cm</span>@endif</div><div class="tl">Height</div></div>
+    <div class="tile"><div class="tv cr">{{ $assessment?->times_sick_last_quarter ?? "\u{2014}" }}</div><div class="tl">Sick This Qtr</div></div>
   </div>
 
   <div class="tab-bar a3">
@@ -65,58 +71,59 @@
           <div class="ir"><span class="ik">Current plan</span><span class="iv gr">{{ $subscription->subscriptionPlan?->name ?? $subscription->model }}</span></div>
           <div class="ir"><span class="ik">Plan invoice</span><a class="iv gr" href="{{ route('diet-subscriptions.invoice-download', $subscription) }}">Download PDF</a></div>
         @endif
-        <div class="ir"><span class="ik">Age phase</span><span class="iv" id="ptPhase">Phase {{ \Carbon\Carbon::parse($child->dob)->age <= 6 ? '1' : (\Carbon\Carbon::parse($child->dob)->age <= 9 ? '2' : '3') }}</span></div>
-        <div class="ir"><span class="ik">Diet type</span><span class="iv" id="ptDiet">{{ $assessment->diet_type ?? 'Vegetarian' }}</span></div>
-        <div class="ir"><span class="ik">Picky level</span><span class="iv" id="ptPicky">{{ $assessment->picky_level ?? 'Slightly picky' }}</span></div>
-        <div class="ir"><span class="ik">Allergies</span><span class="iv" id="ptAllergies">{{ $assessment->allergies ? implode(', ', (array) $assessment->allergies) : 'None' }}</span></div>
-        <div class="ir"><span class="ik">Activity</span><span class="iv" id="ptActivity">{{ $assessment->activity_level ?? 'Moderately active' }}</span></div>
-        <div class="ir"><span class="ik">Region</span><span class="iv" id="ptRegion">{{ $assessment->region ?? 'India' }}</span></div>
-        <div class="ir"><span class="ik">Current season</span><span class="iv">{{ $assessment->current_season ?? 'Year-round' }}</span></div>
-        <div class="ir"><span class="ik">Plan</span><span class="iv gr" id="ptPlan">{{ ucfirst($assessment->model_level ?? 'champion') }} ✓</span></div>
+        <div class="ir"><span class="ik">Age phase</span><span class="iv" id="ptPhase">{{ $childAge === null ? $notProvided : 'Phase ' . ($childAge <= 6 ? '1' : ($childAge <= 9 ? '2' : '3')) }}</span></div>
+        <div class="ir"><span class="ik">Diet type</span><span class="iv" id="ptDiet">{{ $assessment?->diet_type ? ucfirst($assessment->diet_type) : $notProvided }}</span></div>
+        <div class="ir"><span class="ik">Appetite</span><span class="iv" id="ptPicky">{{ $assessment?->picky_level ?: $notProvided }}</span></div>
+        <div class="ir"><span class="ik">Allergies</span><span class="iv" id="ptAllergies">{{ $assessment?->allergies ? implode(', ', (array) $assessment->allergies) : 'None' }}</span></div>
+        <div class="ir"><span class="ik">Activity</span><span class="iv" id="ptActivity">{{ $assessment?->activity_level ?: $notProvided }}</span></div>
+        <div class="ir"><span class="ik">Region</span><span class="iv" id="ptRegion">{{ $assessment?->region ?: $notProvided }}</span></div>
+        <div class="ir"><span class="ik">Current season</span><span class="iv">{{ $assessment?->current_season ?: $notProvided }}</span></div>
+        <div class="ir"><span class="ik">Plan</span><span class="iv gr" id="ptPlan">{{ $assessment?->model_level ? ucfirst($assessment->model_level) . " \u{2713}" : $notProvided }}</span></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:12px;">
         <div class="gap-card">
           <div class="gap-head">Detected Nutrient Gaps</div>
-          @php
-            $flags = $assessment?->clinicalFlags()->orderedByPriority()->get() ?? collect([]);
-          @endphp
-          @if($flags->count() > 0)
-            @foreach($flags as $flag)
-              <div class="gap-row">
-                <span class="gn">{{ $flag->flag_name }}</span>
-                <span class="gb {{ $flag->priority === 'high' ? 'crit' : ($flag->priority === 'medium' ? 'gap' : ($flag->priority === 'low' ? 'part' : 'met')) }}">
-                  @if($flag->priority === 'high')
-                    Critical
-                  @elseif($flag->priority === 'medium')
-                    Gap
-                  @elseif($flag->priority === 'low')
-                    Partial
-                  @else
-                    Met ✓
-                  @endif
-                </span>
-              </div>
-            @endforeach
-          @else
-            <div class="gap-row"><span class="gn">Vitamin D</span><span class="gb crit">Critical</span></div>
-            <div class="gap-row"><span class="gn">Omega-3</span><span class="gb gap">Gap</span></div>
-            <div class="gap-row"><span class="gn">Iron</span><span class="gb gap">Gap</span></div>
-            <div class="gap-row"><span class="gn">Calcium</span><span class="gb part">Partial</span></div>
-            <div class="gap-row"><span class="gn">Vitamin C</span><span class="gb met">Met ✓</span></div>
-          @endif
+          @forelse($nutrientGaps as $gap)
+            <div class="gap-row">
+              <span class="gn">{{ $gap['label'] }}</span>
+              <span class="gb {{ $gap['class'] }}">{{ $gap['badge'] }}@if($gap['class'] === 'met') &#10003;@endif</span>
+            </div>
+          @empty
+            <div class="gap-row"><span class="gn">Your nutrient gaps will appear here once your diet chart has been reviewed and approved.</span></div>
+          @endforelse
         </div>
+
+        @php
+            $flags = $assessment?->clinicalFlags()->orderedByPriority()->get() ?? collect([]);
+        @endphp
+        @if($flags->count() > 0)
+        <div class="gap-card">
+          <div class="gap-head">Health Flags Noticed</div>
+          @foreach($flags as $flag)
+            <div class="gap-row">
+              <span class="gn">{{ $flag->flag_name }}</span>
+              <span class="gb {{ $flag->priority === 'high' ? 'crit' : ($flag->priority === 'medium' ? 'gap' : ($flag->priority === 'low' ? 'part' : 'met')) }}">
+                @if($flag->priority === 'high')
+                  Critical
+                @elseif($flag->priority === 'medium')
+                  Gap
+                @elseif($flag->priority === 'low')
+                  Partial
+                @else
+                  Met &#10003;
+                @endif
+              </span>
+            </div>
+          @endforeach
+        </div>
+        @endif
       </div>
     </div>
   </div>
 
-
-
-
-
 </main>
 </div>
 @endif
-
 <!-- ═══ VIEW: EDIT/ONBOARDING ═══ -->
 <div class="view @if(!$child) on @endif" id="vEdit">
 <main class="ob-shell">
