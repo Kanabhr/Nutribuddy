@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\CRM;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\CRM\CustomerRequest;
 use App\Models\User;
+use App\Services\Checkout\StateCityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -77,5 +78,18 @@ class CustomerController extends Controller
         $customer->delete();
 
         return redirect()->back()->with('success', 'Customer deleted successfully.');
+    }
+
+    public function getCities(Request $request, StateCityService $stateCityService)
+    {
+        $stateCode = $request->query('state');
+        
+        if (!$stateCode) {
+            return response()->json(['cities' => []]);
+        }
+        
+        $cities = $stateCityService->checkoutCitiesForState($stateCode);
+        
+        return response()->json(['cities' => $cities ?? []]);
     }
 }
