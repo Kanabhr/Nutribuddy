@@ -31,7 +31,7 @@ class DietRulesPageTest extends TestCase
             ->assertSee('How foods are ranked')
             ->assertSee('Flags and approval gate')
             ->assertSee('generator now reads questionnaire answer 18 and excludes disliked foods')
-            ->assertSee('has no lactose-specific exclusion')
-            ->assertSee('an unset allergen flag is not treated as a match');
+            ->assertSee('foods marked as containing dairy are excluded')
+            ->assertSee('an unset or empty allergen flag is treated as unsafe for that allergy');
     }
 }

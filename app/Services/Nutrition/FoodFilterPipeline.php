@@ -9,9 +9,11 @@ use Illuminate\Support\Collection;
 class FoodFilterPipeline
 {
     /**
-     * ICMR-NIN 2020 mandates cereal : legume : milk balance (~3:1:2.5).
-     * If a dislike list would wipe an entire protected group from the eligible
-     * pool, we restore it.  The tokens here are matched against food_group.
+     * The ICMR-NIN 2020 RDA/EAR note says the cereal-legume-milk composition of
+     * the diet should be 3:1:2.5 for good protein quality.
+     * Restoring a protected group when dislikes would wipe it from the eligible
+     * pool is OUR OWN safeguard, not an ICMR rule. UNVERIFIED: needs nutritionist
+     * confirmation. The tokens here are matched against food_group.
      */
     private const PROTECTED_GROUP_TOKENS = ['pulse', 'legume', 'dal', 'dairy', 'milk', 'cereal', 'grain'];
 
@@ -173,9 +175,12 @@ class FoodFilterPipeline
      *      still be empty for a given slot, and the engine's slot loop restores
      *      the full safe pool for just that slot.
      *
-     *  (b) Food-group protection: if a dislike term would eliminate an entire
-     *      ICMR-protected food group from the whole pool, we restore foods in
-     *      that group so at least one cereal, legume, and dairy option survives.
+     *  (b) Food-group safeguard: if a dislike term would eliminate an entire
+     *      protected food group from the whole pool, we restore foods in that
+     *      group so at least one cereal, legume, and dairy option survives.
+     *      The 3:1:2.5 cereal:legume:milk figure (ICMR-NIN 2020 note) says it
+     *      "should" be that for protein quality; the restore logic is our own,
+     *      UNVERIFIED, and pending nutritionist confirmation.
      */
     private function applyDislikes(Collection $safePool, array $dislikedFoods): Collection
     {

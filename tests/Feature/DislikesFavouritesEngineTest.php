@@ -251,7 +251,34 @@ class DislikesFavouritesEngineTest extends TestCase
         $service = app(ChildProfileService::class);
         $this->assertSame(['paneer'], $service->foodList('Paneer, PANEER, paneer'));
     }
+// -- foodList extra separators (C6-DOCFIX) --
 
+    public function test_foodlist_splits_on_semicolon(): void
+    {
+        $this->assertSame(['lauki', 'karela'], app(ChildProfileService::class)->foodList('lauki; karela'));
+    }
+
+    public function test_foodlist_splits_on_the_word_and(): void
+    {
+        $this->assertSame(['lauki', 'karela'], app(ChildProfileService::class)->foodList('lauki and karela'));
+        $this->assertSame(['lauki', 'karela'], app(ChildProfileService::class)->foodList('lauki AND karela'));
+    }
+
+    public function test_foodlist_splits_on_new_lines(): void
+    {
+        $this->assertSame(['lauki', 'karela'], app(ChildProfileService::class)->foodList("lauki\nkarela"));
+        $this->assertSame(['lauki', 'karela'], app(ChildProfileService::class)->foodList("lauki\r\nkarela"));
+    }
+
+    public function test_foodlist_does_not_split_inside_words_containing_and(): void
+    {
+        $this->assertSame(['sandwich', 'candy'], app(ChildProfileService::class)->foodList('sandwich and candy'));
+    }
+
+    public function test_foodlist_empty_string_gives_no_terms(): void
+    {
+        $this->assertSame([], app(ChildProfileService::class)->foodList(''));
+    }
     // -- foodList ignore-list and min-length (C6-FIX) --
 
     public function test_foodlist_ignores_none(): void

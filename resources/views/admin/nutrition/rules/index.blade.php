@@ -133,9 +133,9 @@
             </div>
             <ul>
                 <li><strong>Food age limits:</strong> the active filter does not apply per-food age minimums or maximums. Age is used to look up nutrition targets.</li>
-                <li><strong>Disliked foods:</strong> the generator now reads questionnaire answer 18 and excludes disliked foods by name and food group; a per-slot fallback and ICMR food-group protection ensure a child always gets a balanced plan. Favourite foods (answer 17) receive a small ranking boost but do not override variety or allergy rules.</li>
-                <li><strong>Lactose:</strong> the allergy answer is normalized, but the active food filter has no lactose-specific exclusion; dairy exclusion is applied only for a dairy allergy.</li>
-                <li><strong>Incomplete allergen data:</strong> an unset allergen flag is not treated as a match by the active filter. Food catalog allergy flags need to be completed for exclusions to work reliably.</li>
+                <li><strong>Disliked foods:</strong> the generator now reads questionnaire answer 18 and excludes disliked foods by name and food group; a per-slot fallback keeps every meal slot filled, and a food-group safeguard (our own rule, based on the ICMR-NIN note that cereal:legume:milk should be about 3:1:2.5; not verified, awaiting nutritionist confirmation) restores a protected food group if the dislikes would remove it entirely. Favourite foods (answer 17) receive a small ranking boost but do not override variety or allergy rules.</li>
+                <li><strong>Lactose:</strong> a dairy allergy and a lactose intolerance are both handled the same way: foods marked as containing dairy are excluded. This is strict by default; a nutritionist may relax it case by case.</li>
+                <li><strong>Incomplete allergen data:</strong> an unset or empty allergen flag is treated as unsafe for that allergy, so the food is excluded. Complete the food catalog allergy flags so foods are not excluded unnecessarily.</li>
             </ul>
         </aside>
     </main>

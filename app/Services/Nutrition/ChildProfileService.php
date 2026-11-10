@@ -251,7 +251,8 @@ class ChildProfileService
     /**
      * Parse a free-text food list (answer 17 or 18).
      *
-     * Splits on commas, slashes, or pipes; trims whitespace; lowercases each token.
+     * Splits on commas, slashes, pipes, semicolons, new lines and the whole word
+     * "and" (so "sand" and "candy" are not split); trims whitespace; lowercases each token.
      * Drops:
      *   - empty strings
      *   - terms under 3 characters (too ambiguous: "no", "na", "ok" …)
@@ -272,7 +273,7 @@ class ChildProfileService
 
         $ignored = ['none', 'no', 'nil', 'nothing', 'n/a', 'na'];
 
-        return collect(preg_split('/[,\/|]+/', $raw))
+        return collect(preg_split('/[,\/|;\r\n]+|\band\b/i', $raw))
             ->map(fn ($item) => strtolower(trim($item)))
             ->filter(fn ($item) => $item !== '')
             ->filter(fn ($item) => strlen($item) >= 3)
