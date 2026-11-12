@@ -1037,7 +1037,9 @@
     <!-- ════════════════════════════════════════════════   ══════════════════════════════════════════
                                                      PARENT REVIEWS
                                                 ══════════════════════════════════════════ -->
-    @include('partials.parent-reviews')
+       @include('partials.parent-reviews')
+
+    @include('frontend.storefront.products.partials.leave-review')
 
     <!-- ══════════════════════════════════════════
                                                      FAQ

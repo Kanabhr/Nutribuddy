@@ -54,11 +54,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const rows = (data.states || [])
       .filter(row => activeZone === 'all' || String(row.zone || '').toLowerCase() === activeZone)
-      .sort((a, b) => metricValue(b, activeMetric) - metricValue(a, activeMetric))
-      .slice(0, 10);
+            .sort((a, b) => metricValue(b, activeMetric) - metricValue(a, activeMetric));
 
-    if (title) title.textContent = activeZone === 'all' ? 'Top States - All Zones' : 'Top States - ' + activeZone.charAt(0).toUpperCase() + activeZone.slice(1) + ' Zone';
-
+        if (title) title.textContent = activeZone === 'all' ? 'Sales by State - All Zones' : 'Sales by State - ' + activeZone.charAt(0).toUpperCase() + activeZone.slice(1) + ' Zone';
     const max = Math.max(1, ...rows.map(row => metricValue(row, activeMetric)));
     wrap.innerHTML = rows.length
       ? rows.map(row => {
@@ -465,10 +463,10 @@ SCRIPT;
                                     <div class="nb-zone-card" data-zone="{{ $key }}">
                                         <div class="nb-zone-name">{{ $zone['zone'] }} Zone</div>
                                         <div class="nb-zone-value">Rs. {{ number_format($zone['total'], 0) }}</div>
-                                        <div class="nb-zone-sub">{{ number_format($zone['percent'], 1) }}% share - {{ number_format($zone['orders']) }} orders</div>
-                                        <div class="mt-8">
-                                            <span class="badge bg-{{ $zoneClasses[$key] ?? 'secondary' }}-focus text-{{ $zoneClasses[$key] ?? 'secondary' }}-main">{{ $zone['states'] }}</span>
+                                        <div class="nb-zone-sub">{{ number_format($zone['percent'], 1) }}% share - {{ number_format($zone['orders']) }} orders</div>                                                                             <div class="mt-8">
+                                            <span class="badge bg-{{ $zoneClasses[$key] ?? 'secondary' }}-focus text-{{ $zoneClasses[$key] ?? 'secondary' }}-main">{{ $zone['state_count'] }} states / UTs</span>
                                         </div>
+                                        <div class="nb-zone-sub mt-8">{{ $zone['states'] }}</div>
                                     </div>
                                 </div>
                             @endforeach
@@ -477,14 +475,14 @@ SCRIPT;
                         <hr class="my-24">
 
                         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-12">
-                            <h6 class="mb-0 fw-bold" id="stateTitle">Top States - All Zones</h6>
+                   <h6 class="mb-0 fw-bold" id="stateTitle">Sales by State - All Zones</h6>
                             <div class="nb-seg" id="stateMetric">
                                 <button type="button" class="active" data-state-metric="rev">Revenue</button>
                                 <button type="button" data-state-metric="ord">Orders</button>
                                 <button type="button" data-state-metric="aov">AOV</button>
                             </div>
                         </div>
-                        <div id="stateBars"></div>
+          <div id="stateBars" style="max-height: 460px; overflow-y: auto;"></div>
                     </div>
                 </div>
             </div>

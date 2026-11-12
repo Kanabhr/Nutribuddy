@@ -13,6 +13,13 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardAnalyticsService
 {
+    /** Zone => states, using the same names as storage/app/india_states_districts.json. */
+    private const ZONE_STATES = [
+        'North' => ['Delhi', 'Haryana', 'Punjab', 'Uttar Pradesh', 'Uttarakhand', 'Himachal Pradesh', 'Jammu And Kashmir', 'Ladakh', 'Chandigarh'],
+        'South' => ['Karnataka', 'Tamil Nadu', 'Telangana', 'Kerala', 'Andhra Pradesh', 'Puducherry', 'Lakshadweep'],
+        'West' => ['Maharashtra', 'Gujarat', 'Rajasthan', 'Goa', 'Madhya Pradesh', 'Chhattisgarh', 'The Dadra And Nagar Haveli And Daman And Diu'],
+        'East' => ['West Bengal', 'Odisha', 'Assam', 'Bihar', 'Jharkhand', 'Sikkim', 'Arunachal Pradesh', 'Nagaland', 'Manipur', 'Meghalaya', 'Mizoram', 'Tripura', 'Andaman And Nicobar Islands'],
+    ];
     public function build(): array
     {
         $request = request();
@@ -37,14 +44,32 @@ class DashboardAnalyticsService
         $allOrdersQuery = $this->analyticsOrdersQuery($startDate, $endDate, $productId, $segment, false);
         $allOrderStats = (clone $allOrdersQuery)->selectRaw('COUNT(*) as orders, COUNT(DISTINCT user_id) as customers, SUM(CASE WHEN user_id IS NULL THEN 1 ELSE 0 END) as guest_orders, SUM(discount_total) as discount, SUM(shipping_total) as shipping')->first();
 
-        $stateRows = (clone $ordersQuery)->selectRaw("COALESCE(NULLIF(shipping_state, ''), 'Unknown') as state, SUM(grand_total) as revenue, COUNT(*) as orders")
-            ->groupBy('shipping_state')->orderByDesc('revenue')->get()->map(function ($row) {
-                $count = (int) $row->orders;
-                $revenue = (float) $row->revenue;
-                return ['state' => $row->state, 'zone' => $this->zoneForState($row->state), 'revenue' => $revenue, 'orders' => $count, 'aov' => $count ? round($revenue / $count, 2) : 0];
+                $stateRows = (clone $ordersQuery)->selectRaw("COALESCE(NULLIF(shipping_state, ''), 'Unknown') as state, SUM(grand_total) as revenue, COUNT(*) as orders")
+            ->groupBy('shipping_state')->get()
+            ->map(fn ($row) => ['state' => $this->canonicalState($row->state), 'revenue' => (float) $row->revenue, 'orders' => (int) $row->orders])
+            ->groupBy('state')
+            ->map(function ($rows, $state) {
+                $revenue = (float) $rows->sum('revenue');
+                $count = (int) $rows->sum('orders');
+                return ['state' => $state, 'zone' => $this->zoneForState($state), 'revenue' => $revenue, 'orders' => $count, 'aov' => $count ? round($revenue / $count, 2) : 0];
             })->values();
-        $zoneTotals = collect(['North' => ['total' => 0.0, 'orders' => 0], 'South' => ['total' => 0.0, 'orders' => 0], 'West' => ['total' => 0.0, 'orders' => 0], 'East' => ['total' => 0.0, 'orders' => 0]]);
+
+        // Every state and union territory is listed, including those with no sales yet.
+        $seenStates = $stateRows->pluck('state')->all();
+        foreach (self::ZONE_STATES as $zoneName => $zoneStates) {
+            foreach ($zoneStates as $stateName) {
+                if (! in_array($stateName, $seenStates, true)) {
+                    $stateRows->push(['state' => $stateName, 'zone' => $zoneName, 'revenue' => 0.0, 'orders' => 0, 'aov' => 0]);
+                }
+            }
+        }
+        $stateRows = $stateRows->sort(fn ($a, $b) => [$b['revenue'], $a['state']] <=> [$a['revenue'], $b['state']])->values();
+
+        $zoneTotals = collect(array_map(fn () => ['total' => 0.0, 'orders' => 0], self::ZONE_STATES));
         foreach ($stateRows as $row) {
+            if (! $zoneTotals->has($row['zone'])) {
+                continue; // "Unknown" or unmatched state: not part of any zone total
+            }
             $totals = $zoneTotals->get($row['zone']);
             $totals['total'] += $row['revenue'];
             $totals['orders'] += $row['orders'];
@@ -55,7 +80,8 @@ class DashboardAnalyticsService
             'zone' => $zone, 'key' => strtolower($zone), 'total' => $totals['total'],
             'percent' => $zoneGrandTotal > 0 ? round(($totals['total'] / $zoneGrandTotal) * 100, 1) : 0,
             'orders' => $totals['orders'],
-            'states' => match ($zone) { 'North' => 'DL - UP - PB - HR', 'South' => 'KA - TN - TG - KL', 'West' => 'MH - GJ - RJ - GA', default => 'WB - OD - AS - BR' },
+            'state_count' => count(self::ZONE_STATES[$zone]),
+            'states' => implode(', ', self::ZONE_STATES[$zone]),
         ])->values();
 
         $cityRows = (clone $ordersQuery)->selectRaw("COALESCE(NULLIF(shipping_city, ''), 'Unknown') as city, SUM(grand_total) as revenue, COUNT(*) as orders")
@@ -280,17 +306,47 @@ class DashboardAnalyticsService
         }
     }
 
+     /** Accepts a state name, a state code (e.g. "7") or a slightly different spelling and returns the canonical name. */
+    private function canonicalState(?string $state): string
+    {
+        $state = trim((string) $state);
+        if ($state === '' || strtolower($state) === 'unknown') {
+            return 'Unknown';
+        }
+
+        if (ctype_digit($state)) {
+            $byCode = app(\App\Services\Checkout\StateCityService::class)->getStateCityData()[$state]['name'] ?? null;
+            if ($byCode) {
+                $state = $byCode;
+            }
+        }
+
+        $normalize = fn (string $value) => preg_replace('/\s+/', ' ', str_replace(['&', '-'], [' and ', ' '], strtolower(trim($value))));
+        $aliases = ['orissa' => 'Odisha', 'uttaranchal' => 'Uttarakhand', 'jammu and kashmir' => 'Jammu And Kashmir', 'nct of delhi' => 'Delhi', 'new delhi' => 'Delhi'];
+        $key = $normalize($state);
+        if (isset($aliases[$key])) {
+            return $aliases[$key];
+        }
+        foreach (self::ZONE_STATES as $states) {
+            foreach ($states as $name) {
+                if ($normalize($name) === $key) {
+                    return $name;
+                }
+            }
+        }
+
+        return $state;
+    }
+
     private function zoneForState(?string $state): string
     {
-        $state = strtolower(trim((string) $state));
-        $north = ['delhi', 'haryana', 'punjab', 'uttar pradesh', 'rajasthan', 'uttarakhand', 'himachal pradesh', 'jammu', 'kashmir', 'chandigarh'];
-        $south = ['karnataka', 'tamil nadu', 'kerala', 'andhra pradesh', 'telangana', 'puducherry'];
-        $west = ['maharashtra', 'gujarat', 'goa', 'madhya pradesh', 'chhattisgarh'];
+        foreach (self::ZONE_STATES as $zone => $states) {
+            if (in_array($state, $states, true)) {
+                return $zone;
+            }
+        }
 
-        if (in_array($state, $north, true)) return 'North';
-        if (in_array($state, $south, true)) return 'South';
-        if (in_array($state, $west, true)) return 'West';
-        return 'East';
+        return 'Unassigned';
     }
 
     private function cohortRetention(Carbon $startDate, Carbon $endDate, ?int $productId): array

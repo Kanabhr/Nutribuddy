@@ -2,6 +2,7 @@
 
 namespace App\Services\Storefront;
 
+use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductReview;
 use Illuminate\Http\UploadedFile;
@@ -45,5 +46,22 @@ class ProductReviewService
             Storage::disk('public')->delete($storedPaths);
             throw $exception;
         }
+    }
+        /** True when the user has a delivered or completed order containing this product. */
+    public function hasPurchased(Product $product, int $userId): bool
+    {
+        return OrderItem::where('product_id', $product->id)
+            ->whereHas('order', fn ($query) => $query
+                ->where('user_id', $userId)
+                ->whereIn('status', ['delivered', 'completed']))
+            ->exists();
+    }
+
+    public function existingReview(Product $product, int $userId): ?ProductReview
+    {
+        return ProductReview::where('product_id', $product->id)
+            ->where('user_id', $userId)
+            ->latest('id')
+            ->first();
     }
 }

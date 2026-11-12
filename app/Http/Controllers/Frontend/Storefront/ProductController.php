@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Frontend\Storefront;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Services\Storefront\ProductReviewService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
@@ -145,8 +146,22 @@ class ProductController extends Controller
 
             $relatedProducts = $relatedProducts->concat($fallbackProducts);
         }
+        // Review box state: guest | not_purchased | already_reviewed | can_review
+        $reviewState = 'guest';
+        $userReview = null;
+        if (auth()->check()) {
+            $reviewService = app(ProductReviewService::class);
+            $userReview = $reviewService->existingReview($product, (int) auth()->id());
+            if ($userReview) {
+                $reviewState = 'already_reviewed';
+            } elseif ($reviewService->hasPurchased($product, (int) auth()->id())) {
+                $reviewState = 'can_review';
+            } else {
+                $reviewState = 'not_purchased';
+            }
+        }
 
         return response()
-            ->view('pages.product', compact('product', 'relatedProducts'));
+            ->view('pages.product', compact('product', 'relatedProducts', 'reviewState', 'userReview'));
     }
 }

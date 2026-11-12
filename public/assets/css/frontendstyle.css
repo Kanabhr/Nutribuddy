@@ -364,7 +364,7 @@ body.has-custom-cursor * {
     background: var(--pk);
     border-radius: 50%;
     pointer-events: none;
-    z-index: 99999;
+    z-index: 2147483647;
     transform: translate(-50%, -50%);
     mix-blend-mode: multiply;
     transition: width .18s, height .18s, background .18s
@@ -377,7 +377,7 @@ body.has-custom-cursor * {
     border: 2.5px solid var(--pu);
     border-radius: 50%;
     pointer-events: none;
-    z-index: 99998;
+    z-index: 2147483646;
     transform: translate(-50%, -50%);
     transition: all .1s ease
 }
