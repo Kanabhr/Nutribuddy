@@ -483,7 +483,7 @@
 
                 <div class="qz-question-block{{ $isPeriodsQ ? ' qz-hidden-for-boy' : '' }}"
                      data-qid="{{ $q->id }}"
-                     @if($isPeriodsQ) data-qz-periods-question style="display:none;" @endif>
+                                         @if($isPeriodsQ) data-qz-periods-question style="{{ strtolower((string) ($child?->sex ?? '')) === 'girl' ? '' : 'display:none;' }}" @endif>
 
                     @if($q->answer_type === 'Text' || $q->answer_type === 'Date' || $q->answer_type === 'Number')
 

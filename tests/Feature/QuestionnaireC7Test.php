@@ -1053,4 +1053,74 @@ class QuestionnaireC7Test extends TestCase
         $this->assertStringNotContainsString('blood_reports/', $url);
         $this->assertStringNotContainsString('storage/', $url);
     }
+    
+    // ─────────────────────────────────────────────────────────────────────────
+    // P2: Q32 on the Premium upgrade page, where the Sex question is not asked
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** A Basic-answered child of the given sex, plus the Premium plan and Q3/Q32. */
+    private function upgradeFixture(string $sex): array
+    {
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+
+        $q3  = $this->seedQ3();
+        $q32 = $this->seedQ32();
+        SubscriptionPlan::create([
+            'name' => 'Premium', 'slug' => 'premium', 'price' => 999, 'monthly_price' => 999,
+            'level' => 'premium', 'is_active' => true,
+        ]);
+
+        $user  = User::factory()->create();
+        $child = Child::create(['user_id' => $user->id, 'name' => 'Upgrade Kid', 'sex' => $sex, 'dob' => now()->subYears(10)->toDateString()]);
+        ChildAssessment::create([
+            'child_id' => $child->id, 'model_level' => 'basic',
+            'current_weight_kg' => 30, 'current_height_cm' => 135, 'diet_type' => 'vegetarian',
+        ]);
+
+        return [$user, $child, $q3, $q32];
+    }
+
+    public function test_premium_upgrade_page_shows_q32_for_a_girl_child_and_hides_it_for_a_boy(): void
+    {
+        [$girlParent, $girl] = $this->upgradeFixture('girl');
+        $html = $this->actingAs($girlParent)
+            ->get(route('frontend.nutrition.questionnaire.child', $girl).'?plan=premium')
+            ->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('/data-qz-periods-question\s+style=""/', $html);
+
+        // Same page for a boy: Q32 is rendered hidden.
+        $boyParent = User::factory()->create();
+        $boy = Child::create(['user_id' => $boyParent->id, 'name' => 'Boy Kid', 'sex' => 'boy', 'dob' => now()->subYears(10)->toDateString()]);
+        ChildAssessment::create(['child_id' => $boy->id, 'model_level' => 'basic', 'current_weight_kg' => 30, 'current_height_cm' => 135, 'diet_type' => 'vegetarian']);
+        $html = $this->actingAs($boyParent)
+            ->get(route('frontend.nutrition.questionnaire.child', $boy).'?plan=premium')
+            ->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('/data-qz-periods-question\s+style="display:none;"/', $html);
+    }
+
+    public function test_upgrade_submission_without_a_sex_answer_stores_q32_for_a_girl_child(): void
+    {
+        [$user, $child, , $q32] = $this->upgradeFixture('girl');
+
+        $response = $this->actingAs($user)->postJson(route('api.nutrition.questionnaire.submit'), [
+            'plan_slug' => 'premium', 'child_id' => $child->id, 'q_'.$q32->id => 'Not yet',
+        ]);
+
+        $response->assertOk()->assertJsonPath('success', true);
+        $assessment = ChildAssessment::where('child_id', $child->id)->latest('id')->firstOrFail();
+        $this->assertSame('Not yet', $assessment->answers()->where('question_id', $q32->id)->first()?->answer_value);
+    }
+
+    public function test_upgrade_submission_without_a_sex_answer_drops_q32_for_a_boy_child(): void
+    {
+        [$user, $child, , $q32] = $this->upgradeFixture('boy');
+
+        $response = $this->actingAs($user)->postJson(route('api.nutrition.questionnaire.submit'), [
+            'plan_slug' => 'premium', 'child_id' => $child->id, 'q_'.$q32->id => 'Not yet',
+        ]);
+
+        $response->assertOk()->assertJsonPath('success', true);
+        $assessment = ChildAssessment::where('child_id', $child->id)->latest('id')->firstOrFail();
+        $this->assertNull($assessment->answers()->where('question_id', $q32->id)->first(), 'Q32 must not be stored for a boy child');
+    }
 }

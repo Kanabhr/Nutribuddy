@@ -75,11 +75,18 @@ class SubmitQuestionnaireRequest extends FormRequest
             $genderKey  = 'q_'.$genderQuestion->id;
             $periodsKey = 'q_'.$periodsQuestion->id;
 
-            if (array_key_exists($genderKey, $input)) {
+                   if (array_key_exists($genderKey, $input)) {
                 $genderVal = strtolower(trim((string) (is_array($input[$genderKey]) ? ($input[$genderKey][0] ?? '') : $input[$genderKey])));
-                if ($genderVal === 'boy' && array_key_exists($periodsKey, $input)) {
-                    unset($input[$periodsKey]);
-                }
+            } elseif (! empty($input['child_id']) && is_numeric($input['child_id'])) {
+                // Upgrade form: the Sex question is not on the page, so use the saved child.
+                // Only the signed-in parent's own children are looked up.
+                $genderVal = strtolower(trim((string) $this->user()?->children()->whereKey((int) $input['child_id'])->value('sex')));
+            } else {
+                $genderVal = '';
+            }
+
+            if ($genderVal === 'boy' && array_key_exists($periodsKey, $input)) {
+                unset($input[$periodsKey]);
             }
         }
 
