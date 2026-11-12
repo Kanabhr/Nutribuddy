@@ -296,5 +296,9 @@ Route::prefix('admin/nutrition')->name('admin.nutrition.')->middleware('auth:adm
         Route::patch('my-leads/{lead}/diet-plans/{dietPlan}', [\App\Http\Controllers\Admin\Nutrition\NutritionistQueueController::class, 'update'])->name('lead-queue.update');
         Route::patch('my-leads/{lead}/diet-plans/{dietPlan}/products', [\App\Http\Controllers\Admin\Nutrition\NutritionistQueueController::class, 'updateProducts'])->name('lead-queue.products');
         Route::patch('my-leads/{lead}/diet-plans/{dietPlan}/approve', [\App\Http\Controllers\Admin\Nutrition\NutritionistQueueController::class, 'approve'])->name('lead-queue.approve');
+        // C7-FIX-2: blood report download for the admin/nutritionist reviewer.
+        Route::get('blood-report/{assessment}/download', [\App\Http\Controllers\Frontend\Nutrition\BloodReportController::class, 'downloadForAdmin'])
+            ->whereNumber('assessment')
+            ->name('blood-report.download');
     });
 });

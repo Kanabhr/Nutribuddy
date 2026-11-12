@@ -71,14 +71,35 @@
                             <dl class="lead-answer-list">
                                 @foreach ($assessment->answers->sortBy(fn ($answer) => $answer->question?->sort_order ?? PHP_INT_MAX) as $answer)
                                     @php($answerValue = $answer->answer_value)
+                                    @php($answerSortOrder = $answer->question?->sort_order)
                                     <div>
                                         <dt>{{ $answer->question?->question ?? 'Question unavailable' }}</dt>
-                                        <dd>{{ is_array($answerValue) ? collect($answerValue)->map(fn ($value) => is_scalar($value) ? (string) $value : json_encode($value))->implode(', ') : ($answerValue ?? 'Not answered') }}</dd>
+                                        <dd>{{ is_array($answerValue) ? collect($answerValue)->map(fn ($value) => is_scalar($value) ? (string) $value : json_encode($value))->implode(', ') : ($answerSortOrder === 31 && is_string($answerValue) && str_starts_with($answerValue, 'blood_reports/') ? 'File uploaded (see download link)' : ($answerValue ?? 'Not answered')) }}</dd>
                                     </div>
                                 @endforeach
                             </dl>
                         @else
                             <p class="text-secondary mb-0 mt-3">No questionnaire answers were saved.</p>
+                        @endif
+
+                        <?php
+                            // "View blood report" link (Q31) — look for a stored file path in answers.
+                            $bloodQ31 = \App\Models\Nutrition\QuestionnaireQuestion::where('sort_order', 31)->first();
+                            $bloodAnswer = $bloodQ31
+                                ? $assessment->answers->firstWhere('question_id', $bloodQ31->id)
+                                : null;
+                            $bloodPath = $bloodAnswer?->answer_value;
+                            $bloodPath = is_string($bloodPath) && str_starts_with($bloodPath, 'blood_reports/') ? $bloodPath : null;
+                        ?>
+                        @if ($bloodPath)
+                            <div class="mt-3">
+                                <a href="{{ route('admin.nutrition.blood-report.download', $assessment) }}"
+                                   class="btn btn-sm btn-outline-primary"
+                                   target="_blank" rel="noopener">
+                                    <i class="ri-file-download-line me-1" aria-hidden="true"></i>
+                                    View blood report
+                                </a>
+                            </div>
                         @endif
                     </details>
 

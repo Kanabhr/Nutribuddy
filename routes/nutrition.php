@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Nutrition\QuestionnaireController as QuestionnaireApiController;
+use App\Http\Controllers\Frontend\Nutrition\BloodReportController;
 use App\Http\Controllers\Frontend\Nutrition\ChildCheckInController;
 use App\Http\Controllers\Frontend\Nutrition\MealItemController;
 use App\Http\Controllers\Frontend\Nutrition\QuestionnaireController;
@@ -43,3 +44,10 @@ Route::prefix('api/nutrition/questionnaire')->group(function () {
 
 Route::redirect('/child-profile/{child}', '/child-profile')->name('child.profile');
 Route::redirect('/child-profile/{child}/diet-chart', '/child-profile')->name('child.diet_chart');
+
+// Blood report download (Q31) — private disk, auth required.
+Route::middleware('auth')
+    ->get('/nutrition/blood-report/{assessment}/download', [BloodReportController::class, 'download'])
+    ->whereNumber('assessment')
+    ->name('nutrition.blood-report.download');
+

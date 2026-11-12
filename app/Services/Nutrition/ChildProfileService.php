@@ -235,7 +235,7 @@ class ChildProfileService
 
         return collect($signs)
             ->map(fn ($sign) => trim((string) $sign))
-            ->reject(fn ($sign) => $sign === '' || strtolower($sign) === 'none')
+            ->reject(fn ($sign) => $sign === '' || \App\Services\Nutrition\VisibleSignsMap::isNoFlag($sign))
             ->unique()
             ->values()
             ->all();

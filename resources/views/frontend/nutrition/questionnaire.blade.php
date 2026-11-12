@@ -338,6 +338,59 @@
         }
         .qz-h-ftin-wrap { gap: 8px; }
     }
+
+    /* ── Q31 file upload ──────────────────────────────────────────────────── */
+    .qz-file-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .qz-file-label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 18px;
+        border: 2px dashed #c9bce8;
+        border-radius: 14px;
+        background: #faf8ff;
+        cursor: pointer;
+        transition: border-color .2s, background .2s;
+        font-size: .9rem;
+        color: #7c3aed;
+        font-weight: 600;
+        font-family: inherit;
+    }
+    .qz-file-label:hover { border-color: #845ec2; background: #f3ebff; }
+    .qz-file-input { display: none; }
+    .qz-file-hint { font-size: .82rem; color: #94a3b8; font-weight: 500; }
+    .qz-file-chosen {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        background: #dcfce7;
+        border-radius: 10px;
+        font-size: .88rem;
+        color: #166534;
+        font-weight: 600;
+    }
+    .qz-file-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .qz-file-remove {
+        flex: 0 0 auto;
+        border: none;
+        background: none;
+        color: #dc2626;
+        font-size: 1rem;
+        cursor: pointer;
+        line-height: 1;
+        padding: 0 4px;
+    }
+    .qz-file-error {
+        font-size: .82rem;
+        color: #dc2626;
+        font-weight: 600;
+        min-height: 1.2em;
+    }
 </style>
 
 <div class="qz-wrap">
@@ -382,7 +435,7 @@
                 @endforeach
             </div>
 
-            <form id="questionnaireForm" style="display:none;">
+            <form id="questionnaireForm" enctype="multipart/form-data" style="display:none;">
                 @csrf
                 <input type="hidden" name="plan_slug" value="{{ $plan->slug }}">
                 <input type="hidden" name="cycle" value="{{ $cycle }}">
@@ -410,16 +463,27 @@
                 @foreach($sectionQuestions as $q)
                 @php
                     $ql = strtolower($q->question);
-                    $isHeight  = str_contains($ql, 'height');
-                    $isWeight  = str_contains($ql, 'weight');
-                    $isName    = str_contains($ql, 'name');
-                    $isAgeQ    = str_contains($ql, 'age') && $q->answer_type === 'Choice';
-                    $isGenderQ = str_contains($ql, 'gender') || str_contains($ql, 'sex');
-                    $isMulti   = $q->answer_type === 'Multi'
+                    $isHeight    = str_contains($ql, 'height');
+                    $isWeight    = str_contains($ql, 'weight');
+                    $isName      = str_contains($ql, 'name');
+                    $isAgeQ      = str_contains($ql, 'age') && $q->answer_type === 'Choice';
+                    $isGenderQ   = str_contains($ql, 'gender') || str_contains($ql, 'sex');
+                    $isMulti     = $q->answer_type === 'Multi'
                         || (str_contains($ql, 'region') && str_contains($ql, 'cuisine'));
+                    // Q32: periods question — hidden until gender is known, default hidden
+                    $isPeriodsQ  = $q->sort_order === 32
+                        || str_contains($ql, 'periods started');
+                    // Q31: blood report — file upload
+                    $isFileQ     = $q->answer_type === 'File'
+                        || (str_contains($ql, 'blood report') && str_contains($ql, 'latest'));
+                    // Q26: visible signs — exclusive "none" options
+                    $isVisibleSignsQ = $q->sort_order === 26
+                        || str_contains($ql, 'visible signs');
                 @endphp
 
-                <div class="qz-question-block" data-qid="{{ $q->id }}">
+                <div class="qz-question-block{{ $isPeriodsQ ? ' qz-hidden-for-boy' : '' }}"
+                     data-qid="{{ $q->id }}"
+                     @if($isPeriodsQ) data-qz-periods-question style="display:none;" @endif>
 
                     @if($q->answer_type === 'Text' || $q->answer_type === 'Date' || $q->answer_type === 'Number')
 
@@ -521,7 +585,7 @@
                         @endif
 
                     @elseif($q->answer_type === 'Choice' || $q->answer_type === 'Multi')
-                        @php $opts = array_map('trim', explode('/', $q->options_scale)); @endphp
+                        @php $opts = array_values(array_filter(array_map('trim', preg_split('/\s+\/\s+/', (string) $q->options_scale, -1, PREG_SPLIT_NO_EMPTY) ?: []), fn ($o) => $o !== '')); @endphp
 
                         @if($isAgeQ)
                             <div class="qz-sub-heading">Age Group</div>
@@ -542,7 +606,7 @@
                             <div class="qz-gender-row" id="genderGrid_{{ $q->id }}">
                                 @foreach($opts as $idx => $opt)
                                 <div class="qz-gender-card" data-val="{{ $opt }}"
-                                     onclick="qzSelectCard(this,'genderGrid_{{ $q->id }}','{{ $q->id }}',false)">
+                                     onclick="qzSelectCard(this,'genderGrid_{{ $q->id }}','{{ $q->id }}',false); qzUpdatePeriodsVisibility(this.dataset.val)">
                                     <span class="qz-gender-emoji">{{ $genderEmojis[$idx] ?? '🧒' }}</span>
                                     <div class="qz-gender-name">{{ $opt }}</div>
                                 </div>
@@ -555,10 +619,18 @@
                                 {{ $q->question }} <span style="color:#e84040">*</span>
                                 @if($isMulti)<span style="font-size:.7rem;color:#aaa;font-weight:500;margin-left:4px">(Select all that apply)</span>@endif
                             </label>
-                            <div class="qz-choice-row" id="choiceRow_{{ $q->id }}">
+                            @php
+                                // Q26: exclusive options that clear all others when selected
+                                $exclusiveOpts = $isVisibleSignsQ
+                                    ? ['None of the above', 'Not sure']
+                                    : [];
+                            @endphp
+                            <div class="qz-choice-row" id="choiceRow_{{ $q->id }}"
+                                @if($exclusiveOpts) data-qz-exclusive="{{ implode('|', $exclusiveOpts) }}" @endif>
                                 @foreach($opts as $opt)
                                 <div class="qz-choice-chip"
                                      data-val="{{ $opt }}"
+                                     @if(in_array($opt, $exclusiveOpts)) data-qz-exclusive-chip="true" @endif
                                      onclick="qzSelectChip(this,'choiceRow_{{ $q->id }}','{{ $q->id }}',{{ $isMulti ? 'true' : 'false' }})">
                                     {{ $q->question === 'How often falls ill' ? str_replace(' yr', ' year', $opt) : $opt }}
                                 </div>
@@ -646,6 +718,34 @@
                                 </div>
                             </div>
 
+                        @elseif($isFileQ)
+                            {{-- Q31 blood report: optional file upload (private disk) --}}
+                            <label class="qz-field-label">
+                                📋 {{ $q->question }}
+                                <span class="qz-opt-tag">Optional</span>
+                            </label>
+                            <div class="qz-file-wrap" id="fileWrap_{{ $q->id }}">
+                                <label class="qz-file-label" for="fileInput_{{ $q->id }}">
+                                    <span class="qz-file-icon" aria-hidden="true">📎</span>
+                                    <span class="qz-file-hint">{{ $q->options_scale ?? 'PDF, image or Word file' }} — max 5 MB</span>
+                                    <input type="file"
+                                           id="fileInput_{{ $q->id }}"
+                                           class="qz-file-input"
+                                           data-qid="{{ $q->id }}"
+                                           accept=".pdf,.jpg,.jpeg,.png,.docx"
+                                           onchange="qzHandleFileChange('{{ $q->id }}', this)">
+                                </label>
+                                <div class="qz-file-chosen" id="fileChosen_{{ $q->id }}" hidden>
+                                    <span class="qz-file-name" id="fileName_{{ $q->id }}"></span>
+                                    <button type="button" class="qz-file-remove"
+                                            onclick="qzRemoveFile('{{ $q->id }}')"
+                                            aria-label="Remove file">✕</button>
+                                </div>
+                                <div class="qz-file-error" id="fileErr_{{ $q->id }}" role="alert"></div>
+                            </div>
+                            {{-- Hidden value sent in form data; filled by qzHandleFileChange --}}
+                            <input type="hidden" class="qz-form-field" data-qid="{{ $q->id }}" id="hidFile_{{ $q->id }}">
+
                         @else
                             <label class="qz-field-label">
                                 {{ $q->question }} <span style="color:#e84040">*</span>
@@ -705,7 +805,7 @@
         const totalIn = Math.round(cm / 2.54);
         const ft = Math.floor(totalIn / 12);
         const inch = totalIn % 12;
-        return ft + "'" + inch + '"';
+        return ft + 'ft ' + inch + 'in (' + cm + 'cm)';
     }
 
     // ---------- build dropdown options ----------
@@ -716,12 +816,15 @@
                 out.push({ label: cm + ' cm', cm: cm });
             }
         } else {
+            // Iterate by total-inches so each (ft, in) label appears exactly once.
+            // cm is derived from the inch value to avoid rounding duplicates.
             const minInches = Math.ceil(HEIGHT_MIN_CM / 2.54);
             const maxInches = Math.floor(HEIGHT_MAX_CM / 2.54);
             for (let totalIn = minInches; totalIn <= maxInches; totalIn++) {
                 const ft = Math.floor(totalIn / 12);
                 const inch = totalIn % 12;
-                out.push({ label: ft + "'" + inch + '"', cm: Math.round(totalIn * 2.54) });
+                const cm = Math.round(totalIn * 2.54);
+                out.push({ label: ft + 'ft ' + inch + 'in (' + cm + 'cm)', cm: cm });
             }
         }
         return out;
@@ -818,10 +921,6 @@
         }
 
         state.valueCm = cm;
-        if (hidEl) hidEl.value = qzFormatHeightCm(cm, state.mode) === (cm + ' cm')
-            ? cm + ' cm'
-            : qzFormatHeightCm(cm, 'ft').replace("'", 'ft ').replace('"', 'in') + ' (' + cm + 'cm)';
-
         // Simpler: store as ft+in (cm) for ft mode, cm only for cm mode
         if (state.mode === 'cm') {
             hidEl.value = cm + ' cm';
@@ -978,6 +1077,115 @@
             });
         });
     });
+</script>
+
+<script>
+/* ==========================================================================
+   C7-FIX-A: Q32 periods visibility — show only when gender is Girl.
+   - Stores the original `required` state on first call so it can be restored.
+   - Removes `required` and clears the hidden field when the block is hidden.
+   - qzGo/qzSubmit in questionnaire.js already skip fields in display:none
+     blocks via qzFieldIsHidden(), so this is a defence-in-depth measure.
+   ========================================================================== */
+function qzUpdatePeriodsVisibility(genderVal) {
+    var gender = (genderVal || '').trim().toLowerCase();
+    var periodsBlocks = document.querySelectorAll('[data-qz-periods-question]');
+    periodsBlocks.forEach(function (block) {
+        var fields = block.querySelectorAll('.qz-form-field');
+
+        if (gender === 'girl') {
+            block.style.display = '';
+            // Restore original required state if previously stored
+            fields.forEach(function (f) {
+                if (f.dataset.qzWasRequired === 'true') {
+                    f.required = true;
+                }
+            });
+        } else {
+            block.style.display = 'none';
+            // Store original required state once, then remove it
+            fields.forEach(function (f) {
+                if (f.dataset.qzWasRequired === undefined) {
+                    f.dataset.qzWasRequired = f.required ? 'true' : 'false';
+                }
+                f.required = false;
+                f.value = '';
+                // Deselect any chip
+            });
+            block.querySelectorAll('.qz-choice-chip.selected').forEach(function (chip) {
+                chip.classList.remove('selected');
+            });
+        }
+    });
+}
+
+/* ==========================================================================
+   C7-FIX-C: Exclusive chip logic is now inside qzSelectChip in questionnaire.js.
+   The inline wrapper was removed because questionnaire.js is loaded AFTER this
+   script block, so any wrapper here would either wrap undefined or be
+   overwritten when questionnaire.js defines qzSelectChip authoritatively.
+   ========================================================================== */
+
+/* ==========================================================================
+   C7: Q31 file upload handling
+   ========================================================================== */
+
+/** Allowed MIME types for blood report upload — validated server-side too. */
+var QZ_BLOOD_REPORT_ALLOWED_EXTS = ['pdf', 'jpg', 'jpeg', 'png', 'docx'];
+var QZ_BLOOD_REPORT_MAX_BYTES = 5 * 1024 * 1024; // 5 MB placeholder — owner to confirm
+
+function qzHandleFileChange(qid, input) {
+    var errEl    = document.getElementById('fileErr_' + qid);
+    var nameEl   = document.getElementById('fileName_' + qid);
+    var chosenEl = document.getElementById('fileChosen_' + qid);
+    var hidEl    = document.getElementById('hidFile_' + qid);
+
+    if (errEl)    errEl.textContent = '';
+    if (chosenEl) chosenEl.hidden = true;
+    if (hidEl)    hidEl.value = '';
+
+    var file = input.files && input.files[0];
+    if (!file) return;
+
+    // Extension check (client-side hint; real MIME check is server-side)
+    var ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (!QZ_BLOOD_REPORT_ALLOWED_EXTS.includes(ext)) {
+        if (errEl) errEl.textContent = 'Only PDF, JPG, PNG, or DOCX files are allowed. This file type is not accepted.';
+        input.value = '';
+        return;
+    }
+    // Size check
+    if (file.size > QZ_BLOOD_REPORT_MAX_BYTES) {
+        if (errEl) errEl.textContent = 'File is too large. Maximum size is 5 MB.';
+        input.value = '';
+        return;
+    }
+
+    // Show chosen file name + remove button
+    if (nameEl)   nameEl.textContent = file.name;
+    if (chosenEl) chosenEl.hidden = false;
+    // Store the file reference in the hidden field's dataset so qzSubmit can retrieve it
+    if (hidEl) {
+        hidEl.value = '__file_pending__'; // non-empty so the step validator passes
+        hidEl.dataset.pendingFile = '1';
+    }
+}
+
+function qzRemoveFile(qid) {
+    var input    = document.getElementById('fileInput_' + qid);
+    var chosenEl = document.getElementById('fileChosen_' + qid);
+    var hidEl    = document.getElementById('hidFile_' + qid);
+    var errEl    = document.getElementById('fileErr_' + qid);
+
+    if (input)    { input.value = ''; }
+    if (chosenEl) chosenEl.hidden = true;
+    if (hidEl)    { hidEl.value = ''; delete hidEl.dataset.pendingFile; }
+    if (errEl)    errEl.textContent = '';
+}
+
+/* On submit, questionnaire.js detects the pending file via qzFindChosenFile()
+   and builds a FormData payload automatically (C7-FIX-B).
+   The qzBuildFormDataHook approach is no longer needed.               */
 </script>
 <script src="{{ asset('js/questionnaire.js') }}"></script>
 @endsection

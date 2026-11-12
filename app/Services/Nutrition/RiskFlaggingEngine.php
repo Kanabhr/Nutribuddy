@@ -13,21 +13,23 @@ use Illuminate\Support\Collection;
  * Correlates the parent-visible signs answered in Q26 (questionnaire)
  * with DeficiencyRule rows and materialises ClinicalFlag records.
  *
- * Q26 option texts (exact, as seeded by QuestionnaireQuestionsSeeder):
- *   "Pale eyes/skin"
- *   "Tiredness"
- *   "Hair fall"
- *   "Brittle nails"
- *   "Mouth-corner cracks/ulcers"
- *   "Night-vision trouble"
- *   "Delayed teeth/bowed legs"
- *   "Poor focus"
- *   "None"
+ * Q26 option texts as of C7 (new labels):
+ *   "Pale skin or eyes"           → sign "Pale eyes/skin"
+ *   "Tiredness or low energy"     → sign "Tiredness"
+ *   "Hair fall"                   → sign "Hair fall"
+ *   "Brittle nails"               → sign "Brittle nails"
+ *   "Mouth ulcers or cracks"      → sign "Mouth-corner cracks/ulcers"
+ *   "Poor night vision"           → sign "Night-vision trouble"
+ *   "Delayed teeth or bowed legs" → sign "Delayed teeth/bowed legs"
+ *   "Poor concentration"          → sign "Poor focus"
+ *   "None of the above"           → no flag
+ *   "Not sure"                    → no flag
  *
- * DeficiencyRulesSeeder seeds one deficiency_rules row per option above
- * (except "None") using those strings as the `sign` column value.
- * This engine does an exact whereIn on deficiency_rules.sign — so the
- * strings must match precisely.
+ * Legacy labels (pre-C7) are also accepted via VisibleSignsMap so
+ * already-saved answers continue to produce the correct flags.
+ *
+ * DeficiencyRulesSeeder and the deficiency_rules table are NOT changed.
+ * The mapping lives entirely in VisibleSignsMap::toSigns().
  */
 class RiskFlaggingEngine
 {
@@ -42,21 +44,22 @@ class RiskFlaggingEngine
      */
     public function generateFlags(ChildAssessment $assessment, array $answers): Collection
     {
-        $signs = collect($answers['visible_signs'] ?? [])
-            ->map(fn($sign) => trim((string) $sign))
+        $rawSigns = collect($answers['visible_signs'] ?? [])
+            ->map(fn ($sign) => trim((string) $sign))
             ->filter()
-            ->reject(fn($sign) => strtolower($sign) === 'none') // "None" has no rule
-            ->unique()
-            ->values();
+            ->values()
+            ->all();
 
-        if ($signs->isEmpty()) {
+        // Map new/legacy labels to canonical deficiency_rules.sign strings.
+        $signs = VisibleSignsMap::toSigns($rawSigns);
+
+        if ($signs === []) {
             return collect();
         }
 
         $flags = collect();
 
-        // Exact match on deficiency_rules.sign — seeded by DeficiencyRulesSeeder
-        // using the Q26 option texts verbatim.
+        // Exact match on deficiency_rules.sign — seeded by DeficiencyRulesSeeder.
         $rules = DeficiencyRule::whereIn('sign', $signs)->get();
 
         foreach ($rules as $rule) {
@@ -77,20 +80,19 @@ class RiskFlaggingEngine
      * Return likely_gap strings for matched signs, without persisting flags.
      * Useful for passing to ComboEngine::getCombos() as the $flags argument.
      *
-     * @param  array<string>  $signs  Q26 option values
+     * @param  array<string>  $signs  Q26 option values (new or legacy labels)
      * @return array<string>          unique likely_gap values
      */
     public function resolveGapLabels(array $signs): array
     {
-        $filtered = collect($signs)
-            ->map(fn($s) => trim((string) $s))
-            ->filter()
-            ->reject(fn($s) => strtolower($s) === 'none')
-            ->unique()
-            ->values()
-            ->all();
+        // Map new/legacy labels to canonical deficiency_rules.sign strings.
+        $canonicalSigns = VisibleSignsMap::toSigns($signs);
 
-        return DeficiencyRule::whereIn('sign', $filtered)
+        if ($canonicalSigns === []) {
+            return [];
+        }
+
+        return DeficiencyRule::whereIn('sign', $canonicalSigns)
             ->pluck('likely_gap')
             ->unique()
             ->values()

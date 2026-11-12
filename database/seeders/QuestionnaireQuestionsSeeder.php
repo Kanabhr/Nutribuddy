@@ -259,7 +259,7 @@ class QuestionnaireQuestionsSeeder extends Seeder
               "id": 23,
               "question": "Growth trend (last 6 months)",
               "answer_type": "Choice",
-              "options_scale": "Gaining well / About the same / Lost weight  •  vs peers: smaller / average / larger",
+              "options_scale": "Gaining weight steadily / Weight has remained mostly the same / Has lost weight / Seems smaller than children of the same age / Seems about average compared to children of the same age / Seems larger than children of the same age",
               "clinical_reason": "Trajectory matters more than one reading",
               "shapes_chart": "Escalation / calorie push",
               "only_ask_if": "always"
@@ -286,7 +286,7 @@ class QuestionnaireQuestionsSeeder extends Seeder
               "id": 26,
               "question": "Visible signs you notice",
               "answer_type": "Multi",
-              "options_scale": "Pale eyes/skin · Tiredness · Hair fall · Brittle nails · Mouth-corner cracks/ulcers · Night-vision trouble · Delayed teeth/bowed legs · Poor focus · None",
+              "options_scale": "Pale skin or eyes / Tiredness or low energy / Hair fall / Brittle nails / Mouth ulcers or cracks / Poor night vision / Delayed teeth or bowed legs / Poor concentration / None of the above / Not sure",
               "clinical_reason": "Parent-visible clues to iron/Vit D/B-complex/Vit A/zinc gaps",
               "shapes_chart": "Flags likely deficiency → targeted foods + \'test\' nudge",
               "only_ask_if": "always"
@@ -340,8 +340,8 @@ class QuestionnaireQuestionsSeeder extends Seeder
             {
               "id": 31,
               "question": "Latest blood report",
-              "answer_type": "Numbers (optional)",
-              "options_scale": "Hb · Ferritin · Vitamin D · B12 · TSH",
+              "answer_type": "File",
+              "options_scale": "PDF, image or Word file",
               "clinical_reason": "Turns \'maybe low\' into a measured gap",
               "shapes_chart": "Precise gap → honest supplement dosing",
               "only_ask_if": "only if report available"

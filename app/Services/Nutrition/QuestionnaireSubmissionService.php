@@ -10,14 +10,20 @@ use App\Models\Nutrition\QuestionnaireQuestion;
 use App\Models\User;
 use App\Support\PlanAccess;
 use Carbon\Carbon;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class QuestionnaireSubmissionService
 {
     /** @param array<string, mixed> $validated */
     public function submit(User $user, array $validated): array
     {
-        $result = DB::transaction(function () use ($user, $validated): array {
+        // Resolve the Q31 file before entering the transaction (file I/O outside DB tx).
+        $bloodReportPath = $this->storeBloodReport($validated);
+
+        $result = DB::transaction(function () use ($user, $validated, $bloodReportPath): array {
             $child = isset($validated['child_id'])
                 ? $user->children()->findOrFail($validated['child_id'])
                 : null;
@@ -31,6 +37,19 @@ class QuestionnaireSubmissionService
             $answersByOrder = $answers->mapWithKeys(fn ($value, $questionId) => [
                 $sortOrders[$questionId] ?? $questionId => $value,
             ]);
+
+            // Substitute the stored file path for the uploaded file object in answersByOrder.
+            if ($bloodReportPath !== null) {
+                $bloodQ = QuestionnaireQuestion::where('sort_order', 31)->first();
+                if ($bloodQ) {
+                    $answersByOrder[$bloodQ->sort_order] = $bloodReportPath;
+                    // Also update the $answers collection (keyed by question id) so the
+                    // answer row is written correctly below.
+                    $answers = $answers->map(fn ($v, $qId) =>
+                        ((int) ($sortOrders[$qId] ?? $qId) === 31) ? $bloodReportPath : $v
+                    );
+                }
+            }
 
             $name = $answersByOrder->get(1) ?? $child?->name ?? 'Child';
             $dobInput = $answersByOrder->get(2);
@@ -101,7 +120,8 @@ class QuestionnaireSubmissionService
                 // Skip null, empty-string, and empty-array answers so the NOT NULL
                 // constraint on answer_value is never violated for optional questions.
                 // Any previous answer copied forward from an earlier assessment is kept.
-                if ($value === null || $value === '' || $value === []) {
+                // Also skip raw UploadedFile objects — the path was already substituted above.
+                if ($value === null || $value === '' || $value === [] || $value instanceof UploadedFile) {
                     continue;
                 }
 
@@ -120,6 +140,44 @@ class QuestionnaireSubmissionService
         $this->maybeGenerateChartAfterSubmit($user, $result['child_id'], $validated['plan_slug'] ?? 'basic');
 
         return $result;
+    }
+
+    /**
+     * Store the uploaded blood-report file (Q31) on the private disk.
+     *
+     * Returns the stored path string, or null if no file was uploaded.
+     * File is stored at blood_reports/{assessment_id_placeholder}/{random}.{ext}
+     * We do not have the assessment id yet, so we use a random UUID as the folder.
+     *
+     * MAX SIZE constant is in VisibleSignsMap::BLOOD_REPORT_MAX_BYTES.
+     * Allowed MIME types: pdf, jpg, jpeg, png, docx.
+     * The disk is 'local' (private, not publicly accessible).
+     */
+    private function storeBloodReport(array &$validated): ?string
+    {
+        // Find Q31's question id.
+        $bloodQ = QuestionnaireQuestion::where('sort_order', 31)->first();
+        if (! $bloodQ) {
+            return null;
+        }
+
+        $key = 'q_'.$bloodQ->id;
+        $file = $validated[$key] ?? null;
+
+        if (! ($file instanceof UploadedFile)) {
+            return null;
+        }
+
+        $folder = 'blood_reports/'.Str::uuid();
+        $ext    = strtolower($file->getClientOriginalExtension());
+        $name   = Str::random(40).'.'.$ext;
+
+        $path = $file->storeAs($folder, $name, ['disk' => 'local']);
+
+        // Replace the UploadedFile with the path so carry-over and answer save work.
+        $validated[$key] = $path;
+
+        return $path;
     }
 
     /**

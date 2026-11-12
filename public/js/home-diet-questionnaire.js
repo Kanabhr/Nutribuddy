@@ -39,8 +39,20 @@ function initHomeDietQuestionnaire() {
         const select = control.querySelector('[data-home-height-select]');
         if (!state || !select) return;
         select.replaceChildren(new Option(state.mode === 'cm' ? 'Select height (cm)' : 'Select height (ft / in)', ''));
-        for (let cm = 91; cm <= 213; cm++) {
-            select.add(new Option(heightLabel(cm, state.mode), String(cm), false, state.cm === cm));
+        if (state.mode === 'cm') {
+            for (let cm = 91; cm <= 213; cm++) {
+                select.add(new Option(heightLabel(cm, state.mode), String(cm), false, state.cm === cm));
+            }
+        } else {
+            // C7-FIX-3: iterate by total inches so each (ft, in) label appears
+            // exactly once.  Deriving cm from the inch value avoids the rounding
+            // duplicates that happen when iterating cm and converting to inches.
+            const minInches = Math.ceil(91 / 2.54);
+            const maxInches = Math.floor(213 / 2.54);
+            for (let totalIn = minInches; totalIn <= maxInches; totalIn++) {
+                const cm = Math.round(totalIn * 2.54);
+                select.add(new Option(heightLabel(cm, state.mode), String(cm), false, state.cm === cm));
+            }
         }
         select.add(new Option('Enter manually…', '__custom__'));
     }

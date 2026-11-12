@@ -61,6 +61,28 @@ class SubmitQuestionnaireRequest extends FormRequest
             }
         }
 
+        // Step 3 – Q32 "Periods started?" must only be stored for girls.
+        // If the child's gender (sort_order 3, Q3) is "boy" (case-insensitive),
+        // drop any submitted Q32 answer so it is never persisted.
+        // We determine gender from the submitted answer to the question at
+        // sort_order 3; if that answer is not in this submission we cannot
+        // tell gender here (carry-over path), so we leave Q32 alone and rely
+        // on the server-side strip in QuestionnaireSubmissionService.
+        $genderQuestion = QuestionnaireQuestion::where('sort_order', 3)->first();
+        $periodsQuestion = QuestionnaireQuestion::where('sort_order', 32)->first();
+
+        if ($genderQuestion && $periodsQuestion) {
+            $genderKey  = 'q_'.$genderQuestion->id;
+            $periodsKey = 'q_'.$periodsQuestion->id;
+
+            if (array_key_exists($genderKey, $input)) {
+                $genderVal = strtolower(trim((string) (is_array($input[$genderKey]) ? ($input[$genderKey][0] ?? '') : $input[$genderKey])));
+                if ($genderVal === 'boy' && array_key_exists($periodsKey, $input)) {
+                    unset($input[$periodsKey]);
+                }
+            }
+        }
+
         $this->replace($input);
     }
 
@@ -77,8 +99,36 @@ class SubmitQuestionnaireRequest extends FormRequest
             'cycle' => ['nullable', 'string', 'in:monthly,quarterly,annually'],
         ];
 
+        // Q31 blood report — optional file upload, validated by real MIME type.
+        // MAX SIZE: 5 MB placeholder — unverified, owner to confirm.
+        $periodsQuestion = QuestionnaireQuestion::where('sort_order', 32)->first();
+        $bloodReportQuestion = QuestionnaireQuestion::where('sort_order', 31)->first();
+
+        if ($bloodReportQuestion) {
+            $bloodKey = 'q_'.$bloodReportQuestion->id;
+            if ($this->hasFile($bloodKey)) {
+                $rules[$bloodKey] = [
+                    'nullable',
+                    'file',
+                    'max:'.(int) (\App\Services\Nutrition\VisibleSignsMap::BLOOD_REPORT_MAX_BYTES / 1024),
+                    'mimes:pdf,jpg,jpeg,png,docx',
+                ];
+            } else {
+                $rules[$bloodKey] = ['nullable'];
+            }
+        }
+
+        // Q32 periods — not required; already stripped for boys in prepareForValidation.
+        if ($periodsQuestion) {
+            $rules['q_'.$periodsQuestion->id] = ['nullable', 'string', 'max:255'];
+        }
+
         foreach ($this->all() as $key => $value) {
             if (preg_match('/^q_[1-9]\d*$/', (string) $key)) {
+                // Don't overwrite blood report or periods rules already set above.
+                if (isset($rules[$key])) {
+                    continue;
+                }
                 $rules[$key] = ['nullable', function (string $attribute, mixed $value, \Closure $fail): void {
                     if (! is_scalar($value) && ! is_array($value)) {
                         $fail('The answer must be a scalar value or a list of values.');
