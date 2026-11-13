@@ -48,7 +48,12 @@ class ProductReviewUploadRegressionTest extends TestCase
     {
         $user = User::factory()->create();
         $order = Order::factory()->create(['user_id' => $user->id, 'status' => $status]);
-        OrderItem::factory()->create(['order_id' => $order->id, 'product_id' => $product->id]);
+                OrderItem::factory()->create([
+            'order_id' => $order->id,
+            'product_id' => $product->id,
+            'product_name' => $product->name,
+            'sku' => 'TEST-SKU-'.$product->id,
+        ]);
 
         return $user;
     }

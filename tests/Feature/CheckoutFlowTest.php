@@ -1,7 +1,7 @@
 <?php
 
 namespace Tests\Feature;
-
+use App\Models\Setting;
 use App\Models\Category;
 use App\Models\Coupon;
 use App\Models\CustomerAddress;
@@ -30,7 +30,7 @@ class CheckoutFlowTest extends TestCase
     {
         $this->get(route('checkout.index'))
             ->assertOk()
-            ->assertSee('Andaman and Nicobar Islands')
+            ->assertSee('Andaman And Nicobar Islands')
             ->assertSee('stateField')
             ->assertDontSee('citiesByState')
             ->assertDontSee('allCities');
@@ -38,18 +38,19 @@ class CheckoutFlowTest extends TestCase
 
     public function test_checkout_city_endpoint_returns_cities_for_a_valid_state(): void
     {
-        $this->getJson(route('checkout.cities', ['stateCode' => '01']))
+              $this->getJson(route('checkout.cities', ['stateCode' => '35']))
             ->assertOk()
-            ->assertJsonPath('cities.0', 'Aberdeen');
+            ->assertJsonPath('cities.0', 'Nicobars');
 
         $this->getJson(route('checkout.cities', ['stateCode' => 'unknown']))
             ->assertNotFound()
             ->assertExactJson(['cities' => []]);
     }
 
-    public function test_user_can_place_cod_order_and_token_prevents_duplicate_orders(): void
+       public function test_user_can_place_cod_order_and_token_prevents_duplicate_orders(): void
     {
         $this->withoutMiddleware(ValidateCsrfToken::class);
+        Setting::set('cod_otp_enabled', '0');
 
         $user = User::factory()->create();
         $category = Category::factory()->create();

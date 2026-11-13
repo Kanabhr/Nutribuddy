@@ -34,7 +34,7 @@
 
         @if ($reviewState === 'guest')
             <p class="sub">Please log in to review this product.</p>
-            <a class="pdp-review-submit" style="text-decoration:none;display:inline-block;" href="{{ route('login') }}">Log in</a>
+            <a class="pdp-review-submit" style="text-decoration:none;display:inline-block;" href="{{ route('frontend.login') }}">Log in</a>
         @elseif ($reviewState === 'not_purchased')
             <div class="pdp-review-note">Only customers who have received this product can review it. Once your order is delivered, you can review it here.</div>
         @elseif ($reviewState === 'already_reviewed')
