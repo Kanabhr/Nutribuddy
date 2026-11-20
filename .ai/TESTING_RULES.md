@@ -2,7 +2,22 @@
 
 Install PHP dependencies with `composer install` and frontend dependencies with `npm ci`.
 
-Before a focused change, check `git status` and run relevant existing tests to establish a baseline. Afterward run the applicable checks and report failures separately from skipped checks:
+## Required regression workflow
+
+For every code change:
+
+1. Check `git status` and inspect the affected implementation, callers, routes, permissions, database operations, views, and dependent workflows before editing.
+2. Run relevant existing tests before editing and record the baseline, including existing failures. Identify the tests and business rules that cover the affected behavior.
+3. Add or update tests for the new or changed behavior. Run those tests, directly affected regression tests, dependent module or integration tests, and the complete available suite.
+4. Verify affected routes, permissions, database behavior, calculations, reports, and frontend or Livewire interactions where applicable.
+5. Compare the results to baseline. Investigate and fix regressions without changing or removing existing tests just to make the suite pass.
+6. Review the final diff and report passes, failures, baseline failures, skipped checks, unverified behavior, and remaining risks. Do not claim unrelated functionality is unaffected without evidence.
+
+If coverage is missing, add relevant tests where practical. If a check cannot be run, say why and identify the behavior that remains unverified.
+
+## Local quality checks
+
+After focused regression tests, run the full available checks and report failures separately from skipped checks:
 
 ```sh
 composer validate
