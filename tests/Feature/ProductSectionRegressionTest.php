@@ -79,6 +79,19 @@ class ProductSectionRegressionTest extends TestCase
         $response->assertStatus(200);
         $response->assertViewIs('pages.product');
         $response->assertViewHas('product');
+        $response->assertSee('pdp-formula-reveal');
+        $response->assertSee('Meet your nutrition buddy');
+        $response->assertSee('Little gummy.');
+        $response->assertSee('Thoughtful formula.');
+        $response->assertSee('Brain Booster Gummies');
+        $response->assertSee('assets/brain/hero-reveal.webp');
+        $response->assertSee('Ayurveda + nutraceutical');
+        $response->assertSee('Brahmi & Shankhpushpi');
+        $response->assertSee('20 mg');
+        $response->assertSee('No preservatives');
+        $response->assertSee('100% vegetarian');
+        $response->assertSee('Choose your plan');
+        $response->assertSee('Explore ingredients');
     }
 
     public function test_authenticated_user_can_add_product_to_cart(): void

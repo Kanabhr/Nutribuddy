@@ -1781,3 +1781,277 @@
         padding: 0 30px !important;
     }
 }
+
+/* Product detail: Brain Booster formula reveal, matched to the standalone page. */
+.pdp-formula-reveal {
+    position: relative;
+    overflow: hidden;
+    width: 100vw;
+    margin: 0 0 0 calc(50% - 50vw);
+    background: radial-gradient(ellipse at 50% 50%, #ffeff8, transparent), linear-gradient(110deg, #ffeff6, #f7eaff);
+    color: #281638;
+    font-family: 'Nunito', sans-serif;
+}
+
+.pdp-formula-shell {
+    max-width: 1500px;
+    margin: 0 auto;
+    padding: 45px 56px 40px;
+}
+
+.pdp-formula-heading {
+    position: relative;
+    z-index: 1;
+    margin: 0 0 6px;
+    text-align: center;
+}
+
+.pdp-formula-heading .pdp-formula-eyebrow {
+    margin: 0 0 10px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: #ff408c;
+    font-size: 14px;
+    font-weight: 900;
+    letter-spacing: 3.5px;
+    line-height: 1.5;
+    text-transform: uppercase;
+}
+
+.pdp-formula-heading h2 {
+    margin: 0;
+    color: #281638;
+    font-family: 'Fredoka', 'Fredoka One', sans-serif;
+    font-size: 49px;
+    font-weight: 400;
+    letter-spacing: -.5px;
+    line-height: 1.16;
+}
+
+.pdp-formula-heading h2 em {
+    color: #ff378e;
+    font-style: normal;
+}
+
+.pdp-formula-product-name {
+    margin: 0 0 13px;
+    color: #281638;
+    font-family: 'Fredoka', 'Fredoka One', sans-serif;
+    font-size: 26px;
+    font-weight: 400;
+    line-height: 1.2;
+    text-align: center;
+}
+
+.pdp-ayurveda-pill {
+    display: flex;
+    width: max-content;
+    max-width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 0 auto;
+    padding: 8px 24px;
+    border: 1px solid #ff9bd4;
+    border-radius: 30px;
+    background: #fff8fc;
+    font-size: 17px;
+    font-weight: 900;
+}
+
+.pdp-ayurveda-pill svg {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 auto;
+}
+
+.pdp-formula-stage {
+    position: relative;
+    isolation: isolate;
+    width: 100%;
+    max-width: 1250px;
+    height: 620px;
+    margin: -5px auto -30px;
+}
+
+.pdp-formula-stage > img {
+    position: relative;
+    z-index: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    mix-blend-mode: multiply;
+}
+
+.pdp-formula-word {
+    position: absolute;
+    z-index: -1;
+    top: -.03em;
+    left: 50%;
+    width: 100%;
+    color: rgba(207, 173, 232, .05);
+    font-family: 'Fredoka', 'Fredoka One', sans-serif;
+    font-size: clamp(150px, 22vw, 310px);
+    font-weight: 400;
+    letter-spacing: .025em;
+    line-height: 1;
+    text-align: center;
+    -webkit-text-stroke: 1.5px rgba(188, 139, 221, .22);
+    transform: translateX(-50%);
+    pointer-events: none;
+    user-select: none;
+}
+
+.pdp-formula-stat {
+    position: absolute;
+    z-index: 1;
+    top: 31%;
+    display: flex;
+    max-width: 260px;
+    flex-direction: column;
+}
+
+.pdp-formula-stat--left { left: 2%; }
+.pdp-formula-stat--right { right: 1%; }
+
+.pdp-formula-stat strong {
+    color: #401043;
+    font-family: 'Fredoka', 'Fredoka One', sans-serif;
+    font-size: 76px;
+    font-weight: 400;
+    line-height: .95;
+}
+
+.pdp-formula-stat--right strong { color: #ee007e; }
+
+.pdp-formula-stat b {
+    margin-top: 6px;
+    color: #401043;
+    font-family: 'Fredoka', 'Fredoka One', sans-serif;
+    font-size: 25px;
+    font-weight: 400;
+    line-height: 1.25;
+}
+
+.pdp-formula-stat small { font-size: 18px; }
+
+.pdp-formula-badges {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    justify-content: center;
+    margin: 15px auto 0;
+}
+
+.pdp-formula-badges > div {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding: 0 25px;
+    border-right: 1px solid #efa7d2;
+    color: #401043;
+    font-size: 16px;
+}
+
+.pdp-formula-badges > div:last-child { border-right: 0; }
+
+.pdp-formula-icon {
+    display: inline-flex;
+    width: 49px;
+    height: 49px;
+    flex: 0 0 auto;
+    place-items: center;
+    justify-content: center;
+    border: 1px solid #e5b6dc;
+    border-radius: 50%;
+    background: #fce5f1;
+    color: #551849;
+}
+
+.pdp-formula-icon svg {
+    width: 28px;
+    height: 28px;
+}
+
+.pdp-formula-icon.tone-1 { background: #e7f6ff; color: #6a3eaa; }
+.pdp-formula-icon.tone-2 { background: #e9faef; color: #326756; }
+.pdp-formula-icon.tone-3 { background: #fff7d9; color: #745b21; }
+
+.pdp-formula-reveal .pdp-formula-eyebrow::before,
+.pdp-formula-reveal .pdp-formula-eyebrow::after {
+    display: none;
+}
+
+.pdp-formula-caption,
+.pdp-formula-note {
+    color: #625b76;
+    text-align: center;
+}
+
+.pdp-formula-caption { margin: 23px 0 14px; font-size: 16px; }
+
+.pdp-formula-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 14px;
+}
+
+.pdp-formula-actions a {
+    display: inline-flex;
+    min-width: 230px;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 13px 22px;
+    border: 1px solid #401043;
+    border-radius: 28px;
+    font-weight: 900;
+    text-decoration: none;
+}
+
+.pdp-formula-primary { background: #400a49; color: #fff; }
+.pdp-formula-secondary { background: #fff8fc; color: #400a49; }
+.pdp-formula-actions a:focus-visible { outline: 3px solid #ff378e; outline-offset: 3px; }
+.pdp-formula-note { margin: 10px 0 0; font-size: 14px; }
+
+@media (max-width: 1250px) {
+    .pdp-formula-shell { padding-right: 40px; padding-left: 40px; }
+    .pdp-formula-stage { height: 540px; }
+    .pdp-formula-stat strong { font-size: 62px; }
+    .pdp-formula-stat b { font-size: 21px; }
+    .pdp-formula-stat--left { left: 0; }
+    .pdp-formula-stat--right { right: 0; }
+    .pdp-formula-badges > div { padding: 0 16px; font-size: 14px; }
+}
+
+@media (max-width: 767px) {
+    .pdp-formula-shell { padding: 33px 20px 30px; }
+    .pdp-formula-heading { margin-bottom: 27px; }
+    .pdp-formula-heading h2 { font-size: 31px; line-height: 1.2; letter-spacing: -.3px; }
+    .pdp-formula-heading .pdp-formula-eyebrow { font-size: 9px; letter-spacing: 2px; margin-bottom: 12px; }
+    .pdp-formula-product-name { font-size: 18px; margin-top: 9px; margin-bottom: 13px; }
+    .pdp-ayurveda-pill { font-size: 12px; padding: 6px 14px; }
+    .pdp-ayurveda-pill svg { width: 16px; height: 16px; }
+    .pdp-formula-stage { margin: 5px -20px -10px; height: 380px; }
+    .pdp-formula-stage > img { object-fit: cover; object-position: center; }
+    .pdp-formula-stat { top: 4%; max-width: 110px; }
+    .pdp-formula-stat--left { left: 17px; }
+    .pdp-formula-stat--right { right: 12px; text-align: right; }
+    .pdp-formula-stat strong { font-size: 37px; }
+    .pdp-formula-stat b { font-size: 11px; line-height: 1.3; margin-top: 3px; }
+    .pdp-formula-stat small { font-size: 10px; }
+    .pdp-formula-word { top: .12em; font-size: 29vw; letter-spacing: .015em; }
+    .pdp-formula-badges { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px; }
+    .pdp-formula-badges > div { gap: 8px; padding: 0; border: 0; font-size: 11px; }
+    .pdp-formula-icon { width: 35px; height: 35px; }
+    .pdp-formula-icon svg { width: 21px; }
+    .pdp-formula-caption { margin: 20px 0 15px; font-size: 12px; line-height: 1.6; }
+    .pdp-formula-actions { gap: 10px; }
+    .pdp-formula-actions a { min-width: 0; flex: 1; padding: 11px 7px; font-size: 12px; }
+    .pdp-formula-note { font-size: 11px; }
+}

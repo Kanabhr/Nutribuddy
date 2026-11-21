@@ -135,17 +135,6 @@
                 ? route('storage.public', ['path' => $path])
                 : '';
         };
-        $psBrandTitle = $product->ps_brand_title;
-        $psProductTitle = $product->ps_product_title;
-        $psTaglineItems = !empty($product->ps_tagline_items) ? $product->ps_tagline_items : [];
-        $psLeftLabel = $product->ps_left_label;
-        $psLeftCards = !empty($product->ps_left_cards) ? $product->ps_left_cards : [];
-        $psCenterImage = $problemSolutionAsset($product->ps_center_image);
-        $psRightLabel = $product->ps_right_label;
-        $psRightCards = !empty($product->ps_right_cards) ? $product->ps_right_cards : [];
-        $psShelfLeftImage = $problemSolutionAsset($product->ps_shelf_left_image);
-        $psShelfRightImage = $problemSolutionAsset($product->ps_shelf_right_image);
-
         $transformDescription = $product->transform_description;
         $transformMainImage = $problemSolutionAsset($product->transform_main_image);
         $transformResults = is_array($product->transform_results) ? $product->transform_results : [];
@@ -887,108 +876,47 @@
             </div>
             @endif
 
-            <!-- DIVIDER -->
-            <div class="ps-divider reveal">
-                <div class="div-arrow">↓</div>
-                <div class="div-badge"> Here's Our Answer</div>
-                <div class="div-arrow">↓</div>
-            </div>
+        </div>
 
-            <section class="nb__section reveal">
-                <div class="nb__leaf-cluster nb__leaf-cluster--tl" aria-hidden="true"></div>
-                <div class="nb__leaf-cluster nb__leaf-cluster--tr" aria-hidden="true"></div>
-                <div class="nb__leaf-cluster nb__leaf-cluster--bl" aria-hidden="true"></div>
-                <div class="nb__leaf-cluster nb__leaf-cluster--br" aria-hidden="true"></div>
-
-                <div class="nb__wrap">
-                    <header class="nb__headline">
-                        <h2 class="nb__brand-title">{{ $psBrandTitle }}</h2>
-                        <h3 class="nb__product-title">{{ $psProductTitle }}</h3>
-                        <p class="nb__tagline">
-                            @foreach ($psTaglineItems as $taglineIndex => $taglineItem)
-                                @if ($taglineIndex > 0)
-                                    <span>&bull;</span>
-                                @endif
-                                {{ $taglineItem }}
-                            @endforeach
-                        </p>
+    <section class="pdp-formula-reveal" aria-labelledby="pdp-formula-title">
+                <div class="pdp-formula-shell">
+                    <header class="pdp-formula-heading section-heading center">
+                        <p class="pdp-formula-eyebrow eyebrow">Meet your nutrition buddy</p>
+                        <h2 id="pdp-formula-title">Little gummy. <em>Thoughtful formula.</em></h2>
                     </header>
-
-                    <div class="nb__main-grid">
-                        <aside class="nb__ingredients-col">
-                            <div class="nb__corner-label">{!! nl2br(e($psLeftLabel)) !!}</div>
-
-                            @foreach ($psLeftCards as $ingredientIndex => $ingredientCard)
-                                @php
-                                    $ingredientIcon = $problemSolutionAsset($ingredientCard['icon'] ?? '');
-                                    $ingredientTitle = $ingredientCard['title'] ?? '';
-                                    $ingredientText = $ingredientCard['text'] ?? '';
-                                @endphp
-                                <article class="nb__ingredient-card">
-                                    <div class="nb__ingredient-img">
-                                        <img src="{{ $ingredientIcon }}" alt="{{ $ingredientTitle }}">
-                                    </div>
-                                    <div class="nb__ingredient-text">
-                                        <h4>{{ $ingredientTitle }}</h4>
-                                        <p>{!! nl2br(e($ingredientText)) !!}</p>
-                                    </div>
-                                </article>
-                            @endforeach
-                        </aside>
-
-                        <div class="nb__product-center">
-                            @if ($psCenterImage)
-                                <img class="nb__product-image" src="{{ $psCenterImage }}"
-                                    alt="{{ $psBrandTitle }} {{ $psProductTitle }} product">
-                            @endif
-                        </div>
-
-                        <aside class="nb__features-col">
-                            <div class="nb__side-label">{!! nl2br(e($psRightLabel)) !!}</div>
-
-                            <div class="nb__feature-panel">
-                                @foreach ($psRightCards as $featureIndex => $featureCard)
-                                    @php
-                                        $featureIcon = $problemSolutionAsset($featureCard['icon'] ?? '');
-                                        $featureTitle = $featureCard['title'] ?? '';
-                                        $featureText = $featureCard['text'] ?? '';
-                                    @endphp
-                                    <article class="nb__feature-card">
-                                        <div class="nb__feature-icon">
-                                            <img src="{{ $featureIcon }}" alt="{{ $featureTitle }}">
-                                        </div>
-                                        <div class="nb__feature-text">
-                                            <h4>{{ $featureTitle }}</h4>
-                                            <p>{{ $featureText }}</p>
-                                        </div>
-                                    </article>
-                                @endforeach
-                            </div>
-                        </aside>
+                    <h3 class="pdp-formula-product-name">Brain Booster Gummies</h3>
+                    <div class="pdp-ayurveda-pill">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3h6m-5 0v6l-5.5 9.2A1.9 1.9 0 0 0 6.1 21h11.8a1.9 1.9 0 0 0 1.6-2.8L14 9V3M8 15h8"/></svg>
+                        Ayurveda + nutraceutical
                     </div>
-
-                    <div class="nb__ingredient-shelf" aria-hidden="true">
-                        <img class="nb__shelf-img nb__shelf-img--amla" src="{{ $psShelfLeftImage }}" alt="">
-                        <img class="nb__shelf-img nb__shelf-img--turmeric" src="{{ $psShelfRightImage }}" alt="">
+                    <div class="pdp-formula-stage">
+                        <span class="pdp-formula-word brain-hero-word" aria-hidden="true">BRAIN</span>
+                        <img src="{{ asset('assets/brain/hero-reveal.webp') }}" alt="NutriBuddy Brain Booster Gummies with grapes and botanicals">
+                        <div class="pdp-formula-stat pdp-formula-stat--left">
+                            <strong>2</strong>
+                            <b>Ayurvedic botanicals<br><small>Brahmi &amp; Shankhpushpi</small></b>
+                        </div>
+                        <div class="pdp-formula-stat pdp-formula-stat--right">
+                            <strong>20 mg</strong>
+                            <b>algal DHA<br><small>in every gummy</small></b>
+                        </div>
                     </div>
-
-                    <footer class="nb__trust-strip">
-                        <div class="nb__trust-badge"><span class="nb__trust-badge-icon"><img
-                                    src="{{ asset('img/vegan-1.png') }}" alt="Ayurvedic wisdom"></span> Ayurvedic<br>Wisdom
-                        </div>
-                        <div class="nb__trust-badge"><span class="nb__trust-badge-icon"><img
-                                    src="{{ asset('img/new-btn-2.png') }}" alt="Safe and trusted formula"></span> Safe &amp;
-                            Trusted<br>Formula</div>
-                        <div class="nb__trust-badge"><span class="nb__trust-badge-icon"><img
-                                    src="{{ asset('img/pro-1.png') }}" alt="No artificial colors"></span> No
-                            Artificial<br>Colors</div>
-                        <div class="nb__trust-badge"><span class="nb__trust-badge-icon"><img
-                                    src="{{ asset('img/new-btn-4.png') }}" alt="Made with love"></span> Made With<br>Love
-                        </div>
-                    </footer>
+                    <div class="pdp-formula-badges" aria-label="Product qualities">
+                        <div><span class="pdp-formula-icon tone-0" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 3h6m-5 0v6l-5.4 9a2 2 0 0 0 1.7 3h11.4a2 2 0 0 0 1.7-3L14 9V3M8 15h8"/></svg></span><b>No preservatives</b></div>
+                        <div><span class="pdp-formula-icon tone-1" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3a9 9 0 1 0 0 18h1.2a2 2 0 0 0 1.5-3.3 1.8 1.8 0 0 1 1.4-3h1.4A3.5 3.5 0 0 0 21 11.2C21 6.7 17 3 12 3Z"/><circle cx="7.5" cy="10" r="1"/><circle cx="11" cy="7" r="1"/><circle cx="16" cy="8" r="1"/></svg></span><b>No added colours</b></div>
+                        <div><span class="pdp-formula-icon tone-2" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 3h8m-6 0v6l-5.4 9a2 2 0 0 0 1.7 3h11.4a2 2 0 0 0 1.7-3L12 9V3M7.5 16h9"/><path d="m4 20 16-16"/></svg></span><b>No refined sugar</b></div>
+                        <div><span class="pdp-formula-icon tone-3" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20 4c-8 0-14 4-14 11a5 5 0 0 0 5 5c7 0 9-8 9-16Z"/><path d="M4 21c3-5 6-8 11-11"/></svg></span><b>100% vegetarian</b></div>
+                    </div>
+                    <p class="pdp-formula-caption">To complement a varied diet, when supplementation is needed.</p>
+                    <div class="pdp-formula-actions">
+                        <a class="pdp-formula-primary" href="#pdpAddToCartBtn">Choose your plan <span aria-hidden="true">→</span></a>
+                        <a class="pdp-formula-secondary" href="#nb-ingredients">Explore ingredients <span aria-hidden="true">→</span></a>
+                    </div>
+                    <p class="pdp-formula-note">One-time purchase or Subscribe &amp; Save</p>
                 </div>
-            </section>
+    </section>
 
+    <div class="ps-inner">
             @if (!empty($product->benefits_cards))
             <!-- DIVIDER -->
             <div class="ps-divider reveal">
@@ -1028,11 +956,9 @@
                                                     <div class="blabel bl-sol">✅ NutriBuddy Solution</div>
                                                     <div class="bline g"></div>
                                                 </div> -->
+
+        </div>
     </section>
-
-
-
-
 
     <!-- ════════════════════════════════════════════════   ══════════════════════════════════════════
                                                      PARENT REVIEWS
