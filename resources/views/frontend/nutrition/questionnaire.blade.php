@@ -1187,5 +1187,10 @@ function qzRemoveFile(qid) {
    and builds a FormData payload automatically (C7-FIX-B).
    The qzBuildFormDataHook approach is no longer needed.               */
 </script>
+<script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
+<script>
+    window.nutribuddyConfig = window.nutribuddyConfig || {};
+    window.nutribuddyConfig.cashfreeEnv = '{{ config("services.cashfree.env", "sandbox") }}';
+</script>
 <script src="{{ asset('js/questionnaire.js') }}"></script>
 @endsection

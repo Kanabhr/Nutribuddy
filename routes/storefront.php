@@ -28,8 +28,19 @@ Route::get('/diet-chart', function () {
 Route::middleware('auth')->group(function () {
     Route::post('/diet-chart/payment/create', [\App\Http\Controllers\Frontend\Nutrition\DietPaymentController::class, 'createOrder'])->name('diet.payment.create');
     Route::post('/diet-chart/payment/verify', [\App\Http\Controllers\Frontend\Nutrition\DietPaymentController::class, 'verifyPayment'])->name('diet.payment.verify');
+
+    // Section 3 PDF Subscriptions APIs
+    Route::post('/api/subscriptions/checkout', [\App\Http\Controllers\Api\SubscriptionApiController::class, 'checkout'])->name('subscription.checkout');
+    Route::post('/api/subscriptions/cancel', [\App\Http\Controllers\Api\SubscriptionApiController::class, 'cancel'])->name('subscription.cancel');
+    Route::get('/api/subscriptions/current', [\App\Http\Controllers\Api\SubscriptionApiController::class, 'current'])->name('subscription.current');
 });
-Route::get('/diet-chart/payment/cashfree/return', [\App\Http\Controllers\Frontend\Nutrition\DietPaymentController::class, 'handleCashfreeReturn'])->name('diet.payment.cashfree.return');
+
+Route::match(['get', 'post'], '/diet-chart/payment/cashfree/return', [\App\Http\Controllers\Frontend\Nutrition\DietPaymentController::class, 'handleCashfreeReturn'])->name('diet.payment.cashfree.return');
+Route::post('/diet-chart/payment/cashfree/webhook', [\App\Http\Controllers\Frontend\Nutrition\DietPaymentController::class, 'handleCashfreeWebhook'])->name('diet.payment.cashfree.webhook');
+
+// Section 3 PDF Subscriptions Verification & Webhook
+Route::match(['get', 'post'], '/api/subscriptions/verify', [\App\Http\Controllers\Api\SubscriptionApiController::class, 'verify'])->name('subscription.verify');
+Route::post('/api/webhooks/cashfree', [\App\Http\Controllers\Api\SubscriptionApiController::class, 'webhook'])->name('cashfree.subscription.webhook');
 
 Route::get('/blog', [BlogController::class, 'index'])->name('blog');
 Route::view('/testimonials', 'frontend.storefront.pages.testimonials')->name('testimonials');
