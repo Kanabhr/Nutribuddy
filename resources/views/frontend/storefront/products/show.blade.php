@@ -3,12 +3,15 @@
 
 @push('styles')
     <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet"
         href="{{ asset('assets/css/product.css') }}?v={{ filemtime(public_path('assets/css/product.css')) }}">
 @endpush
 
 @section('content')
     @php
         $isKadhaProduct = str_contains(strtolower($product->name ?? ''), 'kadha') || str_contains(strtolower($product->slug ?? ''), 'kadha');
+        $isBrainBoosterProduct = str_contains(strtolower($product->name ?? ''), 'brain booster') || str_contains(strtolower($product->slug ?? ''), 'brain-booster');
 
         $variantProducts = $product->variants
             ->filter(fn($variant) => $variant->is_active && !empty($variant->attributes))
@@ -44,6 +47,7 @@
         $defAge = $product->age_group ?: $defVariantAttributes['Age Group'] ?? '';
         $defPack = $product->pack_size ?: $defVariantAttributes['Pack Size'] ?? '';
         $defFlavour = $product->flavor ?: $defVariantAttributes['Flavour'] ?? '';
+        $purchaseUnitLabel = '1 box (30 gummies)';
         $fallbackProductImage = '';
         $productImageUrl = fn($imagePath = null) => $imagePath && \Illuminate\Support\Facades\Storage::disk('public')->exists($imagePath)
             ? route('storage.public', ['path' => $imagePath])
@@ -173,46 +177,69 @@
                         $thumbImageUrl = $productImageUrl($image->image_path);
                     @endphp
                     <div class="thumb {{ $loop->first ? 'active' : '' }}"
-                        onclick="changePdpImage(this, '{{ $thumbImageUrl }}')">
+                        onclick="changePdpImage(this, '{{ $thumbImageUrl }}', {{ $loop->iteration }})"
+                        aria-label="View product image {{ $loop->iteration }}" role="button" tabindex="0">
                         <img src="{{ $thumbImageUrl }}" alt="{{ $product->name }}">
                     </div>
                 @endforeach
             </div>
+            <div class="pdp-gallery-caption" data-gallery-caption>
+                <span><b data-gallery-count>1 / {{ max(1, $product->images->count()) }}</b><small>Meet your buddy</small></span>
+                <div class="pdp-gallery-controls">
+                    <button type="button" data-gallery-prev aria-label="Previous image">‹</button>
+                    <button type="button" data-gallery-next aria-label="Next image">›</button>
+                    <button type="button" class="pdp-gallery-zoom" data-gallery-zoom aria-label="Zoom image">⛶ <span>Zoom</span></button>
+                </div>
+            </div>
+            <dialog class="pdp-gallery-dialog" data-gallery-dialog aria-label="Product image zoom">
+                <button type="button" data-gallery-close aria-label="Close zoom">×</button>
+                <img src="{{ $mainGalleryImage ? $productImageUrl($mainGalleryImage->image_path) : '' }}" alt="{{ $product->name }}">
+            </dialog>
         </div>
 
         <!-- RIGHT: Info -->
         <div class="pdp-info">
-            <h1 class="pdp-name">{{ $product->name }}</h1>
-            <a href="#reviews" class="pdp-rating" style="text-decoration: none;">
-                <div class="stars">
-                    @php
-                        $activeReviewsCount = $product->reviews->where('is_active', true)->count();
-                        $rating =
-                            $activeReviewsCount > 0 ? $product->reviews->where('is_active', true)->avg('rating') : 0;
-                        $fullStars = floor($rating);
-                    @endphp
-                    @for ($i = 0; $i < 5; $i++)
-                        @if ($i < $fullStars)
-                            ★
-                        @elseif ($i == $fullStars && ($rating - $fullStars) >= 0.5)
-                            ★
-                        @else
-                            ☆
-                        @endif
-                    @endfor
-                </div>
-                <div class="rating-val">{{ number_format($rating, 1) }}</div>
-                <div class="rating-divider"></div>
-                <div class="rating-count">{{ number_format($activeReviewsCount) }}
-                    Verified Reviews</div>
-            </a>
+            <div class="pdp-title-line">
+                <h1 class="pdp-name">{{ $isBrainBoosterProduct ? 'Brain Booster Gummies' : $product->name }}</h1>
+                <a href="#reviews" class="pdp-rating" style="text-decoration: none;">
+                    @if ($isBrainBoosterProduct)
+                        <span class="pdp-rating-summary">
+                            <span class="stars" aria-label="5 out of 5 stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
+                            <b class="rating-val">5.0</b>
+                        </span>
+                        <small class="rating-count">1 review · design sample</small>
+                    @else
+                        @php
+                            $activeReviews = $product->reviews->where('is_active', true);
+                            $activeReviewsCount = $activeReviews->count();
+                            $rating = $activeReviewsCount > 0 ? $activeReviews->avg('rating') : 0;
+                            $fullStars = floor($rating);
+                        @endphp
+                        <span class="pdp-rating-summary">
+                            <span class="stars" aria-label="{{ number_format($rating, 1) }} out of 5 stars">
+                                @for ($i = 0; $i < 5; $i++)
+                                    @if ($i < $fullStars || ($i == $fullStars && ($rating - $fullStars) >= 0.5))&#9733;@else&#9734;@endif
+                                @endfor
+                            </span>
+                            <b class="rating-val">{{ number_format($rating, 1) }}</b>
+                        </span>
+                        <small class="rating-count">{{ number_format($activeReviewsCount) }}
+                            {{ \Illuminate\Support\Str::plural('review', $activeReviewsCount) }}</small>
+                    @endif
+                </a>
+            </div>
+            @if ($isBrainBoosterProduct)
+                <p class="pdp-subtitle">Algal DHA, Brahmi &amp; Shankhpushpi, with essential nutrients.</p>
+            @elseif (filled($product->problem_subtitle))
+                <p class="pdp-subtitle">{{ $product->problem_subtitle }}</p>
+            @endif
 
             <!-- Price -->
             <div class="price-box">
-                <div class="price-row">
+                <div class="price-row pdp-price-line">
                     <div class="price-now" id="pdpPriceNow">₹{{ number_format($initialPrice, 0) }}</div>
                     @if ($initialComparePrice > $initialPrice)
-                        <div class="price-old" id="pdpPriceOld">₹{{ number_format($initialComparePrice, 0) }}</div>
+                        <div class="pdp-mrp"><span>MRP</span><s class="price-old" id="pdpPriceOld">₹{{ number_format($initialComparePrice, 0) }}</s></div>
                         @php $initialDiscount = round((($initialComparePrice - $initialPrice) / $initialComparePrice) * 100); @endphp
                         <div class="price-save" id="pdpPriceSave">Save
                             ₹{{ number_format($initialComparePrice - $initialPrice, 0) }} ({{ $initialDiscount }}% Off)
@@ -221,15 +248,105 @@
                         <div class="price-old d-none" id="pdpPriceOld"></div>
                         <div class="price-save d-none" id="pdpPriceSave"></div>
                     @endif
+                    <div class="price-note">Inclusive of all taxes</div>
                 </div>
-                <div class="price-note">Inclusive of all taxes · Free shipping on this order</div>
-                <div class="cashback-row">
-                    <span>🪙</span>
-                    <span id="pdpCashback">Get
+                <button type="button" class="cashback-row pdp-coins-strip" id="pdpCoinsTrigger" aria-haspopup="dialog" aria-controls="pdpCoinsModal">
+                    <svg class="pdp-coins-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle cx="8" cy="15" r="6" stroke="currentColor" stroke-width="1.8" />
+                        <path d="M8 11.8v6.4M10 13.2c-.4-.7-1-1-2-1s-1.8.5-1.8 1.3c0 2 3.8.8 3.8 2.8 0 .8-.8 1.4-2 1.4-.9 0-1.7-.4-2.1-1.1M14 3.5a7 7 0 0 1 6.5 6.5M17 3.5h-3.5V7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <b id="pdpCashback">Earn
                         {{ !empty($product->coins_reward) ? $product->coins_reward : round($initialPrice * 0.05) }} NB
-                        Coins on this purchase!</span>
-                </div>
+                        Coins on this purchase</b>
+                    <svg class="pdp-coins-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="m9 18 6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </button>
             </div>
+
+            <div class="pdp-coins-modal" id="pdpCoinsModal" hidden aria-hidden="true">
+                <div class="pdp-coins-backdrop" data-close-coins-modal></div>
+                <section class="pdp-coins-dialog" role="dialog" aria-modal="true" aria-labelledby="pdpCoinsTitle">
+                    <div class="pdp-coins-dialog-head">
+                        <h2 id="pdpCoinsTitle">A little thank-you from NutriBuddy</h2>
+                        <button type="button" class="pdp-coins-close" aria-label="Close rewards details" data-close-coins-modal>×</button>
+                    </div>
+                    <div class="pdp-coins-reward-card">
+                        <svg width="46" height="46" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M13.744 17.736a6 6 0 1 1-7.48-7.48M15 6h1v4m-9.866 4.768.866-.5 2 3.464" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                            <circle cx="16" cy="8" r="6" stroke="currentColor" stroke-width="1.8" />
+                        </svg>
+                        <strong><span id="pdpCoinsModalAmount">{{ !empty($product->coins_reward) ? $product->coins_reward : round($initialPrice * 0.05) }}</span> NB Coins</strong>
+                        <p>Shown on this <span id="pdpCoinsModalPrice">₹{{ number_format($initialPrice, 0) }}</span> purchase.</p>
+                    </div>
+                    <p>Earn rewards when you shop. Eligible coins and redemption terms will be shown in your account once the loyalty programme is connected.</p>
+                    <p class="pdp-coins-disclaimer">Rewards are illustrative in this preview; no coins are credited to a live account.</p>
+                    <button type="button" class="pdp-coins-got-it" data-close-coins-modal>Got it</button>
+                </section>
+            </div>
+
+            <fieldset class="pdp-purchase-options">
+                <legend>How do you want to buy?</legend>
+                <label class="pdp-purchase-option selected" data-pdp-purchase-option>
+                    <input type="radio" name="pdpPurchaseOption" value="once" checked>
+                    <span class="pdp-purchase-copy">
+                        <b>One-time purchase</b>
+                        <small>{{ $purchaseUnitLabel }}</small>
+                    </span>
+                    <strong class="pdp-purchase-price" id="pdpOneTimePrice">₹{{ number_format($initialPrice, 0) }}</strong>
+                </label>
+                <label class="pdp-purchase-option pdp-subscription-option" data-pdp-purchase-option>
+                    <input type="radio" name="pdpPurchaseOption" value="subscribe">
+                    <span class="pdp-purchase-copy">
+                        <b>Subscribe &amp; Save</b>
+                        <small>2, 3 or 4 months · Monthly delivery</small>
+                    </span>
+                    <span class="pdp-subscription-from">
+                        <strong>From ₹569<small>/month</small></strong>
+                        <small>Lower price from month 2</small>
+                    </span>
+                    <svg class="pdp-subscription-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </label>
+                <div class="pdp-subscription-panel" id="pdpSubscriptionPanel" hidden>
+                    <span class="pdp-subscription-chip">Save from month 2 · Cancel anytime</span>
+                    <div class="pdp-subscription-plans">
+                        <label class="pdp-subscription-plan" data-pdp-subscription-plan>
+                            <input type="radio" name="pdpSubscriptionPlan" value="2">
+                            <span class="pdp-plan-copy">
+                                <span class="pdp-plan-heading"><b>2 months</b><strong>₹599<small>/month</small></strong></span>
+                                <small>₹649 today, then ₹599/month</small>
+                                <span class="pdp-plan-badges"><span class="pdp-plan-save">Save ₹150 vs. MRP</span></span>
+                            </span>
+                        </label>
+                        <label class="pdp-subscription-plan" data-pdp-subscription-plan>
+                            <input type="radio" name="pdpSubscriptionPlan" value="3">
+                            <span class="pdp-plan-copy">
+                                <span class="pdp-plan-heading"><b>3 months</b><span class="pdp-plan-tag pdp-plan-recommended">Recommended</span><strong>₹579<small>/month</small></strong></span>
+                                <small>₹649 today, then ₹579/month</small>
+                                <span class="pdp-plan-badges"><span class="pdp-plan-save">Save ₹290 vs. MRP</span></span>
+                            </span>
+                        </label>
+                        <label class="pdp-subscription-plan" data-pdp-subscription-plan>
+                            <input type="radio" name="pdpSubscriptionPlan" value="4">
+                            <span class="pdp-plan-copy">
+                                <span class="pdp-plan-heading"><b>4 months</b><span class="pdp-plan-tag pdp-plan-best">Best value</span><strong>₹569<small>/month</small></strong></span>
+                                <small>₹649 today, then ₹569/month</small>
+                                <span class="pdp-plan-badges">
+                                    <span class="pdp-plan-save">Save ₹440 vs. MRP</span>
+                                    <span class="pdp-plan-gift">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                            <path d="M3 9h18v12H3zM2 5h20v4H2zM12 5v16m0-16H7.5a2.5 2.5 0 1 1 2.5-2.5C10 4 12 5 12 5Zm0 0h4.5A2.5 2.5 0 1 0 14 2.5C14 4 12 5 12 5Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                        Free Tasty Kadha
+                                    </span>
+                                </span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            </fieldset>
 
             @if (!empty($variantAttributeGroups))
                 <div class="pdp-variant-panel" id="pdpVariantPanel">
@@ -317,55 +434,28 @@
                 </div>
             @endif
 
-            <div class="variant-block">
-                <div class="variant-label">{{ $product->name }} Features </div>
-                <div class="feature-slider-shell">
-                    <button type="button" class="feature-slider-btn feature-slider-prev"
-                        aria-label="Previous feature">‹</button>
-                    <div class="variant-row" id="flavorRow">
-                        @php
-                            $tags = $product->tags ?? [];
-                            // Backward compatibility for old string tags
-                            if (is_string($tags)) {
-                                $tags = array_map(function ($t) {
-                                    preg_match(
-                                        '/^([\x{1F300}-\x{1F9FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}])?\s*(.*)$/u',
-                                        $t,
-                                        $m,
-                                    );
-                                    return ['icon' => $m[1] ?? '', 'text' => $m[2] ?? $t];
-                                }, array_filter(array_map('trim', explode(',', $tags))));
-                            }
-                        @endphp
-
-                        @if (is_array($tags) && count($tags) > 0)
-                            @foreach ($tags as $tag)
-                                <div class="flavor-opt active">
-                                    <div class="flavor-emoji">
-                                        @if (!empty($tag['icon']))
-                                            @php
-                                                $isFilePath = str_contains($tag['icon'], 'tags/');
-                                            @endphp
-                                            @if ($isFilePath)
-                                                <img src="{{ asset('storage/' . $tag['icon']) }}" alt=""
-                                                    style="width: 28px; height: 28px; object-fit: contain;">
-                                            @else
-                                                <span style="font-size: 28px; display: inline-block;">{{ $tag['icon'] }}</span>
-                                            @endif
-                                        @else
-                                            <span style="font-size: 28px; display: inline-block;">✨</span>
-                                        @endif
-                                    </div>
-                                    <div class="flavor-name">{!! nl2br(e($tag['text'] ?? '')) !!}</div>
-                                </div>
-                            @endforeach
-                        @endif
-                    </div>
-                    <button type="button" class="feature-slider-btn feature-slider-next"
-                        aria-label="Next feature">›</button>
+            <section class="pdp-reference-features" aria-label="Product features">
+                <div class="pdp-reference-feature">
+                    <span class="pdp-reference-feature-icon"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M9 38 38 9M17 13l18 18M13 18l17 17M19 11c4 4 4 8 0 12l-7 7a7 7 0 0 0 10 10l7-7c4-4 8-4 12 0M32 8l8 8"/></svg></span>
+                    <span>No Added<br>Colours</span>
                 </div>
-            </div>
-
+                <div class="pdp-reference-feature">
+                    <span class="pdp-reference-feature-icon"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M9 39 39 9M17 15l16 16M14 24l10 10M23 12l13 13M11 30l8 8M30 17l7-7M8 39h30M18 11v17a7 7 0 0 1-7 7M28 9v8a7 7 0 0 0 7 7"/></svg></span>
+                    <span>No Refined<br>Sugar</span>
+                </div>
+                <div class="pdp-reference-feature">
+                    <span class="pdp-reference-feature-icon"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M9 40h30L27 20V9M21 9h12M18 29h17M12 36l25-27M23 20v-4"/></svg></span>
+                    <span>No<br>Preservatives</span>
+                </div>
+                <div class="pdp-reference-feature">
+                    <span class="pdp-reference-feature-icon"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="m10 17 14-8 14 8v16l-14 8-14-8V17ZM10 17l14 8 14-8M24 25v16M7 41 41 7M16 13l18 10"/></svg></span>
+                    <span>No<br>Gelatin</span>
+                </div>
+                <div class="pdp-reference-feature">
+                    <span class="pdp-reference-feature-icon"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M39 8c-17 0-28 8-28 22 0 6 4 10 10 10 13 0 21-13 18-32ZM10 40c4-9 10-15 20-21"/></svg></span>
+                    <span>100%<br>Vegetarian</span>
+                </div>
+            </section>
             <!-- Quick Specs: Pack Size & Age -->
             <!-- <div class="pdp-specs-row" style="display:flex;gap:20px;margin: 20px 0;padding:15px;background:#f9f9f9;border-radius:12px;border:1px solid #eee;">
                                                     <div class="spec-item">
@@ -397,66 +487,154 @@
                 <button type="button" class="btn-buy" id="pdpBuyNowBtn" onclick="handleBuyNow('{{ $product->id }}', this)">Buy Now</button>
             </div>
 
-            <!-- Guarantees -->
-            <div class="guarantees">
-                <div class="guarantee">
-                    <div class="g-icon">🚚</div>
-                    <div class="g-title">Free Shipping</div>
-                    <div class="g-sub">On orders ₹200+</div>
+            <div class="pdp-offers-delivery">
+                <div class="pdp-multi-buy-offer">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M20.59 13.41 11 3.83V3H4v7h.83l9.58 9.59a2 2 0 0 0 2.83 0l3.35-3.35a2 2 0 0 0 0-2.83Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                        <circle cx="7.5" cy="6.5" r=".8" fill="currentColor" />
+                    </svg>
+                    <span>
+                        <b>Buy 2: save 5% · Buy 3+: save 10%</b>
+                        <small>Individual items · best eligible offer applied in cart</small>
+                    </span>
                 </div>
-                <div class="guarantee">
-                    <div class="g-icon">🔄</div>
-                    <div class="g-title">7-Day Return</div>
-                    <div class="g-sub">No questions asked</div>
+
+                <button type="button" class="pdp-coupon-offer" id="pdpCouponTrigger" aria-haspopup="dialog" aria-controls="pdpCouponModal">
+                    <svg width="25" height="25" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M20.59 13.41 11 3.83V3H4v7h.83l9.58 9.59a2 2 0 0 0 2.83 0l3.35-3.35a2 2 0 0 0 0-2.83Z" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" />
+                        <circle cx="7.5" cy="6.5" r=".8" fill="currentColor" />
+                    </svg>
+                    <span>
+                        <b>Available Coupons</b>
+                        <small>Check eligible offers at checkout</small>
+                    </span>
+                    <svg class="pdp-coupon-chevron" width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="m9 18 6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </button>
+
+                <div class="pdp-shipping-info">
+                    <span>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M3 7h11v11H3zM14 10h4l3 3v5h-7z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+                            <circle cx="7.5" cy="18" r="2" fill="#fff" stroke="currentColor" stroke-width="1.8" />
+                            <circle cx="17.5" cy="18" r="2" fill="#fff" stroke="currentColor" stroke-width="1.8" />
+                        </svg>
+                        Free shipping ₹1000+
+                    </span>
+                    <span>COD Available</span>
+                    <span>Extra 5% OFF on Prepaid orders</span>
                 </div>
-                <div class="guarantee">
-                    <div class="g-icon">🔒</div>
-                    <div class="g-title">Secure Payment</div>
-                    <div class="g-sub">UPI · Cards · COD</div>
-                </div>
+
+                <p class="pdp-delivery-estimate">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8" />
+                        <path d="M16 3v4M8 3v4M3 10h18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                    </svg>
+                    Estimated delivery between <b>17 November – 19 November.</b>
+                </p>
             </div>
 
-            <!-- Product Highlights -->
-            <div class="highlights">
-                <h4>Why Parents Love {{ $product->name }}</h4>
-                <ul class="highlight-list">
-                    @php
-                        $features = $product->short_description ? explode("\n", $product->short_description) : [];
-                        $features = array_filter(array_map('trim', $features));
-                    @endphp
-                    @if (count($features) > 0)
-                        @foreach (array_slice($features, 0, 6) as $feature)
-                            <li>
-                                <div class="hl-dot"></div>{{ preg_replace('/^[•\-\*]\s*/', '', $feature) }}
-                            </li>
-                        @endforeach
-                    @else
-                        {{-- Fallback --}}
-                        <li>
-                            <div class="hl-dot"></div>Ashwagandha (KSM-66), Vitamin D3, and Zinc support daily wellness.
-                        </li>
-                        <li>
-                            <div class="hl-dot"></div>Tastes so good kids ask for it every morning.
-                        </li>
-                    @endif
-                </ul>
+            <section class="pdp-accordion-section" aria-label="Product information">
+                <div class="pdp-accordions">
+                    <details class="pdp-accordion">
+                        <summary>Product description</summary>
+                        <div class="pdp-accordion-content">
+                            @if (!empty(trim((string) ($product->description ?? ''))))
+                                {!! $product->description !!}
+                            @else
+                                <p>{{ $product->short_description ?: $product->name }}</p>
+                            @endif
+                        </div>
+                    </details>
+                    <details class="pdp-accordion">
+                        <summary>What’s inside?</summary>
+                        <div class="pdp-accordion-content">
+                            @if ($product->ingredients->isNotEmpty())
+                                <ul>
+                                    @foreach ($product->ingredients as $ingredient)
+                                        <li>{{ $ingredient->main_heading ?: $ingredient->short_heading }}</li>
+                                    @endforeach
+                                </ul>
+                            @else
+                                <p>Made with carefully selected ingredients for your daily wellness routine.</p>
+                            @endif
+                        </div>
+                    </details>
+                    <details class="pdp-accordion">
+                        <summary>How do I use it?</summary>
+                        <div class="pdp-accordion-content">
+                            <p>{{ $product->dosage ?: 'Follow the serving instructions printed on the product pack. For children, use under adult supervision.' }}</p>
+                            @if ($product->routine)
+                                <p>{{ $product->routine }}</p>
+                            @endif
+                        </div>
+                    </details>
+                    <details class="pdp-accordion">
+                        <summary>How does Subscribe &amp; Save work?</summary>
+                        <div class="pdp-accordion-content">
+                            <p>Choose a 2, 3, or 4 month plan for monthly delivery. Your first box is charged at the one-time price; the lower plan price applies from month 2. You can cancel anytime.</p>
+                        </div>
+                    </details>
+                    <details class="pdp-accordion">
+                        <summary>What are the shipping and return policies?</summary>
+                        <div class="pdp-accordion-content">
+                            <p>Free shipping is available on orders of ₹1,000 or more. Cash on delivery is available where serviceable. Delivery dates depend on your location.</p>
+                            <p>For return or damage assistance, contact NutriBuddy support with your order details and product photos.</p>
+                        </div>
+                    </details>
+                </div>
+            </section>
+
+            <div class="pdp-coins-modal" id="pdpCouponModal" hidden aria-hidden="true">
+                <div class="pdp-coins-backdrop" data-close-coupon-modal></div>
+                <section class="pdp-coins-dialog pdp-coupon-dialog" role="dialog" aria-modal="true" aria-labelledby="pdpCouponTitle">
+                    <div class="pdp-coins-dialog-head">
+                        <h2 id="pdpCouponTitle">A little extra, on us</h2>
+                        <button type="button" class="pdp-coins-close" aria-label="Close coupon details" data-close-coupon-modal>×</button>
+                    </div>
+                    <div class="pdp-coupon-modal-card">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M20.59 13.41 11 3.83V3H4v7h.83l9.58 9.59a2 2 0 0 0 2.83 0l3.35-3.35a2 2 0 0 0 0-2.83Z" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" />
+                            <circle cx="7.5" cy="6.5" r=".8" fill="currentColor" />
+                        </svg>
+                        <div class="pdp-coupon-modal-copy">
+                            <h3>Extra 5% off prepaid orders</h3>
+                            <p>Select prepaid payment in checkout to use this offer.</p>
+                            <b>PREPAID5</b>
+                        </div>
+                        <button type="button" class="pdp-coupon-apply" data-close-coupon-modal>Apply</button>
+                    </div>
+                    <div class="pdp-coupon-modal-card">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M3 7h11v11H3zM14 10h4l3 3v5h-7z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+                            <circle cx="7.5" cy="18" r="2" fill="#fff" stroke="currentColor" stroke-width="1.8" />
+                            <circle cx="17.5" cy="18" r="2" fill="#fff" stroke="currentColor" stroke-width="1.8" />
+                        </svg>
+                        <div class="pdp-coupon-modal-copy">
+                            <h3>Free shipping on ₹1,000+</h3>
+                            <p>Automatically applied when your cart qualifies.</p>
+                        </div>
+                    </div>
+                    <p class="pdp-coupon-modal-note">Preview offers. Final eligibility and stacking rules are confirmed by the store.</p>
+                </section>
             </div>
+
         </div>
     </div>
+    <section class="pdp-world-nutrition" aria-label="Children’s nutrition research around the world">
+        <iframe
+            class="pdp-world-nutrition-frame"
+            src="{{ asset('assets/research/world-nutrition-map.html') }}"
+            title="Children’s supplement use around the world"
+            loading="lazy"
+            scrolling="no"></iframe>
+    </section>
     <!-- ════════════════════════════════════════════════
                                                  PRODUCT DESCRIPTION SECTION
                                             ════════════════════════════════════════════════ -->
     <!-- Product Description Section -->
-    @if (!empty(trim((string) ($product->description ?? ''))))
-        <section class="pdp-description-section">
-            <div class="pdp-description-wrap">
-                <div class="pdp-description-label">Product Details</div>
-                <div class="pdp-description-copy">
-                    {!! $product->description !!}
-                </div>
-            </div>
-        </section>
-    @endif
+
     <!-- ════════════════════════════════════════════════
                                                  NUTRIBUDDY INGREDIENT SECTION
                                             ════════════════════════════════════════════════ -->
@@ -638,10 +816,22 @@
             <h2 class="sec-title">Watch Your Child <span class="acc">Transform</span></h2>
             <p class="sec-sub">{{ $transformDescription }}</p>
             <div class="transform-grid">
-                <div class="transform-visual">
-                    <img src="{{ $transformMainImage }}" alt="{{ $product->name }} transformation results" loading="lazy"
-                        decoding="async">
-                </div>
+                <figure class="transform-visual pdp-before-after" style="--split: 50%">
+                    <img class="pdp-before-after-image pdp-before-after-after"
+                        src="{{ asset('assets/brain/routine-after.webp') }}"
+                        alt="After: a mother and children enjoying their shared puzzle routine" loading="lazy" decoding="async">
+                    <img class="pdp-before-after-image pdp-before-after-before"
+                        src="{{ asset('assets/brain/routine-before.png') }}"
+                        alt="Before: the same family getting ready to begin a puzzle activity" loading="lazy" decoding="async">
+                    <span class="pdp-before-after-label pdp-before-label">Before<small>Getting started</small></span>
+                    <span class="pdp-before-after-label pdp-after-label">After<small>A shared little habit</small></span>
+                    <span class="pdp-before-after-divider" aria-hidden="true"><span>← →</span></span>
+                    <input type="range" min="0" max="100" value="50"
+                        aria-label="Reveal before and after routine images"
+                        aria-valuetext="50% of before image visible"
+                        oninput="this.closest('.pdp-before-after').style.setProperty('--split', this.value + '%'); this.setAttribute('aria-valuetext', this.value + '% of before image visible')">
+                    <figcaption class="pdp-before-after-hint">Drag to explore</figcaption>
+                </figure>
                 <div class="transform-list">
                     @foreach ($transformResults as $index => $result)
                         @php
