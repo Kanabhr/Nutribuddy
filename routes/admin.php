@@ -207,6 +207,9 @@ Route::post('orders/{order}/shipping/label', [\App\Http\Controllers\Admin\Ecomme
 Route::post('orders/{order}/shipping/track', [\App\Http\Controllers\Admin\Ecommerce\OrderShipmentController::class, 'track'])->name('orders.shipping.track');
 Route::post('orders/{order}/shipping/cancel', [\App\Http\Controllers\Admin\Ecommerce\OrderShipmentController::class, 'cancel'])->name('orders.shipping.cancel');
 Route::post('orders/{order}/shipping/ndr', [\App\Http\Controllers\Admin\Ecommerce\OrderShipmentController::class, 'ndr'])->name('orders.shipping.ndr');
+        Route::post('orders/{order}/payment-adjustments', [\App\Http\Controllers\Admin\Ecommerce\OrderPaymentAdjustmentController::class, 'store'])
+        ->middleware('permission:manage administration,admin')
+        ->name('orders.payment-adjustments.store');
         Route::patch('orders/{order}/status', [AdminOrderController::class, 'updateStatus'])->name('orders.update-status');
         Route::resource('order-returns', \App\Http\Controllers\Admin\Ecommerce\OrderReturnController::class)->except(['index', 'show']);
         Route::resource('invoices', \App\Http\Controllers\Admin\Billing\InvoiceController::class)->except(['index', 'show']); // typically invoices aren't edited but preserving existing routes

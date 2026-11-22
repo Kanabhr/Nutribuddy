@@ -113,14 +113,9 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Payment Status</label>
-                            <select name="payment_status" class="form-select" required>
-                                @foreach ($paymentStatuses as $paymentStatus)
-                                    <option value="{{ $paymentStatus }}"
-                                        {{ $order->payment_status === $paymentStatus ? 'selected' : '' }}>
-                                        {{ ucfirst(str_replace('_', ' ', $paymentStatus)) }}
-                                    </option>
-                                @endforeach
-                            </select>
+                            <div class="form-control-plaintext">{{ ucfirst(str_replace('_', ' ', $order->payment_status)) }}
+                                <small class="text-secondary-light d-block">Change it in the Payment card below.</small>
+                            </div>
                         </div>
 
                         <div class="mb-3">
@@ -419,6 +414,8 @@
                 </div>
             </div>
 
+            @include('admin.ecommerce.orders.partials.payment-adjustments')
+
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">Status Timeline</h5>
@@ -428,7 +425,7 @@
                         <div class="mb-3 pb-3 border-bottom">
                             <div><strong>{{ ucfirst($history->to_status) }}</strong> at
                                 {{ optional($history->created_at)->format('d M Y H:i') }}</div>
-                            <div class="text-muted">From: {{ ucfirst($history->from_status ?? 'new') }}</div>
+                            <div class="text-muted">From: {{ ucfirst($history->from_status ?? 'new') }} &middot; by {{ $history->updatedBy->name ?? 'System' }}</div>
                             @if ($history->note)
                                 <div>{{ $history->note }}</div>
                             @endif
