@@ -304,6 +304,22 @@
             </li>
             @endcan
 
+            @can('view audit log')
+            <li>
+                <a href="{{ route('admin.system.audit-log.index') }}">
+                    <iconify-icon icon="solar:history-bold" class="menu-icon"></iconify-icon>
+                    <span>Audit Log</span>
+                </a>
+            </li>
+            @endcan
+
+            <li>
+                <a href="{{ route('admin.2fa.setup') }}">
+                    <iconify-icon icon="solar:shield-keyhole-outline" class="menu-icon"></iconify-icon>
+                    <span>2FA Settings</span>
+                </a>
+            </li>
+
             <li>
                 <a href="javascript:void(0)"
                     onclick="event.preventDefault(); document.getElementById('logout-form').submit();">

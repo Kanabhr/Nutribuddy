@@ -301,4 +301,25 @@ Route::prefix('admin/nutrition')->name('admin.nutrition.')->middleware('auth:adm
             ->whereNumber('assessment')
             ->name('blood-report.download');
     });
+    
+});
+
+// -- Audit log (point 28) ------------------------------------------------------
+Route::middleware(['auth:admin', 'permission:view audit log,admin'])
+    ->prefix('admin/system')
+    ->name('admin.system.')
+    ->group(function () {
+        Route::get('audit-log', [\App\Http\Controllers\Admin\System\AuditLogController::class, 'index'])->name('audit-log.index');
+    });
+
+// -- Admin 2FA: setup and login challenge (point 28) ---------------------------
+Route::middleware('auth:admin')->prefix('admin/2fa')->name('admin.2fa.')->group(function () {
+    Route::get('setup', [\App\Http\Controllers\Admin\Auth\TwoFactorController::class, 'setup'])->name('setup');
+    Route::post('enable', [\App\Http\Controllers\Admin\Auth\TwoFactorController::class, 'enable'])->name('enable');
+    Route::post('confirm', [\App\Http\Controllers\Admin\Auth\TwoFactorController::class, 'confirm'])->name('confirm');
+    Route::post('disable', [\App\Http\Controllers\Admin\Auth\TwoFactorController::class, 'disable'])->name('disable');
+    Route::get('challenge', [\App\Http\Controllers\Admin\Auth\TwoFactorController::class, 'challenge'])->name('challenge');
+    Route::post('verify', [\App\Http\Controllers\Admin\Auth\TwoFactorController::class, 'verify'])
+        ->middleware('throttle:admin-login')
+        ->name('verify');
 });

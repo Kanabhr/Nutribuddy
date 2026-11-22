@@ -3,14 +3,17 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Models\Nutrition\Child;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, HasRoles;
+    use HasFactory, HasRoles, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -33,6 +36,10 @@ class User extends Authenticatable
         'avatar',
         'google_id',
         'google_avatar',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
+        'two_factor_confirmed_at',
+        'two_factor_last_used_step',
     ];
 
     /**
@@ -43,6 +50,9 @@ class User extends Authenticatable
         'remember_token',
         'otp',
         'otp_expires_at',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
+        'two_factor_last_used_step',
     ];
 
     /**
@@ -58,61 +68,62 @@ class User extends Authenticatable
             'is_active' => 'boolean',
             'otp_expires_at' => 'datetime',
             'coins_balance' => 'integer',
+            'two_factor_confirmed_at' => 'datetime',
         ];
     }
 
-    public function customerAddresses(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function customerAddresses(): HasMany
     {
         return $this->hasMany(CustomerAddress::class);
     }
 
-    public function orders(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
     }
 
-    public function coinTransactions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function coinTransactions(): HasMany
     {
         return $this->hasMany(CoinTransaction::class);
     }
 
-    public function cart(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function cart(): HasOne
     {
         return $this->hasOne(Cart::class);
     }
 
-    public function supportTickets(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function supportTickets(): HasMany
     {
         return $this->hasMany(SupportTicket::class);
     }
 
-    public function blogPosts(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function blogPosts(): HasMany
     {
         return $this->hasMany(BlogPost::class, 'author_id');
     }
 
-    public function assignedLeads(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function assignedLeads(): HasMany
     {
         return $this->hasMany(ContactLead::class, 'assigned_to');
     }
 
-    public function assignedNutritionLeads(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function assignedNutritionLeads(): HasMany
     {
         return $this->hasMany(NutritionLead::class, 'assigned_to');
     }
 
-    public function assessmentAttempts(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function assessmentAttempts(): HasMany
     {
         return $this->hasMany(AssessmentAttempt::class);
     }
 
-    public function dietSubscriptions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function dietSubscriptions(): HasMany
     {
         return $this->hasMany(DietSubscription::class);
     }
 
-    public function children(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function children(): HasMany
     {
-        return $this->hasMany(\App\Models\Nutrition\Child::class);
+        return $this->hasMany(Child::class);
     }
 }

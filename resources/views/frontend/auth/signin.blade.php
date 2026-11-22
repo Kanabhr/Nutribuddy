@@ -34,6 +34,12 @@
                         </div>
                     @endif
 
+                    @if(session('error'))
+                        <div class="alert alert-danger radius-12 mb-16 px-16 py-8 text-sm">
+                            {{ session('error') }}
+                        </div>
+                    @endif
+
                     @if(session('success'))
                         <div class="alert alert-success radius-12 mb-16 px-16 py-8 text-sm">
                             {{ session('success') }}
