@@ -134,6 +134,7 @@ Route::prefix('admin/ecommerce')->name('admin.ecommerce.')->middleware('auth:adm
 
     // -- Promotions --
     Route::middleware('permission:view promotions|manage promotions,admin')->group(function () {
+        Route::get('coupons/report', \App\Http\Controllers\Admin\Ecommerce\CouponReportController::class)->name('coupons.report');
         Route::resource('coupons', AdminCouponController::class)->only(['index', 'show']);
         Route::get('newsletter/export', [AdminNewsletterSubscriberController::class, 'export'])->name('newsletter.export');
         Route::resource('newsletter', AdminNewsletterSubscriberController::class)->only(['index', 'show']);
