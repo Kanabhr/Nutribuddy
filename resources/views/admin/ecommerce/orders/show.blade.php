@@ -221,7 +221,7 @@
                     </div>
                 </div>
             </div>
-
+            @include('admin.ecommerce.orders.partials.shipping')
             @if ($order->returns()->exists())
                 <div class="card border border-warning shadow-none">
                     <div class="card-header bg-warning-focus d-flex justify-content-between align-items-center">
