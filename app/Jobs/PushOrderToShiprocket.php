@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Order;
-use App\Services\Shipping\ShiprocketService;
+use App\Services\Shipping\ShipmentService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -15,42 +15,41 @@ class PushOrderToShiprocket implements ShouldQueue
 
     public $order;
 
+    public int $tries = 3;
+
     /**
      * Create a new job instance.
      */
     public function __construct(Order $order)
     {
         $this->order = $order;
+
+        // Wait until the checkout transaction has committed, so the order items exist when the job runs.
+        $this->afterCommit();
     }
 
     /**
      * Execute the job.
      */
-    public function handle(ShiprocketService $shiprocket): void
+    public function handle(ShipmentService $shipments): void
     {
-        // Don't push if already pushed
-        if (!empty($this->order->shiprocket_order_id)) {
+        $order = $this->order->fresh();
+
+        // Don't push if the order is gone, cancelled, or already pushed
+        if (! $order || $order->status === 'cancelled' || ! empty($order->shiprocket_order_id)) {
             return;
         }
 
         try {
-            $response = $shiprocket->createOrder($this->order);
-            
-            $this->order->forceFill([
-                'shiprocket_order_id' => $response['order_id'] ?? null,
-                'shiprocket_shipment_id' => $response['shipment_id'] ?? null,
-                'awb_code' => $response['awb_code'] ?? null,
-            ])->save();
+            $shipments->push($order);
 
-            Log::info("Order {$this->order->order_number} successfully pushed to Shiprocket.", [
-                'response_data' => $response
-            ]);
+            Log::info("Order {$order->order_number} successfully pushed to Shiprocket.");
         } catch (Throwable $e) {
-            Log::error("Failed to push Order {$this->order->order_number} to Shiprocket.", [
-                'error' => $e->getMessage()
+            Log::error("Failed to push Order {$order->order_number} to Shiprocket.", [
+                'error' => $e->getMessage(),
             ]);
-            
-            // Release back to the queue for retry after 60 seconds
+
+            // Never fail checkout because Shiprocket is down: retry later instead of throwing.
             $this->release(60);
         }
     }

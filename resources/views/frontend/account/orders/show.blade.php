@@ -97,7 +97,7 @@
                 @endif
             </div>
         </div>
-
+        @include('frontend.account.orders.partials.shipment-tracking')
         <!-- FULL DETAILS (ADDRESS & PAYMENT) -->
         <div class="grid-layout-cards">
             <!-- Shipping Details -->
