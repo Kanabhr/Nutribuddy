@@ -2,10 +2,17 @@
 @php
     $title = 'Reviews & Ratings';
     $subTitle = 'Ecommerce / Reviews';
+    $adminUser = auth('admin')->user();
+    $canManage = $adminUser?->can('manage moderation') ?? false;
+    $canViewCustomers = $adminUser?->canAny(['view customers', 'manage customers']) ?? false;
 @endphp
 
 @section('content')
     @include('admin.partials.messages')
+
+    @if ($errors->has('admin_reply'))
+        <div class="alert alert-danger">{{ $errors->first('admin_reply') }}</div>
+    @endif
 
     <div class="card basic-data-table">
         <div class="card-header">
@@ -26,6 +33,7 @@
                     </thead>
                     <tbody>
                         @foreach ($reviews as $review)
+                            @php $stats = $customerStats[$review->user_id] ?? null; @endphp
                             <tr>
                                 <td>
                                     <div class="d-flex align-items-center gap-2">
@@ -42,7 +50,18 @@
                                 </td>
                                 <td>
                                     <div class="d-flex flex-column">
-                                        <h6 class="text-md mb-0 fw-medium text-dark">{{ $review->user->name }}</h6>
+                                        <button type="button"
+                                            class="btn btn-link p-0 text-start text-md fw-medium text-primary-600 text-decoration-none"
+                                            data-bs-toggle="modal" data-bs-target="#customerModal"
+                                            data-name="{{ $review->user->name }}"
+                                            data-email="{{ $review->user->email }}"
+                                            data-phone="{{ $review->user->phone }}"
+                                            data-orders="{{ (int) ($stats->orders_count ?? 0) }}"
+                                            data-spent="{{ number_format((float) ($stats->total_spent ?? 0), 2) }}"
+                                            data-coins="{{ (int) $review->user->coins_balance }}"
+                                            data-profile="{{ $canViewCustomers ? route('admin.ecommerce.customers.show', $review->user_id) : '' }}">
+                                            {{ $review->user->name }}
+                                        </button>
                                         <span class="text-xs text-secondary-light">{{ $review->user->email }}</span>
                                     </div>
                                 </td>
@@ -86,6 +105,14 @@
                                             </a>
                                         </div>
                                     @endif
+                                    @if($review->admin_reply)
+                                        <div class="mt-2 p-2 radius-8 border-start border-3 border-primary-600 bg-neutral-100">
+                                            <span class="text-xs fw-semibold text-primary-600 d-block">
+                                                Brand reply{{ $review->admin_replied_at ? ' · ' . $review->admin_replied_at->format('d M Y') : '' }}
+                                            </span>
+                                            <span class="text-sm text-secondary-light">{{ $review->admin_reply }}</span>
+                                        </div>
+                                    @endif
                                 </td>
                                 <td>
                                     <div class="d-flex flex-column gap-1">
@@ -106,6 +133,18 @@
                                 </td>
                                 <td class="text-end">
                                     <div class="d-flex align-items-center justify-content-end gap-2">
+                                        @if ($canManage)
+                                            <button type="button"
+                                                class="btn btn-sm btn-outline-primary-600 radius-8 d-inline-flex align-items-center gap-1"
+                                                data-bs-toggle="modal" data-bs-target="#replyModal"
+                                                data-action="{{ route('admin.ecommerce.reviews.reply', $review) }}"
+                                                data-customer="{{ $review->user->name }}"
+                                                data-comment="{{ $review->comment }}"
+                                                data-reply="{{ $review->admin_reply }}">
+                                                <iconify-icon icon="solar:chat-round-dots-linear"></iconify-icon>
+                                                {{ $review->admin_reply ? 'Edit reply' : 'Reply' }}
+                                            </button>
+                                        @endif
                                         <form method="POST" action="{{ route('admin.ecommerce.reviews.destroy', $review) }}" class="d-inline">
                                             @csrf
                                             @method('DELETE')
@@ -119,6 +158,53 @@
                         @endforeach
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    {{-- Reply modal --}}
+    <div class="modal fade" id="replyModal" tabindex="-1" aria-labelledby="replyModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form method="POST" action="#" class="modal-content">
+                @csrf
+                <div class="modal-header">
+                    <h6 class="modal-title" id="replyModalLabel">Reply to <span data-fill="customer"></span></h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-sm text-secondary-light mb-3" data-fill="comment"></p>
+                    <label for="admin_reply" class="form-label fw-semibold text-sm">Your reply</label>
+                    <textarea id="admin_reply" name="admin_reply" rows="4" maxlength="2000" class="form-control"></textarea>
+                    <small class="text-xs text-secondary-light">Leave empty and save to remove an existing reply.</small>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-outline-secondary radius-8" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-primary-600 radius-8">Save reply</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {{-- Customer details modal --}}
+    <div class="modal fade" id="customerModal" tabindex="-1" aria-labelledby="customerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title" id="customerModalLabel" data-fill="name"></h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-0 text-sm">
+                        <dt class="col-5 text-secondary-light">Email</dt><dd class="col-7 text-break" data-fill="email"></dd>
+                        <dt class="col-5 text-secondary-light">Phone</dt><dd class="col-7" data-fill="phone"></dd>
+                        <dt class="col-5 text-secondary-light">Orders</dt><dd class="col-7" data-fill="orders"></dd>
+                        <dt class="col-5 text-secondary-light">Total spent</dt><dd class="col-7" data-fill="spent"></dd>
+                        <dt class="col-5 text-secondary-light">NB Coins</dt><dd class="col-7" data-fill="coins"></dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <a href="#" class="btn btn-sm btn-outline-primary-600 radius-8 d-none" data-fill="profile">View full profile</a>
+                </div>
             </div>
         </div>
     </div>
@@ -165,6 +251,45 @@
                     });
                 });
             });
+
+            // Reply modal: fill from the clicked button (textContent only, no HTML injection).
+            const replyModal = document.getElementById('replyModal');
+            if (replyModal) {
+                replyModal.addEventListener('show.bs.modal', function (event) {
+                    const btn = event.relatedTarget;
+                    if (!btn) return;
+                    replyModal.querySelector('form').action = btn.dataset.action;
+                    replyModal.querySelector('[data-fill="customer"]').textContent = btn.dataset.customer || '';
+                    replyModal.querySelector('[data-fill="comment"]').textContent = btn.dataset.comment || 'No comment';
+                    replyModal.querySelector('textarea').value = btn.dataset.reply || '';
+                });
+            }
+
+            // Customer popup.
+            const customerModal = document.getElementById('customerModal');
+            if (customerModal) {
+                customerModal.addEventListener('show.bs.modal', function (event) {
+                    const btn = event.relatedTarget;
+                    if (!btn) return;
+                    const d = btn.dataset;
+                    const set = (key, value) => {
+                        customerModal.querySelector('[data-fill="' + key + '"]').textContent = value || '—';
+                    };
+                    set('name', d.name);
+                    set('email', d.email);
+                    set('phone', d.phone);
+                    set('orders', d.orders);
+                    set('spent', d.spent ? '₹' + d.spent : '');
+                    set('coins', d.coins);
+                    const profile = customerModal.querySelector('a[data-fill="profile"]');
+                    if (d.profile) {
+                        profile.href = d.profile;
+                        profile.classList.remove('d-none');
+                    } else {
+                        profile.classList.add('d-none');
+                    }
+                });
+            }
         });
     </script>
 @endsection

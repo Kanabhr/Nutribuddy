@@ -184,6 +184,7 @@ Route::prefix('admin/ecommerce')->name('admin.ecommerce.')->middleware('auth:adm
     });
 
     Route::middleware('permission:manage moderation,admin')->group(function () {
+        Route::post('reviews/{review}/reply', [\App\Http\Controllers\Admin\Content\ReviewController::class, 'reply'])->name('reviews.reply');
         Route::resource('reviews', \App\Http\Controllers\Admin\Content\ReviewController::class)->except(['index', 'show']);
         Route::resource('video-reviews', \App\Http\Controllers\Admin\Content\VideoReviewController::class)->except(['index', 'show']);
     });
