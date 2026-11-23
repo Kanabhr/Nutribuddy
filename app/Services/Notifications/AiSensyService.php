@@ -55,7 +55,11 @@ class AiSensyService
             ['order_paid', 'cashfree']
         );
     }
-
+    /** Generic order message from an approved AiSensy campaign (customer notifications, point 26). */
+    public function sendOrderTemplate(Order $order, string $campaignName, array $templateParams, array $tags = []): bool
+    {
+    return $this->sendCampaign($campaignName, $order, $templateParams, $tags);
+    }
     private function sendCampaign(string $campaignName, Order $order, array $templateParams, array $tags = []): bool
     {
         if (! (bool) config('services.aisensy.enabled', true)) {

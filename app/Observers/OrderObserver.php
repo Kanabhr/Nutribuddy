@@ -4,8 +4,10 @@ namespace App\Observers;
 
 use App\Jobs\CancelShiprocketOrder;
 use App\Jobs\PushOrderToShiprocket;
+use App\Jobs\SendOrderNotification;
 use App\Models\Order;
 use App\Services\StockService;
+use App\Support\NotificationEvents;
 
 class OrderObserver
 {
@@ -25,6 +27,8 @@ class OrderObserver
         if (in_array(strtolower($order->payment_method), ['cod', 'cash_on_delivery'])) {
             PushOrderToShiprocket::dispatch($order);
         }
+
+        SendOrderNotification::dispatch($order->id, NotificationEvents::PLACED);
     }
 
     /**
@@ -55,6 +59,14 @@ class OrderObserver
             foreach ($order->items as $item) {
                 $this->stockService->deductStock($item);
             }
+        }
+
+        // Customer notifications (point 26): confirmed, shipped, delivered, refund.
+        if ($order->wasChanged('status') && ($event = NotificationEvents::forOrderStatus($order->status))) {
+            SendOrderNotification::dispatch($order->id, $event);
+        }
+        if ($order->wasChanged('payment_status') && in_array($order->payment_status, ['refunded', 'partially_refunded'], true)) {
+            SendOrderNotification::dispatch($order->id, NotificationEvents::REFUNDED);
         }
     }
 
