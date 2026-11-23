@@ -12,16 +12,20 @@ class Payment extends Model
 
     protected $fillable = [
         'order_id',
+        'subscription_id',
         'provider',
         'transaction_type',
+        'payment_type',
         'status',
         'currency',
         'amount',
         'gateway_order_id',
         'gateway_payment_id',
+        'invoice_number',
         'gateway_signature',
         'gateway_payload',
         'notes',
+        'failure_reason',
         'paid_at',
     ];
 
@@ -37,5 +41,10 @@ class Payment extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
+    }
+
+    public function subscription(): BelongsTo
+    {
+        return $this->belongsTo(Subscription::class);
     }
 }

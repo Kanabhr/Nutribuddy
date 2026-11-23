@@ -17,6 +17,10 @@ class SubscriptionPlan extends Model
         'quarterly_price',
         'annual_price',
         'level',
+        'cashfree_plan_id',
+        'interval_type',
+        'intervals',
+        'max_cycles',
         'is_active',
         'features',
     ];

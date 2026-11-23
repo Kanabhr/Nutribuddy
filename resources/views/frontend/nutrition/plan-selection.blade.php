@@ -780,6 +780,7 @@
             paymentCreateRoute: '{{ route("diet.payment.create") }}',
             paymentVerifyRoute: '{{ route("diet.payment.verify") }}',
             csrfToken: '{{ csrf_token() }}',
+            defaultPaymentGateway: 'cashfree',
             cashfreeEnv: '{{ \App\Services\Payments\CashfreePaymentService::resolveEnvironment() }}',
             razorpayKey: '{{ config("services.razorpay.key_id") }}'
         };

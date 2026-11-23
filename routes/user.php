@@ -52,7 +52,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/coupons', [UserCouponController::class, 'index'])->name('my-coupons');
         Route::get('/subscriptions', function () {
             $user          = auth()->user();
-            $subscriptions = $user->dietSubscriptions()->with('child', 'subscriptionPlan', 'product')->latest()->get();
+            $subscriptions = $user->dietSubscriptions()->with('child', 'subscriptionPlan')->latest()->get();
 
             // Rule 5: find subscriptions where the child still needs to answer the questionnaire.
             $pendingQuestionnaires = $subscriptions
