@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Category;
 use App\Models\Inventory;
+use App\Models\Ingredient;
 use App\Models\Product;
 use App\Models\ProductReview;
 use App\Models\ProductVariant;
@@ -51,17 +52,21 @@ class ProductSectionRegressionTest extends TestCase
         $category = Category::factory()->create(['is_active' => true]);
         $product = Product::factory()->create([
             'category_id' => $category->id,
-            'slug' => 'kids-multivitamin-gummies',
+            'name' => 'Brain Booster Gummies',
+            'slug' => 'brain-booster-gummies',
             'is_active' => true,
             'product_type' => 'variable',
             'is_variant_enabled' => true,
+            'problem_subtitle' => 'Algal DHA, Brahmi & Shankhpushpi, with essential nutrients.',
+            'coins_reward' => 91,
         ]);
 
         $variant = ProductVariant::create([
             'product_id' => $product->id,
             'name' => '60 Gummies Pack',
             'sku' => 'GUMMY-60',
-            'price' => 599.00,
+            'price' => 649.00,
+            'compare_at_price' => 699.00,
             'is_active' => true,
             'is_default' => true,
         ]);
@@ -74,11 +79,132 @@ class ProductSectionRegressionTest extends TestCase
             'is_in_stock' => true,
         ]);
 
-        $response = $this->get(route('product.show', 'kids-multivitamin-gummies'));
+        $ingredient = Ingredient::create([
+            'main_heading' => 'Algal DHA',
+            'short_heading' => 'Algal DHA',
+            'description' => 'Plant-derived omega-3.',
+            'dosage_heading_one' => 'Plant-derived omega-3',
+            'dosage_heading_two' => '20 mg',
+            'is_active' => true,
+        ]);
+        $product->ingredients()->attach($ingredient->id);
+
+        $response = $this->get(route('product.show', 'brain-booster-gummies'));
 
         $response->assertStatus(200);
         $response->assertViewIs('pages.product');
         $response->assertViewHas('product');
+        $response->assertSee('pdp-reference-features');
+        $response->assertSee('assets/research/world-nutrition-map.html');
+        $response->assertSee('assets/brain/routine-before.png');
+        $response->assertSee('assets/brain/routine-after.webp');
+        $response->assertSee('Reveal before and after routine images');
+        $response->assertSee('pdp-formula-reveal');
+        $response->assertSee('Meet your nutrition buddy');
+        $response->assertSee('Little gummy.');
+        $response->assertSee('Thoughtful formula.');
+        $response->assertSee('Brain Booster Gummies');
+        $response->assertSee('assets/brain/hero-reveal.webp');
+        $response->assertSee('Ayurveda + nutraceutical');
+        $response->assertSee('Brahmi & Shankhpushpi');
+        $response->assertSee('20 mg');
+        $response->assertSee('No preservatives');
+        $response->assertSee('100% vegetarian');
+        $response->assertSee('Choose your plan');
+        $response->assertSee('Explore ingredients');
+        $response->assertSee('Ingredient Transparency');
+        $response->assertSee('What’s inside');
+        $response->assertSee('nb-ingredient-nav', false);
+        $response->assertSee('role="tablist"', false);
+        $mapDocument = file_get_contents(public_path('assets/research/world-nutrition-map.html'));
+        $this->assertStringContainsString('Math.min(500,w*.4)', $mapDocument);
+        $this->assertStringContainsString('max-width:1400px', $mapDocument);
+        $this->assertStringContainsString('Published study location', $mapDocument);
+        $this->assertStringContainsString('nb-map-legend', $mapDocument);
+        $response->assertSee('Children’s supplement use around the world');
+        $response->assertSee('data-gallery-count', false);
+        $response->assertSee('data-gallery-prev', false);
+        $response->assertSee('data-gallery-next', false);
+        $response->assertSee('data-gallery-zoom', false);
+        $response->assertSee('data-pdp-sticky-purchase', false);
+        $response->assertSee('pdpStickyPrice', false);
+        $response->assertSee('Red grape · 30 gummies · Ages 4+');
+        $response->assertSee('data-pdp-sticky-action="cart"', false);
+        $response->assertSee('data-pdp-sticky-action="buy"', false);
+        $response->assertSee('EXPLORE THE NUTRIBUDDY FAMILY');
+        $response->assertSee('One favourite.');
+        $response->assertSee('Or a little more.');
+        $response->assertSee('Individual products and thoughtful combos, all in one place.');
+        $response->assertSee('data-pdp-family', false);
+        $response->assertSee('Complete Care');
+        $response->assertSee('Total Nutrition Kit');
+        $response->assertSee('pdp-subscribe-story', false);
+        $response->assertSee('Never run out.');
+        $response->assertSee('Save from month two.');
+        $response->assertSee('Pick your plan');
+        $response->assertSee('See every payment');
+        $response->assertSee('Stay in control');
+        $response->assertSee('data-pdp-subscribe-cta', false);
+        $response->assertSee('id="pdp-purchase-options"', false);
+        $response->assertSee('Product description');
+        $response->assertSee('What’s inside?');
+        $response->assertSee('How do I use it?');
+        $response->assertSee('How does Subscribe &amp; Save work?', false);
+        $response->assertSee('What are the shipping and return policies?');
+        $response->assertSeeInOrder([
+            'Estimated delivery between',
+            'Product description',
+            'What’s inside?',
+            'How do I use it?',
+        ]);
+        $response->assertSee('No Added');
+        $response->assertSee('Colours');
+        $response->assertSee('No Refined');
+        $response->assertSee('Sugar');
+        $response->assertSee('Preservatives');
+        $response->assertSee('No<br>Gelatin', false);
+        $response->assertSee('Vegetarian');
+        $response->assertSee('pdp-subtitle');
+        $response->assertSee('Algal DHA, Brahmi & Shankhpushpi, with essential nutrients.');
+        $response->assertSee('1 review · design sample');
+        $response->assertSee('5.0');
+        $response->assertSee('₹649');
+        $response->assertSee('₹699');
+        $response->assertSee('pdp-price-line');
+        $response->assertSee('pdp-coins-strip');
+        $response->assertSee('pdpCoinsModal');
+        $response->assertSee('A little thank-you from NutriBuddy');
+        $response->assertSee('How do you want to buy?');
+        $response->assertSee('One-time purchase');
+        $response->assertSee('Subscribe & Save');
+        $response->assertSee('From ₹569');
+        $response->assertSee('Lower price from month 2');
+        $response->assertDontSee('Plans coming soon');
+        $response->assertSee('pdpSubscriptionPanel');
+        $response->assertSee('Save from month 2 · Cancel anytime');
+        $response->assertSee('2 months');
+        $response->assertSee('3 months');
+        $response->assertSee('4 months');
+        $response->assertSee('Recommended');
+        $response->assertSee('Best value');
+        $response->assertSee('Free Tasty Kadha');
+        $response->assertSee('Buy 2: save 5% · Buy 3+: save 10%');
+        $response->assertSee('Available Coupons');
+        $response->assertSee('Check eligible offers at checkout');
+        $response->assertSee('pdpCouponModal');
+        $response->assertSee('A little extra, on us');
+        $response->assertSee('Extra 5% off prepaid orders');
+        $response->assertSee('PREPAID5');
+        $response->assertSee('Free shipping on ₹1,000+');
+        $response->assertSee('Free shipping ₹1000+');
+        $response->assertSee('COD Available');
+        $response->assertSee('Extra 5% OFF on Prepaid orders');
+        $response->assertSee('Estimated delivery between');
+        $response->assertSee('17 November – 19 November.');
+        $response->assertDontSee('Why Parents Love Brain Booster Gummies');
+        $response->assertDontSee('7-Day Return');
+        $response->assertSee('Earn');
+        $response->assertSee('91 NB');
     }
 
     public function test_authenticated_user_can_add_product_to_cart(): void
