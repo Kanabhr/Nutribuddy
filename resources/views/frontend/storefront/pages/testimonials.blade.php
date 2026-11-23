@@ -136,6 +136,7 @@
                     </div>
                     <div class="featured-quote">"{{ Str::limit($featuredReview->comment, 60) }}"</div>
                     <p class="featured-text">{{ $featuredReview->comment }}</p>
+                    @include('partials.review-admin-reply', ['review' => $featuredReview])
                     <div class="featured-author">
                         <div class="author-mark">{{ strtoupper(substr($featuredReview->user?->name ?? 'A', 0, 2)) }}</div>
                         <div>
@@ -178,6 +179,7 @@
                             </div>
                         @endif
                         <p class="review-text">"{{ $review->comment }}"</p>
+                        @include('partials.review-admin-reply', ['review' => $review])
                         <div class="review-author">
                             <div class="review-avatar" style="background: {{ $bgColor }}; color: var(--dk);">
                                 {{ strtoupper(substr($review->user?->name ?? 'A', 0, 2)) }}

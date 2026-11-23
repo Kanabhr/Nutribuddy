@@ -311,6 +311,7 @@
                             @endfor
                         </div>
                         <p class="wrev-txt">{{ $review->comment }}</p>
+                        @include('partials.review-admin-reply', ['review' => $review])
                         @php
                             $cardImages = [];
                             if (!empty($review->images)) {
