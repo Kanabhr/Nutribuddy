@@ -226,6 +226,12 @@
                         <a href="{{ route('admin.ecommerce.notifications.index') }}"><i
                                 class="ri-circle-fill circle-icon text-primary-600 w-auto"></i> Notifications</a>
                     </li>
+                    @can('manage administration')
+                    <li>
+                        <a href="{{ route('admin.system.notification-templates.index') }}"><i
+                                class="ri-circle-fill circle-icon text-success-main w-auto"></i> Order Messages</a>
+                    </li>
+                    @endcan
                     <li>
                         <a href="{{ route('admin.ecommerce.support-tickets.index') }}"><i
                                 class="ri-circle-fill circle-icon text-pink w-auto"></i> Support Tickets</a>
