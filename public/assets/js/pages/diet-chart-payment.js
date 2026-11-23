@@ -102,16 +102,44 @@ window.startDietCheckout = async function (planSlug, btn, childId = null, select
         }
 
         if (gateway === 'cashfree') {
-            // Cashfree Checkout
+            // Cashfree Checkout (Subscriptions or Orders)
             btn.innerText = 'Opening Cashfree...';
-            const cashfree = Cashfree({
-                mode: createData.mode || window.nutribuddyConfig.cashfreeEnv || 'sandbox'
-            });
+            try {
+                const cashfree = Cashfree({
+                    mode: createData.mode || window.nutribuddyConfig.cashfreeEnv || 'sandbox'
+                });
 
-            cashfree.checkout({
-                paymentSessionId: createData.payment_session_id,
-                redirectTarget: '_self'
-            });
+                const sessionId = createData.subscription_session_id || createData.subs_session_id || createData.subsSessionId || createData.payment_session_id;
+
+                if (createData.subscription_session_id || createData.subs_session_id || createData.subsSessionId) {
+                    cashfree.subscriptionsCheckout({
+                        subsSessionId: sessionId,
+                        subscriptionSessionId: sessionId,
+                        redirectTarget: '_self'
+                    }).then(function (result) {
+                        if (result && result.error) {
+                            alert(result.error.message || 'Payment initiation failed.');
+                            btn.innerText = originalText;
+                            btn.disabled = false;
+                        }
+                    }).catch(function (err) {
+                        console.error('Subscription checkout error:', err);
+                        alert('Checkout error: ' + (err.message || err));
+                        btn.innerText = originalText;
+                        btn.disabled = false;
+                    });
+                } else {
+                    cashfree.checkout({
+                        paymentSessionId: createData.payment_session_id,
+                        redirectTarget: '_self'
+                    });
+                }
+            } catch (err) {
+                console.error('Cashfree init error:', err);
+                alert('Unable to open payment gateway: ' + (err.message || err));
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
 
         } else {
             // Razorpay Checkout

@@ -70,7 +70,7 @@ class NutritionPageService
 
         if (! $dietPlan) {
             $reviewPending = DietPlan::whereHas('assessment', fn ($query) => $query->where('child_id', $child->id))
-                ->where('status', 'pending_review')
+                ->where('review_status', 'pending_review')
                 ->exists();
 
             return compact('reviewPending', 'mealChild');

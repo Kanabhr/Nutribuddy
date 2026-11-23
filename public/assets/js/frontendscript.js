@@ -2484,58 +2484,54 @@ document.querySelectorAll('.reveal').forEach(r => ro.observe(r));
 
   if (!listEl || !detailEl) return;
 
-  let activeId = null;
-  let currentFilter = 'all';
+  let activeId = ingredients.length ? ingredients[0].id : null;
 
-  function renderList(filter) {
-    currentFilter = filter;
-    const filtered = filter === 'all' ? ingredients : ingredients.filter(i => i.cat === filter);
-    listEl.innerHTML = filtered.map(i => `
-      <div class="nb-ing-row${activeId === i.id ? ' nb-row-active' : ''}" data-id="${i.id}">
-        <div class="nb-ing-row-emoji" style="background:${i.emojiBg}; overflow: hidden; display: flex; align-items: center; justify-content: center;">
-          <img src="${i.image || 'img/logo.png'}" alt="${i.name}" style="width: 100%; height: 100%; object-fit: cover;">
-        </div>
-        <div>
-          <div class="nb-ing-row-name">${i.name}</div>
-          <div class="nb-ing-row-cat">${i.catLabel}</div>
-        </div>
-        <div class="nb-ing-row-badge" style="background:${i.badgeBg};color:${i.badgeColor}">${i.catLabel}</div>
-      </div>
+  function renderList() {
+    listEl.innerHTML = ingredients.map(i => `
+      <button class="nb-ing-tab${activeId === i.id ? ' nb-row-active' : ''}" type="button" role="tab"
+        aria-selected="${activeId === i.id}" tabindex="${activeId === i.id ? '0' : '-1'}" data-id="${i.id}">
+        ${i.shortName || i.name}
+      </button>
     `).join('');
-    listEl.querySelectorAll('.nb-ing-row').forEach(row => {
-      row.addEventListener('click', () => showDetail(row.dataset.id));
+    listEl.querySelectorAll('.nb-ing-tab').forEach(tab => {
+      tab.addEventListener('click', () => showDetail(tab.dataset.id));
+    });
+    listEl.addEventListener('keydown', event => {
+      if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+      const tabs = [...listEl.querySelectorAll('.nb-ing-tab')];
+      const index = tabs.indexOf(document.activeElement);
+      if (index < 0) return;
+      event.preventDefault();
+      tabs[(index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length]?.click();
+      listEl.querySelector('[aria-selected="true"]')?.focus();
     });
   }
 
   function renderDetailCards() {
     detailEl.innerHTML = ingredients.map(i => `
-      <div class="nb-detail-card" data-detail="${i.id}">
-        <div class="nb-detail-header" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-          <div style="width:72px;height:72px;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <img src="${i.image || 'img/logo.png'}" alt="${i.name}" style="width:100%;height:100%;object-fit:cover;">
-          </div>
-          <div style="flex:1;min-width:220px;">
-            <div class="nb-detail-name">${i.name}</div>
-            <div class="nb-detail-latin">${i.latin || ''}</div>
-            <div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <div class="nb-detail-cat-badge" style="background:${i.badgeBg};color:${i.badgeColor}">${i.catLabel}</div>
-            </div>
-          </div>
-        </div>
-        <div class="nb-detail-desc">${i.desc}</div>
-        <div class="nb-detail-benefits">
-          <h5>Key Benefits</h5>
-          <div class="nb-benefit-tags">
+      <article class="nb-detail-card" data-detail="${i.id}">
+        <div class="nb-detail-photo-wrap"><img class="nb-detail-photo" src="${i.image || 'img/logo.png'}" alt="${i.name}" loading="lazy"></div>
+        <div class="nb-detail-copy">
+          <h3 class="nb-detail-name">${i.name}</h3>
+          <p class="nb-detail-latin">${i.latin || i.catLabel}</p>
+          <div class="nb-ingredient-amount"><b>AMOUNT PER GUMMY</b><strong>${i.dosage || 'See product label'}</strong></div>
+          <p class="nb-detail-desc">${i.desc}</p>
+          <div class="nb-detail-benefits"><h5>Key Benefits</h5><div class="nb-benefit-tags">
             ${i.benefits.map(b => `<span class="nb-benefit-tag">${b}</span>`).join('')}
-          </div>
+          </div></div>
         </div>
-      </div>
+      </article>
     `).join('');
   }
 
   function showDetail(id) {
     activeId = id;
-    listEl.querySelectorAll('.nb-ing-row').forEach(r => r.classList.toggle('nb-row-active', r.dataset.id === id));
+    listEl.querySelectorAll('.nb-ing-tab').forEach(tab => {
+      const selected = tab.dataset.id === id;
+      tab.classList.toggle('nb-row-active', selected);
+      tab.setAttribute('aria-selected', String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+    });
     if (emptyEl) emptyEl.classList.add('nb-hidden');
     detailEl.querySelectorAll('.nb-detail-card').forEach(c => c.classList.toggle('nb-card-active', c.dataset.detail === id));
   }
@@ -2585,9 +2581,14 @@ document.querySelectorAll('.reveal').forEach(r => ro.observe(r));
     renderMobCards(cat);
   };
 
-  renderList('all');
+  document.querySelectorAll('[data-nb-scroll]').forEach(button => {
+    button.addEventListener('click', () => listEl.scrollBy({ left: Number(button.dataset.nbScroll) * 300, behavior: 'smooth' }));
+  });
+
+  renderList();
   renderDetailCards();
   renderMobCards('all');
+  if (activeId) showDetail(activeId);
 })();
 
 

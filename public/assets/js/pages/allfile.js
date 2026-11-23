@@ -30,21 +30,29 @@
     const pdpFallbackCartMeta = config.fallbackCartMeta || {};
     const checkoutUrl = config.checkoutUrl || '/checkout';
 
-    function changePdpImage(el, src) {
+    function isSubscriptionPreviewSelected() {
+        return document.querySelector('input[name="pdpPurchaseOption"]:checked')?.value === 'subscribe';
+    }
+
+    function changePdpImage(el, src, imageNumber = null) {
         const mainImage = document.getElementById('mainPdpImage');
         if (!mainImage || !src) return;
 
         mainImage.src = src;
         document.dispatchEvent(new CustomEvent('nb:pdp-image-changed', { detail: { src } }));
-        document.querySelectorAll('.thumb').forEach(t => t.classList.remove('active'));
+        const thumbs = Array.from(document.querySelectorAll('.pdp-gallery .thumb'));
+        thumbs.forEach(t => t.classList.remove('active'));
         if (el) {
             el.classList.add('active');
             el.scrollIntoView({
                 behavior: 'smooth',
                 block: 'nearest',
-                inline: 'center'
+                inline: window.matchMedia('(max-width: 900px)').matches ? 'center' : 'nearest'
             });
         }
+        const index = imageNumber || thumbs.indexOf(el) + 1;
+        const count = document.querySelector('[data-gallery-count]');
+        if (count && index > 0) count.textContent = `${index} / ${thumbs.length}`;
     }
 
     function initPdpImageZoom() {
@@ -172,7 +180,32 @@
         const galleryTarget = document.querySelector('.pdp-gallery .main-img-wrap .p-image');
         const mainImage = document.getElementById('mainPdpImage');
         const thumbs = Array.from(document.querySelectorAll('.pdp-gallery .thumb'));
-        if (!galleryTarget || !mainImage || thumbs.length < 2) return;
+        if (!galleryTarget || !mainImage) return;
+
+        const moveGallery = direction => {
+            if (thumbs.length < 2) return;
+            const current = Math.max(0, thumbs.findIndex(thumb => thumb.classList.contains('active')));
+            const next = (current + direction + thumbs.length) % thumbs.length;
+            const nextThumb = thumbs[next];
+            changePdpImage(nextThumb, nextThumb.querySelector('img')?.src, next + 1);
+        };
+
+        document.querySelector('[data-gallery-prev]')?.addEventListener('click', () => moveGallery(-1));
+        document.querySelector('[data-gallery-next]')?.addEventListener('click', () => moveGallery(1));
+
+        const dialog = document.querySelector('[data-gallery-dialog]');
+        const dialogImage = dialog?.querySelector('img');
+        document.querySelector('[data-gallery-zoom]')?.addEventListener('click', () => {
+            if (!dialog || !dialogImage) return;
+            dialogImage.src = mainImage.currentSrc || mainImage.src;
+            dialog.showModal();
+        });
+        document.querySelector('[data-gallery-close]')?.addEventListener('click', () => dialog?.close());
+        dialog?.addEventListener('click', event => {
+            if (event.target === dialog) dialog.close();
+        });
+
+        if (thumbs.length < 2) return;
 
         let startX = 0;
         let startY = 0;
@@ -190,14 +223,6 @@
             const currentSrc = mainImage.getAttribute('src') || '';
             const matchedIndex = thumbs.findIndex(thumb => thumb.querySelector('img')?.getAttribute('src') === currentSrc);
             return matchedIndex >= 0 ? matchedIndex : 0;
-        }
-
-        function moveGallery(direction) {
-            const current = activeThumbIndex();
-            const next = (current + direction + thumbs.length) % thumbs.length;
-            const nextThumb = thumbs[next];
-            const nextSrc = nextThumb.querySelector('img')?.getAttribute('src');
-            changePdpImage(nextThumb, nextSrc);
         }
 
         function onStart(event, mode = '') {
@@ -334,6 +359,8 @@
         const selectedEl = document.getElementById('pdpVariantSelected');
         const skuEl = document.getElementById('pdpVariantSku');
         const priceNow = document.getElementById('pdpPriceNow');
+        const oneTimePrice = document.getElementById('pdpOneTimePrice');
+        const stickyPrice = document.getElementById('pdpStickyPrice');
         const priceOld = document.getElementById('pdpPriceOld');
         const priceSave = document.getElementById('pdpPriceSave');
         const discountBadge = document.getElementById('pdpDiscountBadge');
@@ -361,6 +388,8 @@
 
         selectedVariantId = variant.id;
         if (priceNow) priceNow.textContent = formatMoney(variant.price);
+        if (oneTimePrice) oneTimePrice.textContent = formatMoney(variant.price);
+        if (stickyPrice) stickyPrice.textContent = formatMoney(variant.price);
         if (priceOld) {
             priceOld.textContent = variant.compare_price > variant.price ? formatMoney(variant.compare_price) : '';
             priceOld.classList.toggle('d-none', !(variant.compare_price > variant.price));
@@ -375,7 +404,11 @@
             discountBadge.textContent = variant.discount_percent > 0 ? `${variant.discount_percent}% OFF` : '';
             discountBadge.classList.toggle('d-none', !(variant.discount_percent > 0));
         }
-        if (cashback) cashback.textContent = `Get ${variant.coins} NB Coins on this purchase!`;
+        if (cashback) cashback.textContent = `Earn ${variant.coins} NB Coins on this purchase`;
+        const coinsModalAmount = document.getElementById('pdpCoinsModalAmount');
+        const coinsModalPrice = document.getElementById('pdpCoinsModalPrice');
+        if (coinsModalAmount) coinsModalAmount.textContent = String(variant.coins);
+        if (coinsModalPrice) coinsModalPrice.textContent = formatMoney(variant.price);
         if (skuEl) skuEl.textContent = `SKU: ${variant.sku}`;
         if (selectedEl) selectedEl.textContent = pdpVariantLabel(variant);
         if (stockEl) {
@@ -589,10 +622,217 @@
 
     // Default set 5 stars
     window.addEventListener('DOMContentLoaded', () => {
+        const coinsTrigger = document.getElementById('pdpCoinsTrigger');
+        const coinsModal = document.getElementById('pdpCoinsModal');
+        const coinsCloseButtons = coinsModal?.querySelectorAll('[data-close-coins-modal]') || [];
+        const closeCoinsModal = () => {
+            if (!coinsModal || coinsModal.hidden) return;
+            coinsModal.hidden = true;
+            coinsModal.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+            coinsTrigger?.focus();
+        };
+
+        if (coinsTrigger && coinsModal) {
+            coinsTrigger.addEventListener('click', () => {
+                coinsModal.hidden = false;
+                coinsModal.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
+                coinsModal.querySelector('.pdp-coins-close')?.focus();
+            });
+            coinsCloseButtons.forEach(button => button.addEventListener('click', closeCoinsModal));
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape') closeCoinsModal();
+            });
+        }
+
+        const couponTrigger = document.getElementById('pdpCouponTrigger');
+        const couponModal = document.getElementById('pdpCouponModal');
+        const couponCloseButtons = couponModal?.querySelectorAll('[data-close-coupon-modal]') || [];
+        const closeCouponModal = () => {
+            if (!couponModal || couponModal.hidden) return;
+            couponModal.hidden = true;
+            couponModal.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+            couponTrigger?.focus();
+        };
+
+        if (couponTrigger && couponModal) {
+            couponTrigger.addEventListener('click', () => {
+                couponModal.hidden = false;
+                couponModal.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
+                couponModal.querySelector('.pdp-coins-close')?.focus();
+            });
+            couponCloseButtons.forEach(button => button.addEventListener('click', () => {
+                if (button.classList.contains('pdp-coupon-apply') && typeof nbToast === 'function') {
+                    nbToast('Use PREPAID5 with prepaid payment at checkout.', 'info');
+                }
+                closeCouponModal();
+            }));
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape') closeCouponModal();
+            });
+        }
+
+        const purchaseOptions = document.querySelectorAll('input[name="pdpPurchaseOption"]');
+        const purchaseOptionLabels = document.querySelectorAll('[data-pdp-purchase-option]');
+        const subscriptionPanel = document.getElementById('pdpSubscriptionPanel');
+        const subscriptionPlanLabels = document.querySelectorAll('[data-pdp-subscription-plan]');
+        const stickyPurchaseType = document.querySelector('[data-pdp-sticky-purchase-type]');
+        const syncPurchaseOption = () => {
+            const subscriptionSelected = isSubscriptionPreviewSelected();
+            purchaseOptionLabels.forEach(label => {
+                const input = label.querySelector('input[name="pdpPurchaseOption"]');
+                label.classList.toggle('selected', Boolean(input?.checked));
+            });
+            if (subscriptionPanel) subscriptionPanel.hidden = !subscriptionSelected;
+            if (stickyPurchaseType) {
+                stickyPurchaseType.textContent = subscriptionSelected ? 'Subscription checkout preview' : 'One-time purchase';
+            }
+        };
+        purchaseOptions.forEach(input => input.addEventListener('change', syncPurchaseOption));
+        syncPurchaseOption();
+        document.querySelector('[data-pdp-subscribe-cta]')?.addEventListener('click', event => {
+            event.preventDefault();
+            const subscribeOption = document.querySelector('input[name="pdpPurchaseOption"][value="subscribe"]');
+            subscribeOption?.click();
+            document.getElementById('pdp-purchase-options')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            subscribeOption?.focus({ preventScroll: true });
+        });
+        subscriptionPlanLabels.forEach(label => {
+            label.querySelector('input[name="pdpSubscriptionPlan"]')?.addEventListener('change', () => {
+                subscriptionPlanLabels.forEach(plan => {
+                    const input = plan.querySelector('input[name="pdpSubscriptionPlan"]');
+                    plan.classList.toggle('selected', Boolean(input?.checked));
+                });
+            });
+        });
+
+        const stickyPurchaseBar = document.querySelector('[data-pdp-sticky-purchase]');
+        if (stickyPurchaseBar) {
+            document.querySelectorAll('[data-pdp-sticky-action]').forEach(button => {
+                button.addEventListener('click', () => {
+                    const targetId = button.dataset.pdpStickyAction === 'buy' ? 'pdpBuyNowBtn' : 'pdpAddToCartBtn';
+                    document.getElementById(targetId)?.click();
+                });
+            });
+
+            const productHero = document.querySelector('.pdp-hero');
+            if (productHero && 'IntersectionObserver' in window) {
+                const stickyObserver = new IntersectionObserver(([entry]) => {
+                    const isVisible = window.scrollY > 120 && !entry.isIntersecting;
+                    stickyPurchaseBar.classList.toggle('is-visible', isVisible);
+                    stickyPurchaseBar.setAttribute('aria-hidden', String(!isVisible));
+                }, { threshold: 0 });
+                stickyObserver.observe(productHero);
+            }
+        }
+
+        const familySection = document.querySelector('[data-pdp-family]');
+        if (familySection) {
+            const familyTabs = Array.from(familySection.querySelectorAll('[data-family-tab]'));
+            const familyPanels = Array.from(familySection.querySelectorAll('[data-family-panel]'));
+            const activeFamilyPanel = () => familyPanels.find(panel => !panel.hidden);
+            const familyCards = panel => Array.from(panel.querySelectorAll('.pdp-family-card'));
+            const familyCardPosition = (track, card) => card.getBoundingClientRect().left - track.getBoundingClientRect().left + track.scrollLeft;
+
+            const updateFamilyPanel = panel => {
+                const track = panel.querySelector('[data-family-track]');
+                const cards = familyCards(panel);
+                const dots = panel.querySelector('[data-family-dots]');
+                if (!track || !cards.length || !dots) return;
+
+                if (dots.children.length !== cards.length) {
+                    dots.replaceChildren(...cards.map((card, index) => {
+                        const dot = document.createElement('button');
+                        dot.type = 'button';
+                        dot.setAttribute('aria-label', `Show ${card.querySelector('h3')?.textContent.trim() || `item ${index + 1}`}`);
+                        dot.addEventListener('click', () => track.scrollTo({
+                            left: familyCardPosition(track, cards[index]),
+                            behavior: 'smooth'
+                        }));
+                        return dot;
+                    }));
+                }
+
+                const currentIndex = cards.reduce((closest, card, index) => {
+                    const distance = Math.abs(familyCardPosition(track, card) - track.scrollLeft);
+                    const closestDistance = Math.abs(familyCardPosition(track, cards[closest]) - track.scrollLeft);
+                    return distance < closestDistance ? index : closest;
+                }, 0);
+                Array.from(dots.children).forEach((dot, index) => {
+                    dot.classList.toggle('is-active', index === currentIndex);
+                    dot.setAttribute('aria-current', String(index === currentIndex));
+                });
+
+                const canScroll = track.scrollWidth > track.clientWidth + 2;
+                panel.querySelectorAll('[data-family-move]').forEach(button => {
+                    const direction = Number(button.dataset.familyMove);
+                    button.disabled = !canScroll || (direction < 0 ? currentIndex === 0 : currentIndex === cards.length - 1);
+                });
+            };
+
+            const activateFamilyTab = tab => {
+                const selectedType = tab.dataset.familyTab;
+                familyTabs.forEach(item => {
+                    const selected = item === tab;
+                    item.setAttribute('aria-selected', String(selected));
+                    item.tabIndex = selected ? 0 : -1;
+                });
+                familyPanels.forEach(panel => {
+                    panel.hidden = panel.dataset.familyPanel !== selectedType;
+                });
+                const panel = activeFamilyPanel();
+                const track = panel?.querySelector('[data-family-track]');
+                if (track) track.scrollLeft = 0;
+                if (panel) updateFamilyPanel(panel);
+            };
+
+            familyTabs.forEach((tab, index) => {
+                tab.addEventListener('click', () => activateFamilyTab(tab));
+                tab.addEventListener('keydown', event => {
+                    if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+                    event.preventDefault();
+                    const nextIndex = (index + (event.key === 'ArrowRight' ? 1 : -1) + familyTabs.length) % familyTabs.length;
+                    activateFamilyTab(familyTabs[nextIndex]);
+                    familyTabs[nextIndex].focus();
+                });
+            });
+
+            familyPanels.forEach(panel => {
+                panel.querySelectorAll('[data-family-move]').forEach(button => {
+                    button.addEventListener('click', () => {
+                        const track = panel.querySelector('[data-family-track]');
+                        const cards = familyCards(panel);
+                        if (!track || !cards.length) return;
+                        const currentIndex = cards.reduce((closest, card, index) => {
+                            const distance = Math.abs(familyCardPosition(track, card) - track.scrollLeft);
+                            const closestDistance = Math.abs(familyCardPosition(track, cards[closest]) - track.scrollLeft);
+                            return distance < closestDistance ? index : closest;
+                        }, 0);
+                        const nextIndex = Math.max(0, Math.min(cards.length - 1, currentIndex + Number(button.dataset.familyMove)));
+                        track.scrollTo({ left: familyCardPosition(track, cards[nextIndex]), behavior: 'smooth' });
+                    });
+                });
+
+                panel.querySelector('[data-family-track]')?.addEventListener('scroll', () => {
+                    if (!panel.hidden) window.requestAnimationFrame(() => updateFamilyPanel(panel));
+                }, { passive: true });
+            });
+
+            const initialFamilyPanel = activeFamilyPanel();
+            if (initialFamilyPanel) updateFamilyPanel(initialFamilyPanel);
+        }
+
         const addToCartBtn = document.getElementById('pdpAddToCartBtn');
         if (addToCartBtn) {
             addToCartBtn.addEventListener('click', function(e) {
                 e.preventDefault();
+                if (isSubscriptionPreviewSelected()) {
+                    if (typeof nbToast === 'function') nbToast('Subscription checkout is not connected yet.', 'warning');
+                    return;
+                }
                 handleAddToCart(config.productId, this);
             });
         }
@@ -601,6 +841,10 @@
         if (buyNowBtn) {
             buyNowBtn.addEventListener('click', function(e) {
                 e.preventDefault();
+                if (isSubscriptionPreviewSelected()) {
+                    if (typeof nbToast === 'function') nbToast('Subscription checkout is not connected yet.', 'warning');
+                    return;
+                }
                 handleBuyNow(config.productId, this);
             });
         }

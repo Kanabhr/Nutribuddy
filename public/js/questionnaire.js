@@ -213,6 +213,37 @@ function qzBuildFormData(data, fileInfo) {
 }
 
 // ---------------------------------------------------------------------------
+// Toast Notification Helper (Top-Right Widget)
+// ---------------------------------------------------------------------------
+function qzNotify(msg, type = 'warning', title = '') {
+    if (typeof window.nbToast === 'function') {
+        window.nbToast(msg, type, title);
+        return;
+    }
+    if (typeof window.toastr !== 'undefined' && typeof window.toastr[type] === 'function') {
+        window.toastr[type](msg, title);
+        return;
+    }
+    if (typeof window.showToast === 'function') {
+        window.showToast(msg);
+        return;
+    }
+    // Fallback: create floating toast at top-right
+    let wrap = document.getElementById('nb-toast-wrap');
+    if (!wrap) {
+        wrap = document.createElement('div');
+        wrap.id = 'nb-toast-wrap';
+        wrap.style.cssText = 'position:fixed;top:22px;right:22px;z-index:99999;display:flex;flex-direction:column;gap:12px;pointer-events:none;';
+        document.body.appendChild(wrap);
+    }
+    const t = document.createElement('div');
+    t.style.cssText = 'pointer-events:all;padding:14px 18px;border-radius:12px;background:#fff;border-left:5px solid ' + (type === 'warning' ? '#f59e0b' : '#ef4444') + ';box-shadow:0 8px 30px rgba(0,0,0,0.15);font-family:sans-serif;font-size:14px;color:#1f2937;max-width:380px;';
+    t.innerHTML = '<strong>' + (title || (type === 'warning' ? 'Notice' : 'Alert')) + '</strong><div style="margin-top:4px;">' + msg + '</div>';
+    wrap.appendChild(t);
+    setTimeout(() => { t.remove(); }, 4000);
+}
+
+// ---------------------------------------------------------------------------
 // C7-FIX-B: Show server 422 validation errors to the user inline or as alert.
 // ---------------------------------------------------------------------------
 function qzShowServerErrors(errors) {
@@ -233,7 +264,7 @@ function qzShowServerErrors(errors) {
         errorMessages.push(msg);
     }
     if (errorMessages.length > 0) {
-        alert('Please fix the following:\n' + errorMessages.join('\n'));
+        qzNotify('Please fix the following:\n' + errorMessages.join('\n'), 'warning', 'Form Incomplete');
     }
 }
 
@@ -251,7 +282,7 @@ async function qzSubmit(btn) {
         // and show a note that the file must be re-attached after login.
         const fileInfo = qzFindChosenFile();
         if (fileInfo) {
-            alert('Note: your file attachment (blood report) cannot be saved during login. Please attach it again after logging in.');
+            qzNotify('Note: your file attachment (blood report) cannot be saved during login. Please attach it again after logging in.', 'info', 'Notice');
         }
         if (typeof openLoginModal === 'function') {
             document.getElementById('loginModalTitle').textContent = 'Account Required';
@@ -261,7 +292,7 @@ async function qzSubmit(btn) {
                 qzSubmit(btn);
             });
         } else {
-            alert("Please log in or create an account to complete the purchase.");
+            qzNotify("Please log in or create an account to complete the purchase.", 'warning', 'Account Required');
             window.location.href = window.loginUrlBase + '?plan=' + encodeURIComponent(data.plan_slug) + '&cycle=' + encodeURIComponent(data.cycle);
         }
         return;
@@ -291,7 +322,7 @@ async function qzSubmit(btn) {
             if (result.errors) {
                 qzShowServerErrors(result.errors);
             } else {
-                alert(result.message || 'Error submitting questionnaire');
+                qzNotify(result.message || 'Error submitting questionnaire', 'error', 'Submission Error');
             }
             btn.disabled = false; btn.textContent = 'Submit & Pay';
             return;
@@ -304,7 +335,7 @@ async function qzSubmit(btn) {
         }
         qzInitiatePayment(data.plan_slug, data.cycle, result.child_id, btn);
     } catch (e) {
-        console.error(e); alert('An error occurred.');
+        console.error(e); qzNotify('An unexpected error occurred.', 'error');
         btn.disabled = false; btn.textContent = 'Submit & Pay';
     }
 }
@@ -319,7 +350,12 @@ async function qzInitiatePayment(planSlug, cycle, childId, btn) {
         });
         const cd = await cr.json();
         if (!cr.ok || !cd.success) {
-            alert(cd.message || 'Failed to initialize payment.');
+            const isAlreadyActive = cd.message && (cd.message.toLowerCase().includes('already has an active') || cd.message.toLowerCase().includes('active subscription'));
+            qzNotify(
+                cd.message || 'Failed to initialize payment.',
+                isAlreadyActive ? 'warning' : 'error',
+                isAlreadyActive ? 'Plan Already Active' : 'Payment Error'
+            );
             btn.textContent = 'Submit & Pay'; btn.disabled = false; return;
         }
         if (cd.gateway === 'free') { window.location.href = '/user/pages/nutrition/child/' + encodeURIComponent(childId); return; }
@@ -327,22 +363,58 @@ async function qzInitiatePayment(planSlug, cycle, childId, btn) {
         if (cd.gateway === 'cashfree') {
             btn.textContent = 'Redirecting...';
             const loadCF = () => {
-                const cfMode = (window.nutribuddyConfig && window.nutribuddyConfig.cashfreeEnv === 'production') ? 'production' : 'sandbox';
-                const cashfree = Cashfree({ mode: cfMode });
-                cashfree.checkout({ paymentSessionId: cd.payment_session_id, redirectTarget: '_self' });
+                try {
+                    const cfMode = (window.nutribuddyConfig && window.nutribuddyConfig.cashfreeEnv === 'production') ? 'production' : (cd.mode || 'sandbox');
+                    const cashfree = Cashfree({ mode: cfMode });
+                    const sessionId = cd.subscription_session_id || cd.subs_session_id || cd.subsSessionId || cd.payment_session_id;
+
+                    if (cd.subscription_session_id || cd.subs_session_id || cd.subsSessionId) {
+                        cashfree.subscriptionsCheckout({
+                            subsSessionId: sessionId,
+                            subscriptionSessionId: sessionId,
+                            redirectTarget: '_self'
+                        }).then(function (result) {
+                            if (result && result.error) {
+                                console.error('Cashfree subscription error:', result.error);
+                                qzNotify(result.error.message || 'Payment initiation failed.', 'error', 'Payment Error');
+                                btn.textContent = 'Submit & Pay';
+                                btn.disabled = false;
+                            }
+                        }).catch(function (err) {
+                            console.error('Subscription checkout error:', err);
+                            qzNotify('Checkout error: ' + (err.message || err), 'error', 'Checkout Error');
+                            btn.textContent = 'Submit & Pay';
+                            btn.disabled = false;
+                        });
+                    } else if (cd.payment_session_id) {
+                        cashfree.checkout({ paymentSessionId: cd.payment_session_id, redirectTarget: '_self' });
+                    } else {
+                        throw new Error('No valid payment session ID received from server.');
+                    }
+                } catch (err) {
+                    console.error('loadCF error:', err);
+                    qzNotify('Unable to open payment gateway: ' + (err.message || err), 'error', 'Gateway Error');
+                    btn.textContent = 'Submit & Pay';
+                    btn.disabled = false;
+                }
             };
 
             if (typeof Cashfree === 'undefined') {
                 const s = document.createElement('script');
                 s.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
                 s.onload = loadCF;
+                s.onerror = function () {
+                    qzNotify('Failed to load Cashfree Payment SDK. Please check your internet connection.', 'error', 'Network Error');
+                    btn.textContent = 'Submit & Pay';
+                    btn.disabled = false;
+                };
                 document.body.appendChild(s);
             } else {
                 loadCF();
             }
         }
     } catch (e) {
-        console.error(e); alert('An error occurred during payment init.');
+        console.error(e); qzNotify('An error occurred during payment init.', 'error');
         btn.textContent = 'Submit & Pay'; btn.disabled = false;
     }
 }
@@ -388,14 +460,14 @@ async function qzSubmitPending(btn, data) {
             if (result.errors) {
                 qzShowServerErrors(result.errors);
             } else {
-                alert(result.message || 'Error submitting questionnaire');
+                qzNotify(result.message || 'Error submitting questionnaire', 'error', 'Submission Error');
             }
             btn.disabled = false; btn.textContent = 'Submit & Pay';
             return;
         }
         qzInitiatePayment(data.plan_slug, data.cycle, result.child_id, btn);
     } catch (e) {
-        console.error(e); alert('An error occurred.');
+        console.error(e); qzNotify('An unexpected error occurred.', 'error');
         btn.disabled = false; btn.textContent = 'Submit & Pay';
     }
 }

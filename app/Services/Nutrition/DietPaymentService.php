@@ -99,7 +99,7 @@ class DietPaymentService
         try {
             return $data['gateway'] === 'razorpay'
                 ? $this->createRazorpayOrder($user, $plan, $subscription, $amountInPaise)
-                : $this->createCashfreeOrder($user, $plan, $subscription, $amountInRupees);
+                : $this->createCashfreeOrder($user, $plan, $subscription, $amountInRupees, $data['cycle'] ?? 'monthly');
         } catch (\Throwable $exception) {
             Log::error('Diet plan payment order failed.', [
                 'subscription_id' => $subscription->id,
@@ -156,33 +156,61 @@ class DietPaymentService
 
     public function confirmCashfreeReturn(?string $orderId, ?string $subscriptionId): array
     {
-        if (! $orderId || ! $subscriptionId) {
+        if (! $subscriptionId && ! $orderId) {
             return ['success' => false, 'message' => 'Invalid payment return data.'];
         }
 
         try {
-            $subscription = DietSubscription::whereKey($subscriptionId)
-                ->where('razorpay_order_id', $orderId)->first();
+            $subscription = null;
+            if ($subscriptionId) {
+                $subscription = DietSubscription::whereKey($subscriptionId)->first();
+            }
+            if (! $subscription && $orderId && ! str_contains($orderId, '{')) {
+                $subscription = DietSubscription::where('razorpay_order_id', $orderId)->first();
+            }
+
             if (! $subscription) {
                 return ['success' => false, 'message' => 'Invalid payment return data.'];
             }
 
-            $baseUrl = \App\Services\Payments\CashfreePaymentService::resolveBaseUrl() . '/orders/';
-            $response = Http::acceptJson()->withHeaders($this->cashfreeHeaders())
-                ->get($baseUrl.urlencode($orderId));
+            $orderRef = ($orderId && ! str_contains($orderId, '{')) ? $orderId : $subscription->razorpay_order_id;
+            $cfPaymentId = null;
 
-            if (! $response->successful()) {
-                return ['success' => false, 'message' => 'Payment was not successful or was cancelled.'];
-            }
-            $order = $response->json();
-            if (($order['order_id'] ?? null) !== $orderId
-                || round((float) ($order['order_amount'] ?? -1), 2) !== round((float) $subscription->amount_paid, 2)
-                || strtoupper((string) ($order['order_currency'] ?? '')) !== 'INR'
-                || strtoupper((string) ($order['order_status'] ?? '')) !== 'PAID') {
-                return ['success' => false, 'message' => 'Payment was not successful or was cancelled.'];
+            // Check if this was a Cashfree Subscription (recurring mandate)
+            if (str_starts_with((string) $orderRef, 'sub_') || str_starts_with((string) $subscription->razorpay_order_id, 'sub_')) {
+                $subToCheck = str_starts_with((string) $orderRef, 'sub_') ? $orderRef : $subscription->razorpay_order_id;
+                $cfSubService = app(\App\Services\Payments\CashfreeSubscriptionService::class);
+                $cfSub = $cfSubService->getSubscription($subToCheck);
+                $status = strtoupper((string) ($cfSub['subscription_status'] ?? ''));
+
+                if (! in_array($status, ['ACTIVE', 'BANK_APPROVAL_PENDING', 'INITIALIZED'], true)) {
+                    return ['success' => false, 'message' => 'Subscription status: ' . ($status ?: 'Failed')];
+                }
+
+                $cfPaymentId = $cfSub['cf_subscription_id'] ?? null;
+            } else {
+                // Fallback for one-time Cashfree Orders
+                $baseUrl = \App\Services\Payments\CashfreePaymentService::resolveBaseUrl() . '/orders/';
+                $response = Http::acceptJson()
+                    ->withOptions(['verify' => config('app.env') === 'production'])
+                    ->withHeaders($this->cashfreeHeaders())
+                    ->get($baseUrl.urlencode((string) $orderRef));
+
+                if (! $response->successful()) {
+                    return ['success' => false, 'message' => 'Payment was not successful or was cancelled.'];
+                }
+                $order = $response->json();
+                if (($order['order_id'] ?? null) !== $orderRef
+                    || round((float) ($order['order_amount'] ?? -1), 2) !== round((float) $subscription->amount_paid, 2)
+                    || strtoupper((string) ($order['order_currency'] ?? '')) !== 'INR'
+                    || strtoupper((string) ($order['order_status'] ?? '')) !== 'PAID') {
+                    return ['success' => false, 'message' => 'Payment was not successful or was cancelled.'];
+                }
+
+                $cfPaymentId = $order['cf_order_id'] ?? null;
             }
 
-            $subscription = $this->markPaid($subscription, $order['cf_order_id'] ?? null);
+            $subscription = $this->markPaid($subscription, $cfPaymentId);
             $needsQuestionnaire = $this->activateRelatedServices($subscription);
 
             return [
@@ -221,44 +249,154 @@ class DietPaymentService
         ];
     }
 
-    private function createCashfreeOrder(User $user, SubscriptionPlan $plan, DietSubscription $subscription, float $amount): array
+    private function createCashfreeOrder(User $user, SubscriptionPlan $plan, DietSubscription $subscription, float $amount, string $cycle = 'monthly'): array
     {
-        $orderId = 'diet_sub_'.$subscription->id.'_'.uniqid();
-        $baseUrl = \App\Services\Payments\CashfreePaymentService::resolveBaseUrl() . '/orders';
-        $response = Http::acceptJson()->withHeaders($this->cashfreeHeaders())->post($baseUrl, [
-            'order_id' => $orderId,
-            'order_amount' => $amount,
-            'order_currency' => 'INR',
+        $cashfreePlanId = strtolower($plan->slug . '_' . $cycle . '_' . (int) $amount);
+        $cashfreeSubId = 'sub_usr_' . $user->id . '_' . $plan->slug . '_' . time();
+
+        $cfSubService = app(\App\Services\Payments\CashfreeSubscriptionService::class);
+
+        // Ensure the plan exists on Cashfree with this exact price
+        try {
+            $cfSubService->getPlan($cashfreePlanId);
+        } catch (\Throwable) {
+            $intervalType = match ($cycle) {
+                'annually' => 'YEAR',
+                default => 'MONTH',
+            };
+            $intervals = match ($cycle) {
+                'quarterly' => 3,
+                default => 1,
+            };
+            $maxCycles = match ($cycle) {
+                'annually' => 10,
+                'quarterly' => 20,
+                default => 60,
+            };
+            $planName = ucwords(str_replace('_', ' ', $plan->slug . ' ' . $cycle . ' ' . (int) $amount));
+
+            try {
+                $cfSubService->createPlan([
+                    'plan_id' => $cashfreePlanId,
+                    'plan_name' => $planName,
+                    'plan_type' => 'PERIODIC',
+                    'plan_currency' => 'INR',
+                    'plan_recurring_amount' => round($amount, 2),
+                    'plan_max_amount' => round($amount, 2),
+                    'plan_max_cycles' => $maxCycles,
+                    'plan_intervals' => $intervals,
+                    'plan_interval_type' => $intervalType,
+                    'plan_note' => "NutriBuddy {$planName}",
+                ]);
+            } catch (\Throwable $planErr) {
+                Log::warning('Cashfree plan creation error (may already exist): ' . $planErr->getMessage());
+            }
+        }
+
+        $payload = [
+            'subscription_id' => $cashfreeSubId,
+            'plan_details' => [
+                'plan_id' => $cashfreePlanId,
+            ],
             'customer_details' => [
-                'customer_id' => 'user_'.$user->id,
-                'customer_name' => $user->name,
-                'customer_email' => $user->email,
+                'customer_id' => 'user_' . $user->id,
+                'customer_name' => $user->name ?: 'Customer',
+                'customer_email' => $user->email ?: 'user_' . $user->id . '@nutribuddy.in',
                 'customer_phone' => $this->customerPhone($user),
             ],
-            'order_meta' => [
+            'subscription_meta' => [
                 'return_url' => route('diet.payment.cashfree.return')
-                    .'?order_id={order_id}&subscription_id='.$subscription->id,
+                    . '?subscription_id=' . $subscription->id . '&order_id=' . urlencode($cashfreeSubId),
+                'notification_details' => [
+                    'notification_modes' => ['EMAIL', 'SMS'],
+                ],
             ],
-            'order_note' => 'Diet Subscription '.$plan->name,
-        ]);
-        if (! $response->successful()) {
-            // Log HTTP status and response body to help diagnose failures.
-            // Never log request headers, client IDs, secrets, or keys.
-            Log::error('Cashfree order creation failed.', [
-                'subscription_id'  => $subscription->id,
-                'http_status'      => $response->status(),
-                'response_body'    => $response->body(),
-            ]);
-            throw new \RuntimeException('Cashfree order creation failed.');
-        }
-        $order = $response->json();
-        $subscription->update(['razorpay_order_id' => $order['order_id']]);
-
-        return [
-            'success' => true, 'gateway' => 'cashfree', 'payment_session_id' => $order['payment_session_id'],
-            'order_id' => $order['order_id'], 'subscription_id' => $subscription->id,
-            'mode' => \App\Services\Payments\CashfreePaymentService::resolveEnvironment(),
+            'subscription_note' => 'Diet Subscription ' . $plan->name,
+            'subscription_tags' => [
+                'user_id' => (string) $user->id,
+                'child_id' => (string) ($subscription->child_id ?? ''),
+                'diet_subscription_id' => (string) $subscription->id,
+                'plan_slug' => (string) $plan->slug,
+            ],
         ];
+
+        try {
+            $cfResponse = $cfSubService->createSubscription($payload);
+            $subscription->update(['razorpay_order_id' => $cashfreeSubId]);
+
+            // Also keep local subscriptions table in sync
+            \App\Models\Subscription::create([
+                'user_id' => $user->id,
+                'plan_id' => $plan->id,
+                'child_id' => $subscription->child_id,
+                'cashfree_subscription_id' => $cashfreeSubId,
+                'cf_subscription_id' => $cfResponse['cf_subscription_id'] ?? null,
+                'status' => 'INITIALIZED',
+                'current_period_start' => now(),
+                'current_period_end' => $subscription->expires_at,
+            ]);
+
+            return [
+                'success' => true,
+                'gateway' => 'cashfree',
+                'subscription_session_id' => $cfResponse['subscription_session_id'] ?? null,
+                'subsSessionId' => $cfResponse['subscription_session_id'] ?? null,
+                'subs_session_id' => $cfResponse['subscription_session_id'] ?? null,
+                'payment_session_id' => $cfResponse['subscription_session_id'] ?? null, // for backward compatibility
+                'order_id' => $cashfreeSubId,
+                'subscription_id' => $subscription->id,
+                'mode' => config('services.cashfree.env', 'sandbox'),
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Cashfree subscription order failed, falling back to one-time order', [
+                'subscription_id' => $subscription->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            // Fallback to one-time order if plan not found or legacy mode
+            $orderId = 'diet_sub_' . $subscription->id . '_' . uniqid();
+            $baseUrl = \App\Services\Payments\CashfreePaymentService::resolveBaseUrl() . '/orders';
+            $response = Http::acceptJson()
+                ->withOptions(['verify' => config('app.env') === 'production'])
+                ->withHeaders($this->cashfreeHeaders())
+                ->post($baseUrl, [
+                    'order_id' => $orderId,
+                    'order_amount' => $amount,
+                    'order_currency' => 'INR',
+                    'customer_details' => [
+                        'customer_id' => 'user_' . $user->id,
+                        'customer_name' => $user->name ?: 'Customer',
+                        'customer_email' => $user->email ?: 'user_' . $user->id . '@nutribuddy.in',
+                        'customer_phone' => $this->customerPhone($user),
+                    ],
+                    'order_meta' => [
+                        'return_url' => route('diet.payment.cashfree.return')
+                            . '?order_id={order_id}&subscription_id=' . $subscription->id,
+                    ],
+                    'order_note' => 'Diet Subscription ' . $plan->name,
+                ]);
+
+            if (! $response->successful()) {
+                Log::error('Cashfree fallback order creation also failed.', [
+                    'subscription_id' => $subscription->id,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                throw new \RuntimeException('Cashfree payment creation failed.');
+            }
+
+            $order = $response->json();
+            $subscription->update(['razorpay_order_id' => $order['order_id']]);
+
+            return [
+                'success' => true,
+                'gateway' => 'cashfree',
+                'payment_session_id' => $order['payment_session_id'],
+                'order_id' => $order['order_id'],
+                'subscription_id' => $subscription->id,
+                'mode' => \App\Services\Payments\CashfreePaymentService::resolveEnvironment(),
+            ];
+        }
     }
 
     private function activateFree(DietSubscription $subscription): void

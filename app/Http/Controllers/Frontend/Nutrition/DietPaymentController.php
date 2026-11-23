@@ -35,10 +35,10 @@ class DietPaymentController extends Controller
 
     public function handleCashfreeReturn(Request $request, DietPaymentService $payments)
     {
-        $result = $payments->confirmCashfreeReturn(
-            $request->query('order_id'),
-            $request->query('subscription_id')
-        );
+        $orderId = $request->input('order_id') ?: $request->query('order_id');
+        $subscriptionId = $request->input('subscription_id') ?: $request->query('subscription_id');
+
+        $result = $payments->confirmCashfreeReturn($orderId, $subscriptionId);
 
         if (! $result['success']) {
             return redirect()->route('diet_chart')->with('error', $result['message']);
@@ -69,6 +69,33 @@ class DietPaymentController extends Controller
         }
 
         return redirect()->route('meal-plan', ['child_id' => $result['child_id']]);
+    }
+
+    public function handleCashfreeWebhook(Request $request, DietPaymentService $payments): JsonResponse
+    {
+        $signature = $request->header('x-webhook-signature');
+        $timestamp = $request->header('x-webhook-timestamp');
+        $rawBody = (string) $request->getContent();
+
+        $cfSub = app(\App\Services\Payments\CashfreeSubscriptionService::class);
+        if (! $cfSub->verifyWebhookSignature($rawBody, $signature, $timestamp)) {
+            return response()->json(['message' => 'Invalid webhook signature.'], 400);
+        }
+
+        $payload = $request->all();
+        $subDetails = $payload['data']['subscription_details'] ?? [];
+        $subId = $subDetails['subscription_id'] ?? null;
+        $orderData = $payload['data']['order'] ?? [];
+        $orderId = $orderData['order_id'] ?? $subId;
+
+        if ($orderId) {
+            $subscription = \App\Models\DietSubscription::where('razorpay_order_id', $orderId)->first();
+            if ($subscription && $subscription->payment_status !== 'paid') {
+                $payments->confirmCashfreeReturn($orderId, (string) $subscription->id);
+            }
+        }
+
+        return response()->json(['status' => 'ok']);
     }
 
     private function jsonResult(array $result): JsonResponse
