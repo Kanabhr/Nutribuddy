@@ -34,7 +34,7 @@ Route::prefix('/payment/razorpay')->name('razorpay.')->group(function () {
 });
 
 Route::post('/webhooks/aisensy', [AiSensyWebhookController::class, 'handle'])->name('aisensy.webhook');
-
+Route::post('/webhooks/courier-tracking', \App\Http\Controllers\Api\Webhooks\CourierTrackingWebhookController::class)->name('courier-tracking.webhook');
 require __DIR__ . '/auth.php';
 require __DIR__ . '/admin.php';
 require __DIR__ . '/storefront.php';

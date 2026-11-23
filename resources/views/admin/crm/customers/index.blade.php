@@ -75,7 +75,7 @@
                             <tr>
                                 <td>
                                     <div class="d-flex flex-column">
-                                        <span class="text-md fw-semibold text-dark">{{ $customer->name }}</span>
+                                        <a href="{{ route('admin.ecommerce.customers.show', $customer) }}" class="text-md fw-semibold text-primary-600">{{ $customer->name }}</a>
                                         <small class="text-secondary-light">ID: #{{ $customer->id }}</small>
                                     </div>
                                 </td>

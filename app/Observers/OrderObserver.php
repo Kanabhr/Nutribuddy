@@ -2,6 +2,8 @@
 
 namespace App\Observers;
 
+use App\Jobs\CancelShiprocketOrder;
+use App\Jobs\PushOrderToShiprocket;
 use App\Models\Order;
 use App\Services\StockService;
 
@@ -21,7 +23,7 @@ class OrderObserver
     {
         // Push COD orders to Shiprocket immediately upon creation
         if (in_array(strtolower($order->payment_method), ['cod', 'cash_on_delivery'])) {
-            \App\Jobs\PushOrderToShiprocket::dispatch($order);
+            PushOrderToShiprocket::dispatch($order);
         }
     }
 
@@ -36,7 +38,7 @@ class OrderObserver
 
         // We already pushed COD on creation, but if it failed or was skipped, we can push on confirmed too
         if ($isPrepaidPaid || $isCodConfirmed) {
-            \App\Jobs\PushOrderToShiprocket::dispatch($order);
+            PushOrderToShiprocket::dispatch($order);
         }
         // If order status changed to 'cancelled', return stock for all items
         if ($order->wasChanged('status') && $order->status === 'cancelled') {
@@ -44,7 +46,10 @@ class OrderObserver
                 $this->stockService->returnStock($item);
             }
         }
-
+        // Cancelled orders must also be cancelled on Shiprocket, otherwise a courier may still be sent.
+        if ($order->wasChanged('status') && $order->status === 'cancelled' && filled($order->shiprocket_order_id)) {
+            CancelShiprocketOrder::dispatch($order);
+        }
         // If a cancelled order is moved back to a non-cancelled status (rare, but good to handle)
         if ($order->wasChanged('status') && $order->getOriginal('status') === 'cancelled' && $order->status !== 'cancelled') {
             foreach ($order->items as $item) {

@@ -82,7 +82,7 @@
                                 </td>
                                 <td>
                                     <div class="d-flex flex-column">
-                                        <span class="text-md fw-semibold text-dark">{{ $order->customer_name }}</span>
+                                        @if($order->user_id && auth('admin')->user()?->canAny(['view customers', 'manage customers'])) <a href="{{ route('admin.ecommerce.customers.show', $order->user_id) }}" class="text-md fw-semibold text-primary-600">{{ $order->customer_name }}</a> @else <span class="text-md fw-semibold text-dark">{{ $order->customer_name }}</span> @endif
                                         <small class="text-secondary-light">{{ $order->customer_phone }}</small>
                                     </div>
                                 </td>

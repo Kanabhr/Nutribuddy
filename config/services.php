@@ -55,6 +55,8 @@ return [
     ],
 
     'shiprocket' => [
+        'pickup_location' => env('SHIPROCKET_PICKUP_LOCATION', 'work'),
+        'webhook_token' => env('SHIPROCKET_WEBHOOK_TOKEN'),
         'email' => env('SHIPROCKET_EMAIL'),
         'password' => env('SHIPROCKET_PASSWORD'),
         'base_url' => env('SHIPROCKET_BASE_URL', 'https://apiv2.shiprocket.in'),

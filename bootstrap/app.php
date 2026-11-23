@@ -31,6 +31,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\CheckUserIsActive::class,
             \App\Http\Middleware\SecurityHeaders::class,
+            \App\Http\Middleware\AdminSessionTimeout::class,
+            \App\Http\Middleware\RequireAdminTwoFactor::class,
         ]);
 
         $middleware->validateCsrfTokens(except: [
@@ -45,6 +47,8 @@ return Application::configure(basePath: dirname(__DIR__))
         
         $middleware->alias([
             'diet.subscription' => \App\Http\Middleware\CheckDietSubscription::class,
+            'admin.timeout' => \App\Http\Middleware\AdminSessionTimeout::class,
+            'admin.2fa' => \App\Http\Middleware\RequireAdminTwoFactor::class,
             'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,

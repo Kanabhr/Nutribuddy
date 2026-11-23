@@ -19,6 +19,9 @@ class ProductReview extends Model
         'video_path',
         'images',
         'is_active',
+        'admin_reply',
+        'admin_replied_at',
+        'admin_replied_by',
     ];
 
     protected function casts(): array
@@ -27,6 +30,7 @@ class ProductReview extends Model
             'is_active' => 'boolean',
             'rating' => 'integer',
             'images' => 'array',
+            'admin_replied_at' => 'datetime',
         ];
     }
 
@@ -38,5 +42,10 @@ class ProductReview extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function repliedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'admin_replied_by');
     }
 }

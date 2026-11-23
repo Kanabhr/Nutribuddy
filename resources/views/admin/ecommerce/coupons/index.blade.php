@@ -132,7 +132,7 @@
 
     <div class="card basic-data-table">
         <div class="card-header">
-            <h5 class="card-title mb-0">Coupon List</h5>
+            <div class="d-flex justify-content-between align-items-center"> <h5 class="card-title mb-0">Coupon List</h5> <a href="{{ route('admin.ecommerce.coupons.report') }}" class="btn btn-sm btn-outline-primary-600 radius-8">Coupon report</a> </div>
         </div>
         <div class="card-body">
             <div class="table-responsive">

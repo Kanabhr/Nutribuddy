@@ -134,6 +134,7 @@ Route::prefix('admin/ecommerce')->name('admin.ecommerce.')->middleware('auth:adm
 
     // -- Promotions --
     Route::middleware('permission:view promotions|manage promotions,admin')->group(function () {
+        Route::get('coupons/report', \App\Http\Controllers\Admin\Ecommerce\CouponReportController::class)->name('coupons.report');
         Route::resource('coupons', AdminCouponController::class)->only(['index', 'show']);
         Route::get('newsletter/export', [AdminNewsletterSubscriberController::class, 'export'])->name('newsletter.export');
         Route::resource('newsletter', AdminNewsletterSubscriberController::class)->only(['index', 'show']);
@@ -184,6 +185,7 @@ Route::prefix('admin/ecommerce')->name('admin.ecommerce.')->middleware('auth:adm
     });
 
     Route::middleware('permission:manage moderation,admin')->group(function () {
+        Route::post('reviews/{review}/reply', [\App\Http\Controllers\Admin\Content\ReviewController::class, 'reply'])->name('reviews.reply');
         Route::resource('reviews', \App\Http\Controllers\Admin\Content\ReviewController::class)->except(['index', 'show']);
         Route::resource('video-reviews', \App\Http\Controllers\Admin\Content\VideoReviewController::class)->except(['index', 'show']);
     });
@@ -198,6 +200,16 @@ Route::prefix('admin/ecommerce')->name('admin.ecommerce.')->middleware('auth:adm
     });
 
     Route::middleware('permission:manage orders,admin')->group(function () {
+        Route::post('orders/{order}/shipping/push', [\App\Http\Controllers\Admin\Ecommerce\OrderShipmentController::class, 'push'])->name('orders.shipping.push');
+Route::post('orders/{order}/shipping/assign-awb', [\App\Http\Controllers\Admin\Ecommerce\OrderShipmentController::class, 'assignAwb'])->name('orders.shipping.assign-awb');
+Route::post('orders/{order}/shipping/pickup', [\App\Http\Controllers\Admin\Ecommerce\OrderShipmentController::class, 'pickup'])->name('orders.shipping.pickup');
+Route::post('orders/{order}/shipping/label', [\App\Http\Controllers\Admin\Ecommerce\OrderShipmentController::class, 'label'])->name('orders.shipping.label');
+Route::post('orders/{order}/shipping/track', [\App\Http\Controllers\Admin\Ecommerce\OrderShipmentController::class, 'track'])->name('orders.shipping.track');
+Route::post('orders/{order}/shipping/cancel', [\App\Http\Controllers\Admin\Ecommerce\OrderShipmentController::class, 'cancel'])->name('orders.shipping.cancel');
+Route::post('orders/{order}/shipping/ndr', [\App\Http\Controllers\Admin\Ecommerce\OrderShipmentController::class, 'ndr'])->name('orders.shipping.ndr');
+        Route::post('orders/{order}/payment-adjustments', [\App\Http\Controllers\Admin\Ecommerce\OrderPaymentAdjustmentController::class, 'store'])
+        ->middleware('permission:manage administration,admin')
+        ->name('orders.payment-adjustments.store');
         Route::patch('orders/{order}/status', [AdminOrderController::class, 'updateStatus'])->name('orders.update-status');
         Route::resource('order-returns', \App\Http\Controllers\Admin\Ecommerce\OrderReturnController::class)->except(['index', 'show']);
         Route::resource('invoices', \App\Http\Controllers\Admin\Billing\InvoiceController::class)->except(['index', 'show']); // typically invoices aren't edited but preserving existing routes
@@ -301,4 +313,25 @@ Route::prefix('admin/nutrition')->name('admin.nutrition.')->middleware('auth:adm
             ->whereNumber('assessment')
             ->name('blood-report.download');
     });
+    
+});
+
+// -- Audit log (point 28) ------------------------------------------------------
+Route::middleware(['auth:admin', 'permission:view audit log,admin'])
+    ->prefix('admin/system')
+    ->name('admin.system.')
+    ->group(function () {
+        Route::get('audit-log', [\App\Http\Controllers\Admin\System\AuditLogController::class, 'index'])->name('audit-log.index');
+    });
+
+// -- Admin 2FA: setup and login challenge (point 28) ---------------------------
+Route::middleware('auth:admin')->prefix('admin/2fa')->name('admin.2fa.')->group(function () {
+    Route::get('setup', [\App\Http\Controllers\Admin\Auth\TwoFactorController::class, 'setup'])->name('setup');
+    Route::post('enable', [\App\Http\Controllers\Admin\Auth\TwoFactorController::class, 'enable'])->name('enable');
+    Route::post('confirm', [\App\Http\Controllers\Admin\Auth\TwoFactorController::class, 'confirm'])->name('confirm');
+    Route::post('disable', [\App\Http\Controllers\Admin\Auth\TwoFactorController::class, 'disable'])->name('disable');
+    Route::get('challenge', [\App\Http\Controllers\Admin\Auth\TwoFactorController::class, 'challenge'])->name('challenge');
+    Route::post('verify', [\App\Http\Controllers\Admin\Auth\TwoFactorController::class, 'verify'])
+        ->middleware('throttle:admin-login')
+        ->name('verify');
 });
