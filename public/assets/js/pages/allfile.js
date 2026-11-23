@@ -360,6 +360,7 @@
         const skuEl = document.getElementById('pdpVariantSku');
         const priceNow = document.getElementById('pdpPriceNow');
         const oneTimePrice = document.getElementById('pdpOneTimePrice');
+        const stickyPrice = document.getElementById('pdpStickyPrice');
         const priceOld = document.getElementById('pdpPriceOld');
         const priceSave = document.getElementById('pdpPriceSave');
         const discountBadge = document.getElementById('pdpDiscountBadge');
@@ -388,6 +389,7 @@
         selectedVariantId = variant.id;
         if (priceNow) priceNow.textContent = formatMoney(variant.price);
         if (oneTimePrice) oneTimePrice.textContent = formatMoney(variant.price);
+        if (stickyPrice) stickyPrice.textContent = formatMoney(variant.price);
         if (priceOld) {
             priceOld.textContent = variant.compare_price > variant.price ? formatMoney(variant.compare_price) : '';
             priceOld.classList.toggle('d-none', !(variant.compare_price > variant.price));
@@ -677,6 +679,7 @@
         const purchaseOptionLabels = document.querySelectorAll('[data-pdp-purchase-option]');
         const subscriptionPanel = document.getElementById('pdpSubscriptionPanel');
         const subscriptionPlanLabels = document.querySelectorAll('[data-pdp-subscription-plan]');
+        const stickyPurchaseType = document.querySelector('[data-pdp-sticky-purchase-type]');
         const syncPurchaseOption = () => {
             const subscriptionSelected = isSubscriptionPreviewSelected();
             purchaseOptionLabels.forEach(label => {
@@ -684,8 +687,19 @@
                 label.classList.toggle('selected', Boolean(input?.checked));
             });
             if (subscriptionPanel) subscriptionPanel.hidden = !subscriptionSelected;
+            if (stickyPurchaseType) {
+                stickyPurchaseType.textContent = subscriptionSelected ? 'Subscription checkout preview' : 'One-time purchase';
+            }
         };
         purchaseOptions.forEach(input => input.addEventListener('change', syncPurchaseOption));
+        syncPurchaseOption();
+        document.querySelector('[data-pdp-subscribe-cta]')?.addEventListener('click', event => {
+            event.preventDefault();
+            const subscribeOption = document.querySelector('input[name="pdpPurchaseOption"][value="subscribe"]');
+            subscribeOption?.click();
+            document.getElementById('pdp-purchase-options')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            subscribeOption?.focus({ preventScroll: true });
+        });
         subscriptionPlanLabels.forEach(label => {
             label.querySelector('input[name="pdpSubscriptionPlan"]')?.addEventListener('change', () => {
                 subscriptionPlanLabels.forEach(plan => {
@@ -694,6 +708,122 @@
                 });
             });
         });
+
+        const stickyPurchaseBar = document.querySelector('[data-pdp-sticky-purchase]');
+        if (stickyPurchaseBar) {
+            document.querySelectorAll('[data-pdp-sticky-action]').forEach(button => {
+                button.addEventListener('click', () => {
+                    const targetId = button.dataset.pdpStickyAction === 'buy' ? 'pdpBuyNowBtn' : 'pdpAddToCartBtn';
+                    document.getElementById(targetId)?.click();
+                });
+            });
+
+            const productHero = document.querySelector('.pdp-hero');
+            if (productHero && 'IntersectionObserver' in window) {
+                const stickyObserver = new IntersectionObserver(([entry]) => {
+                    const isVisible = window.scrollY > 120 && !entry.isIntersecting;
+                    stickyPurchaseBar.classList.toggle('is-visible', isVisible);
+                    stickyPurchaseBar.setAttribute('aria-hidden', String(!isVisible));
+                }, { threshold: 0 });
+                stickyObserver.observe(productHero);
+            }
+        }
+
+        const familySection = document.querySelector('[data-pdp-family]');
+        if (familySection) {
+            const familyTabs = Array.from(familySection.querySelectorAll('[data-family-tab]'));
+            const familyPanels = Array.from(familySection.querySelectorAll('[data-family-panel]'));
+            const activeFamilyPanel = () => familyPanels.find(panel => !panel.hidden);
+            const familyCards = panel => Array.from(panel.querySelectorAll('.pdp-family-card'));
+            const familyCardPosition = (track, card) => card.getBoundingClientRect().left - track.getBoundingClientRect().left + track.scrollLeft;
+
+            const updateFamilyPanel = panel => {
+                const track = panel.querySelector('[data-family-track]');
+                const cards = familyCards(panel);
+                const dots = panel.querySelector('[data-family-dots]');
+                if (!track || !cards.length || !dots) return;
+
+                if (dots.children.length !== cards.length) {
+                    dots.replaceChildren(...cards.map((card, index) => {
+                        const dot = document.createElement('button');
+                        dot.type = 'button';
+                        dot.setAttribute('aria-label', `Show ${card.querySelector('h3')?.textContent.trim() || `item ${index + 1}`}`);
+                        dot.addEventListener('click', () => track.scrollTo({
+                            left: familyCardPosition(track, cards[index]),
+                            behavior: 'smooth'
+                        }));
+                        return dot;
+                    }));
+                }
+
+                const currentIndex = cards.reduce((closest, card, index) => {
+                    const distance = Math.abs(familyCardPosition(track, card) - track.scrollLeft);
+                    const closestDistance = Math.abs(familyCardPosition(track, cards[closest]) - track.scrollLeft);
+                    return distance < closestDistance ? index : closest;
+                }, 0);
+                Array.from(dots.children).forEach((dot, index) => {
+                    dot.classList.toggle('is-active', index === currentIndex);
+                    dot.setAttribute('aria-current', String(index === currentIndex));
+                });
+
+                const canScroll = track.scrollWidth > track.clientWidth + 2;
+                panel.querySelectorAll('[data-family-move]').forEach(button => {
+                    const direction = Number(button.dataset.familyMove);
+                    button.disabled = !canScroll || (direction < 0 ? currentIndex === 0 : currentIndex === cards.length - 1);
+                });
+            };
+
+            const activateFamilyTab = tab => {
+                const selectedType = tab.dataset.familyTab;
+                familyTabs.forEach(item => {
+                    const selected = item === tab;
+                    item.setAttribute('aria-selected', String(selected));
+                    item.tabIndex = selected ? 0 : -1;
+                });
+                familyPanels.forEach(panel => {
+                    panel.hidden = panel.dataset.familyPanel !== selectedType;
+                });
+                const panel = activeFamilyPanel();
+                const track = panel?.querySelector('[data-family-track]');
+                if (track) track.scrollLeft = 0;
+                if (panel) updateFamilyPanel(panel);
+            };
+
+            familyTabs.forEach((tab, index) => {
+                tab.addEventListener('click', () => activateFamilyTab(tab));
+                tab.addEventListener('keydown', event => {
+                    if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+                    event.preventDefault();
+                    const nextIndex = (index + (event.key === 'ArrowRight' ? 1 : -1) + familyTabs.length) % familyTabs.length;
+                    activateFamilyTab(familyTabs[nextIndex]);
+                    familyTabs[nextIndex].focus();
+                });
+            });
+
+            familyPanels.forEach(panel => {
+                panel.querySelectorAll('[data-family-move]').forEach(button => {
+                    button.addEventListener('click', () => {
+                        const track = panel.querySelector('[data-family-track]');
+                        const cards = familyCards(panel);
+                        if (!track || !cards.length) return;
+                        const currentIndex = cards.reduce((closest, card, index) => {
+                            const distance = Math.abs(familyCardPosition(track, card) - track.scrollLeft);
+                            const closestDistance = Math.abs(familyCardPosition(track, cards[closest]) - track.scrollLeft);
+                            return distance < closestDistance ? index : closest;
+                        }, 0);
+                        const nextIndex = Math.max(0, Math.min(cards.length - 1, currentIndex + Number(button.dataset.familyMove)));
+                        track.scrollTo({ left: familyCardPosition(track, cards[nextIndex]), behavior: 'smooth' });
+                    });
+                });
+
+                panel.querySelector('[data-family-track]')?.addEventListener('scroll', () => {
+                    if (!panel.hidden) window.requestAnimationFrame(() => updateFamilyPanel(panel));
+                }, { passive: true });
+            });
+
+            const initialFamilyPanel = activeFamilyPanel();
+            if (initialFamilyPanel) updateFamilyPanel(initialFamilyPanel);
+        }
 
         const addToCartBtn = document.getElementById('pdpAddToCartBtn');
         if (addToCartBtn) {

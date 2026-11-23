@@ -53,6 +53,62 @@
             ? route('storage.public', ['path' => $imagePath])
             : $fallbackProductImage;
         $mainGalleryImage = $product->images->first();
+        $familyCatalog = collect([$product])->concat($relatedProducts ?? collect())->unique('id')->values();
+        $familyProducts = $familyCatalog->take(3);
+        $familyProductImage = function ($familyProduct) use ($product, $productImageUrl) {
+            $image = $familyProduct->id === $product->id
+                ? ($familyProduct->images->firstWhere('is_primary', true) ?: $familyProduct->images->first())
+                : ($familyProduct->primaryImage ?: $familyProduct->images->first());
+            $imagePath = $familyProduct->card_image_path ?: $image?->image_path;
+
+            return $productImageUrl($imagePath) ?: asset('img/product2.png');
+        };
+        $familyImageFor = function (string $productKey) use ($familyCatalog, $familyProductImage, $product) {
+            $familyProduct = $familyCatalog->first(fn($candidate) => str_contains(
+                strtolower($candidate->name . ' ' . $candidate->slug),
+                $productKey
+            ));
+
+            return $familyProductImage($familyProduct ?: $product);
+        };
+        $familyComboPacks = [
+            [
+                'name' => 'Complete Care',
+                'tag' => 'Everyday essentials',
+                'description' => 'Brain Booster + Multivitamin Immunity',
+                'price' => 1199,
+                'mrp' => 1348,
+                'renewal' => 1089,
+                'products' => ['brain booster', 'immunity'],
+            ],
+            [
+                'name' => 'Exam Ready',
+                'tag' => 'Study-season routine',
+                'description' => 'Brain Booster + Tasty Kadha',
+                'price' => 949,
+                'mrp' => 1048,
+                'renewal' => 869,
+                'products' => ['brain booster', 'kadha'],
+            ],
+            [
+                'name' => 'Sibling Pack',
+                'tag' => 'For 2 kids',
+                'description' => '2 × Brain Booster Gummies',
+                'price' => 1249,
+                'mrp' => 1398,
+                'renewal' => 1129,
+                'products' => ['brain booster', 'brain booster'],
+            ],
+            [
+                'name' => 'Total Nutrition Kit',
+                'tag' => 'The full family',
+                'description' => 'Brain Booster + Immunity + Tasty Kadha',
+                'price' => 1499,
+                'mrp' => 1697,
+                'renewal' => 1389,
+                'products' => ['brain booster', 'immunity', 'kadha'],
+            ],
+        ];
         $variantAttributeGroups = [];
         if (!empty($product->variant_types)) {
             $variantAttributeGroups = $product->variant_types;
@@ -285,7 +341,7 @@
                 </section>
             </div>
 
-            <fieldset class="pdp-purchase-options">
+            <fieldset class="pdp-purchase-options" id="pdp-purchase-options">
                 <legend>How do you want to buy?</legend>
                 <label class="pdp-purchase-option selected" data-pdp-purchase-option>
                     <input type="radio" name="pdpPurchaseOption" value="once" checked>
@@ -660,35 +716,14 @@
 
             <!-- ── Header ── -->
             <div class="nb-ing-header">
-                <div class="nb-eyebrow">🔬 Ingredient Transparency</div>
-                <h2 class="nb-ing-title">
-                    What Goes Into Every<br>
-                    <span class="nb-acc-ye">{{ $product->name }}</span> <span class="nb-acc-pk">Gummy?</span>
-                </h2>
-                <p class="nb-ing-sub">Every single ingredient explained — from ancient Ayurvedic herbs to essential
-                    vitamins
-                    and
-                    minerals. Click any ingredient to learn its full story.</p>
+                <div class="nb-eyebrow">Ingredient Transparency</div>
+                <h2 class="nb-ing-title">What’s inside <span class="nb-acc-pk">every gummy?</span></h2>
+                <p class="nb-ing-sub">Explore our ingredients and what each one does.</p>
             </div>
 
             <!-- ── Category Filter (desktop) ── -->
             @php
                 $productIngredients = $product->ingredients ?? collect();
-
-                // Build category filters
-                $categoryFilters = $productIngredients
-                    ->groupBy(function ($ing) {
-                        return $ing->category->name ?? 'General';
-                    })
-                    ->map(function ($group, $name) {
-                        return [
-                            'key' => \Illuminate\Support\Str::slug($name),
-                            'name' => $name,
-                            'count' => $group->count(),
-                            'dot_color' => 'rgba(0,214,143,.6)',
-                        ];
-                    })
-                    ->values();
 
                 $totalIngredientCount = $productIngredients->count();
 
@@ -727,53 +762,18 @@
                     ['value' => '3rd Party', 'label' => 'Lab Tested', 'color' => '#ff4d8f'],
                 ];
             @endphp
-            <div class="nb-cat-row">
-                <button class="nb-cat-pill nb-active" onclick="nbFilter('all',this)">
-                    <span class="nb-cat-dot" style="background:rgba(255,255,255,.5)"></span>All
-                    ({{ $totalIngredientCount }})
-                </button>
-                @foreach ($categoryFilters as $filter)
-                    <button class="nb-cat-pill" onclick="nbFilter('{{ $filter['key'] }}',this)">
-                        <span class="nb-cat-dot" style="background:{{ $filter['dot_color'] }}"></span>{{ $filter['name'] }}
-                        ({{ $filter['count'] }})
-                    </button>
-                @endforeach
-            </div>
-
-            <!-- ── Mobile Tabs ── -->
-            <div class="nb-mobile-tabs" id="nbMobTabs">
-                <button class="nb-mob-tab nb-sel-mob" onclick="nbMobFilter('all',this)">All
-                    ({{ $totalIngredientCount }})</button>
-                @foreach ($categoryFilters as $filter)
-                    <button class="nb-mob-tab" onclick="nbMobFilter('{{ $filter['key'] }}',this)">{{ $filter['name'] }}
-                        ({{ $filter['count'] }})
-                    </button>
-                @endforeach
+            <div class="nb-ingredient-nav" aria-label="Browse ingredients">
+                <button class="nb-ing-arrow" type="button" data-nb-scroll="-1" aria-label="Previous ingredients">‹</button>
+                <div class="nb-list-scroll" id="nbList" role="tablist" aria-label="Ingredients"></div>
+                <button class="nb-ing-arrow" type="button" data-nb-scroll="1" aria-label="Next ingredients">›</button>
             </div>
 
             <!-- ── Mobile Accordion Cards ── -->
-            <div class="nb-mob-cards" id="nbMobCards">
-                <!-- Generated by JS -->
-            </div>
+            <div class="nb-mob-cards" id="nbMobCards"></div>
 
             <!-- ── Desktop: Two-column layout ── -->
             <div class="nb-ing-body">
 
-                <!-- LEFT LIST -->
-                <div class="nb-list-panel">
-                    <div class="nb-list-head">
-                        <div class="nb-list-head-icon">📋</div>
-                        <div>
-                            <h4>Full Ingredient List</h4>
-                            <p>{{ $totalIngredientCount }} ingredients · click to explore</p>
-                        </div>
-                    </div>
-                    <div class="nb-list-scroll" id="nbList">
-                        <!-- Rendered by JS -->
-                    </div>
-                </div>
-
-                <!-- RIGHT DETAIL -->
                 <div class="nb-detail-wrap">
                     <div class="nb-detail-empty" id="nbDetailEmpty">
                         <div class="nb-empty-ico">🔬</div>
@@ -1153,6 +1153,136 @@
     <!-- ════════════════════════════════════════════════   ══════════════════════════════════════════
                                                      PARENT REVIEWS
                                                 ══════════════════════════════════════════ -->
+    <section class="pdp-family" data-pdp-family aria-labelledby="pdp-family-title">
+        <div class="pdp-family-shell">
+            <header class="pdp-family-heading">
+                <p class="pdp-family-eyebrow">EXPLORE THE NUTRIBUDDY FAMILY</p>
+                <h2 id="pdp-family-title">One favourite. <em>Or a little more.</em></h2>
+                <p>Individual products and thoughtful combos, all in one place.</p>
+            </header>
+
+            <div class="pdp-family-toolbar">
+                <div class="pdp-family-tabs" role="tablist" aria-label="Shop products and combos">
+                    <button type="button" role="tab" id="pdp-family-tab-products" aria-selected="true" aria-controls="pdp-family-panel-products" data-family-tab="products" tabindex="0">
+                        Individual products <span>{{ $familyProducts->count() }}</span>
+                    </button>
+                    <button type="button" role="tab" id="pdp-family-tab-combos" aria-selected="false" aria-controls="pdp-family-panel-combos" data-family-tab="combos" tabindex="-1">
+                        Combo packs <span>{{ count($familyComboPacks) }}</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="pdp-family-panel" id="pdp-family-panel-products" role="tabpanel" aria-labelledby="pdp-family-tab-products" data-family-panel="products">
+                <div class="pdp-family-track" data-family-track>
+                    @foreach ($familyProducts as $familyProduct)
+                        @php
+                            $familyVariant = $familyProduct->variants->firstWhere('is_default', true)
+                                ?: $familyProduct->variants->first(fn($variant) => $variant->is_active);
+                            $familyPrice = $familyVariant?->display_price ?? $familyProduct->display_price;
+                            $familyComparePrice = $familyVariant?->display_compare_price ?? $familyProduct->display_compare_price;
+                            $familyDescription = $familyProduct->short_description ?: $familyProduct->description;
+                        @endphp
+                        <article class="pdp-family-card">
+                            <a class="pdp-family-image" href="{{ route('product.show', $familyProduct->slug) }}" aria-label="Explore {{ $familyProduct->name }}">
+                                <img src="{{ $familyProductImage($familyProduct) }}" alt="{{ $familyProduct->name }}" loading="lazy" decoding="async">
+                            </a>
+                            <div class="pdp-family-card-copy">
+                                <span class="pdp-family-chip">{{ $familyProduct->category?->name ?: 'NutriBuddy favourite' }}</span>
+                                <h3>{{ $familyProduct->name }}</h3>
+                                <p>{{ \Illuminate\Support\Str::limit(strip_tags((string) $familyDescription), 105) }}</p>
+                                <div class="pdp-family-facts">
+                                    @if ($familyProduct->flavor)<span>{{ $familyProduct->flavor }}</span>@endif
+                                    @if ($familyProduct->pack_size)<span>{{ $familyProduct->pack_size }}</span>@endif
+                                    @if ($familyProduct->age_group)<span>{{ $familyProduct->age_group }}</span>@endif
+                                </div>
+                                <div class="pdp-family-price">
+                                    <strong>₹{{ number_format((float) $familyPrice, 0) }}</strong>
+                                    @if ((float) $familyComparePrice > (float) $familyPrice)
+                                        <s>₹{{ number_format((float) $familyComparePrice, 0) }}</s>
+                                    @endif
+                                </div>
+                                <a class="pdp-family-link" href="{{ route('product.show', $familyProduct->slug) }}">View product <span aria-hidden="true">→</span></a>
+                            </div>
+                        </article>
+                    @endforeach
+                </div>
+                <div class="pdp-family-carousel-footer">
+                    <div class="pdp-family-dots" data-family-dots aria-label="Product slides"></div>
+                    <div class="pdp-family-arrows">
+                        <button type="button" data-family-move="-1" aria-label="Previous product">‹</button>
+                        <button type="button" data-family-move="1" aria-label="Next product">›</button>
+                    </div>
+                </div>
+                <p class="pdp-family-note">Buy 2 individual items: save 5%. Buy 3+: save 10%. The best eligible offer is applied in your cart.</p>
+            </div>
+
+            <div class="pdp-family-panel" id="pdp-family-panel-combos" role="tabpanel" aria-labelledby="pdp-family-tab-combos" data-family-panel="combos" hidden>
+                <div class="pdp-family-track" data-family-track>
+                    @foreach ($familyComboPacks as $comboPack)
+                        <article class="pdp-family-card pdp-family-combo-card">
+                            <div class="pdp-family-combo-image" aria-label="{{ $comboPack['name'] }} product combination">
+                                @foreach ($comboPack['products'] as $comboProductKey)
+                                    <img src="{{ $familyImageFor($comboProductKey) }}" alt="" loading="lazy" decoding="async">
+                                @endforeach
+                            </div>
+                            <div class="pdp-family-card-copy">
+                                <span class="pdp-family-chip">{{ $comboPack['tag'] }}</span>
+                                <h3>{{ $comboPack['name'] }}</h3>
+                                <p>{{ $comboPack['description'] }}</p>
+                                <div class="pdp-family-facts">
+                                    <span>{{ $comboPack['products'] === ['brain booster', 'brain booster'] ? 'Ages 4+' : 'Family routine' }}</span>
+                                    <span>{{ count($comboPack['products']) }} products</span>
+                                </div>
+                                <div class="pdp-family-price">
+                                    <strong>₹{{ number_format($comboPack['price']) }}</strong>
+                                    <s>₹{{ number_format($comboPack['mrp']) }}</s>
+                                    <span class="pdp-family-saving">Save ₹{{ number_format($comboPack['mrp'] - $comboPack['price']) }}</span>
+                                </div>
+                                <p class="pdp-family-renewal">Subscribe from ₹{{ number_format($comboPack['renewal']) }}/month</p>
+                                <a class="pdp-family-link" href="{{ route('product') }}">Explore products <span aria-hidden="true">→</span></a>
+                            </div>
+                        </article>
+                    @endforeach
+                </div>
+                <div class="pdp-family-carousel-footer">
+                    <div class="pdp-family-dots" data-family-dots aria-label="Combo pack slides"></div>
+                    <div class="pdp-family-arrows">
+                        <button type="button" data-family-move="-1" aria-label="Previous combo pack">‹</button>
+                        <button type="button" data-family-move="1" aria-label="Next combo pack">›</button>
+                    </div>
+                </div>
+                <p class="pdp-family-note">Combo packs are thoughtful product suggestions. Check current product availability and pricing before ordering.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="pdp-subscribe-story" aria-labelledby="pdp-subscribe-story-title">
+        <p class="pdp-subscribe-story-eyebrow">SUBSCRIBE &amp; SAVE</p>
+        <h2 id="pdp-subscribe-story-title">Never run out. <em>Save from month two.</em></h2>
+
+        <div class="pdp-subscribe-story-steps">
+            <article>
+                <span>1</span>
+                <h3>Pick your plan</h3>
+                <p>Choose 2, 3 or 4 monthly deliveries of Brain Booster.</p>
+            </article>
+            <article>
+                <span>2</span>
+                <h3>See every payment</h3>
+                <p>Pay ₹649 today. Your selected lower price starts in month two.</p>
+            </article>
+            <article>
+                <span>3</span>
+                <h3>Stay in control</h3>
+                <p>Pause or cancel future deliveries. No full-plan payment upfront.</p>
+            </article>
+        </div>
+
+        <a class="pdp-subscribe-story-cta" href="#pdp-purchase-options" data-pdp-subscribe-cta>
+            Choose my plan <span aria-hidden="true">→</span>
+        </a>
+    </section>
+
        @include('partials.parent-reviews')
 
     @include('frontend.storefront.products.partials.leave-review')
@@ -1178,13 +1308,27 @@
         </form>
     </div>
 
-    <!-- Mobile Sticky Bottom Action Bar -->
-    <div class="pdp-mobile-sticky-bar">
-        <button type="button" class="pdp-sticky-btn pdp-sticky-cart" onclick="handleAddToCart('{{ $product->id }}', this)">
+    <div class="pdp-sticky-purchase" data-pdp-sticky-purchase aria-hidden="true">
+        <div class="pdp-sticky-product">
+            @if ($mainGalleryImage)
+                <img src="{{ $productImageUrl($mainGalleryImage->image_path) }}" alt="">
+            @endif
+            <span>
+                <b>{{ $isBrainBoosterProduct ? 'Brain Booster Gummies' : $product->name }}</b>
+                <small>{{ $isBrainBoosterProduct ? 'Red grape · 30 gummies · Ages 4+' : collect([$defFlavour, $defPack, $defAge])->filter()->implode(' · ') }}</small>
+            </span>
+        </div>
+        <div class="pdp-sticky-price">
+            <b id="pdpStickyPrice">₹{{ number_format($initialPrice, 0) }}</b>
+            <small data-pdp-sticky-purchase-type>One-time purchase</small>
+        </div>
+        <button type="button" class="pdp-sticky-action pdp-sticky-cart" data-pdp-sticky-action="cart">
             Add to Cart
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>
         </button>
-        <button type="button" class="pdp-sticky-btn pdp-sticky-buy" onclick="handleBuyNow('{{ $product->id }}', this)">
+        <button type="button" class="pdp-sticky-action pdp-sticky-buy" data-pdp-sticky-action="buy">
             Buy Now
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </button>
     </div>
 @endsection

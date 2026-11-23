@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Category;
 use App\Models\Inventory;
+use App\Models\Ingredient;
 use App\Models\Product;
 use App\Models\ProductReview;
 use App\Models\ProductVariant;
@@ -78,6 +79,16 @@ class ProductSectionRegressionTest extends TestCase
             'is_in_stock' => true,
         ]);
 
+        $ingredient = Ingredient::create([
+            'main_heading' => 'Algal DHA',
+            'short_heading' => 'Algal DHA',
+            'description' => 'Plant-derived omega-3.',
+            'dosage_heading_one' => 'Plant-derived omega-3',
+            'dosage_heading_two' => '20 mg',
+            'is_active' => true,
+        ]);
+        $product->ingredients()->attach($ingredient->id);
+
         $response = $this->get(route('product.show', 'brain-booster-gummies'));
 
         $response->assertStatus(200);
@@ -101,6 +112,10 @@ class ProductSectionRegressionTest extends TestCase
         $response->assertSee('100% vegetarian');
         $response->assertSee('Choose your plan');
         $response->assertSee('Explore ingredients');
+        $response->assertSee('Ingredient Transparency');
+        $response->assertSee('What’s inside');
+        $response->assertSee('nb-ingredient-nav', false);
+        $response->assertSee('role="tablist"', false);
         $mapDocument = file_get_contents(public_path('assets/research/world-nutrition-map.html'));
         $this->assertStringContainsString('Math.min(500,w*.4)', $mapDocument);
         $this->assertStringContainsString('max-width:1400px', $mapDocument);
@@ -111,6 +126,26 @@ class ProductSectionRegressionTest extends TestCase
         $response->assertSee('data-gallery-prev', false);
         $response->assertSee('data-gallery-next', false);
         $response->assertSee('data-gallery-zoom', false);
+        $response->assertSee('data-pdp-sticky-purchase', false);
+        $response->assertSee('pdpStickyPrice', false);
+        $response->assertSee('Red grape · 30 gummies · Ages 4+');
+        $response->assertSee('data-pdp-sticky-action="cart"', false);
+        $response->assertSee('data-pdp-sticky-action="buy"', false);
+        $response->assertSee('EXPLORE THE NUTRIBUDDY FAMILY');
+        $response->assertSee('One favourite.');
+        $response->assertSee('Or a little more.');
+        $response->assertSee('Individual products and thoughtful combos, all in one place.');
+        $response->assertSee('data-pdp-family', false);
+        $response->assertSee('Complete Care');
+        $response->assertSee('Total Nutrition Kit');
+        $response->assertSee('pdp-subscribe-story', false);
+        $response->assertSee('Never run out.');
+        $response->assertSee('Save from month two.');
+        $response->assertSee('Pick your plan');
+        $response->assertSee('See every payment');
+        $response->assertSee('Stay in control');
+        $response->assertSee('data-pdp-subscribe-cta', false);
+        $response->assertSee('id="pdp-purchase-options"', false);
         $response->assertSee('Product description');
         $response->assertSee('What’s inside?');
         $response->assertSee('How do I use it?');
