@@ -48,10 +48,27 @@
         $defPack = $product->pack_size ?: $defVariantAttributes['Pack Size'] ?? '';
         $defFlavour = $product->flavor ?: $defVariantAttributes['Flavour'] ?? '';
         $purchaseUnitLabel = '1 box (30 gummies)';
-        $fallbackProductImage = '';
-        $productImageUrl = fn($imagePath = null) => $imagePath && \Illuminate\Support\Facades\Storage::disk('public')->exists($imagePath)
-            ? route('storage.public', ['path' => $imagePath])
-            : $fallbackProductImage;
+        $productKey = strtolower((string) ($product->slug ?: $product->name));
+        $fallbackProductImage = str_contains($productKey, 'kadha')
+            ? asset('img/newwkadha.png')
+            : ($isBrainBoosterProduct
+                ? asset('assets/brain-gallery/01-meet-your-brain-buddy-640.webp')
+                : asset('img/product2.png'));
+        $productImageUrl = function ($imagePath = null) use ($fallbackProductImage) {
+            $imagePath = trim((string) $imagePath);
+
+            if ($imagePath === '') {
+                return $fallbackProductImage;
+            }
+
+            if (\Illuminate\Support\Str::startsWith($imagePath, ['img/', 'assets/'])) {
+                return asset($imagePath);
+            }
+
+            return \Illuminate\Support\Facades\Storage::disk('public')->exists($imagePath)
+                ? route('storage.public', ['path' => $imagePath])
+                : $fallbackProductImage;
+        };
         $mainGalleryImage = $product->images->first();
         $familyCatalog = collect([$product])->concat($relatedProducts ?? collect())->unique('id')->values();
         $familyProducts = $familyCatalog->take(3);
@@ -725,8 +742,6 @@
             @php
                 $productIngredients = $product->ingredients ?? collect();
 
-                $totalIngredientCount = $productIngredients->count();
-
                 // Build ingredient items for JS
                 $ingredientItems = $productIngredients
                     ->map(function ($ing) {
@@ -747,20 +762,6 @@
                     })
                     ->values();
 
-                // Summary stats
-                $ingredientSummaryStats = [
-                    ['value' => $totalIngredientCount, 'label' => 'Active Ingredients', 'color' => '#00d68f'],
-                    [
-                        'value' => $productIngredients
-                            ->filter(fn($ing) => $ing->category || $ing->ingredient_category_id)
-                            ->groupBy(fn($ing) => $ing->ingredient_category_id ?: $ing->category?->name ?? 'general')
-                            ->count(),
-                        'label' => 'Ingredient Categories',
-                        'color' => '#ff8c00',
-                    ],
-                    ['value' => '100%', 'label' => 'Natural Sources', 'color' => '#00bfff'],
-                    ['value' => '3rd Party', 'label' => 'Lab Tested', 'color' => '#ff4d8f'],
-                ];
             @endphp
             <div class="nb-ingredient-nav" aria-label="Browse ingredients">
                 <button class="nb-ing-arrow" type="button" data-nb-scroll="-1" aria-label="Previous ingredients">‹</button>
@@ -790,20 +791,6 @@
             </div><!-- /nb-ing-body -->
 
             <!-- ── Summary Bar ── -->
-            <div class="nb-summary-bar">
-                <div class="nb-summary-inner">
-                    @foreach ($ingredientSummaryStats as $stat)
-                        <div class="nb-stat">
-                            <div class="nb-stat-n" style="color:{{ $stat['color'] }}">{{ $stat['value'] }}</div>
-                            <div class="nb-stat-l">{{ $stat['label'] }}</div>
-                        </div>
-                        @if (!$loop->last)
-                            <div class="nb-sdiv"></div>
-                        @endif
-                    @endforeach
-                </div>
-            </div>
-
             <script id="nbIngredientsData" type="application/json">@json($ingredientItems)</script>
 
         </section>
