@@ -2515,13 +2515,28 @@ document.querySelectorAll('.reveal').forEach(r => ro.observe(r));
           <h3 class="nb-detail-name">${i.name}</h3>
           <p class="nb-detail-latin">${i.latin || i.catLabel}</p>
           <div class="nb-ingredient-amount"><b>AMOUNT PER GUMMY</b><strong>${i.dosage || 'See product label'}</strong></div>
+          <h4 class="nb-detail-what">What it does</h4>
           <p class="nb-detail-desc">${i.desc}</p>
-          <div class="nb-detail-benefits"><h5>Key Benefits</h5><div class="nb-benefit-tags">
+          <button class="nb-detail-read-more" type="button" aria-expanded="false">
+            Read more <span aria-hidden="true"></span>
+          </button>
+          <div class="nb-detail-benefits" hidden><h5>Key Benefits</h5><div class="nb-benefit-tags">
             ${i.benefits.map(b => `<span class="nb-benefit-tag">${b}</span>`).join('')}
           </div></div>
         </div>
       </article>
     `).join('');
+
+    detailEl.querySelectorAll('.nb-detail-read-more').forEach(button => {
+      button.addEventListener('click', () => {
+        const benefits = button.parentElement?.querySelector('.nb-detail-benefits');
+        if (!benefits) return;
+        const expanded = button.getAttribute('aria-expanded') === 'true';
+        button.setAttribute('aria-expanded', String(!expanded));
+        button.classList.toggle('nb-read-more-open', !expanded);
+        benefits.hidden = expanded;
+      });
+    });
   }
 
   function showDetail(id) {

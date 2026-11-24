@@ -24498,6 +24498,9 @@ textarea.contact-form-control {
 }
 
 #nb-ingredients .nb-ing-header {
+    width: min(100%, 1328px);
+    box-sizing: border-box;
+    margin: 0 auto;
     padding: 56px 24px 30px;
 }
 
@@ -24536,7 +24539,8 @@ textarea.contact-form-control {
     position: relative;
     z-index: 2;
     display: flex;
-    max-width: 1680px;
+    width: min(100%, 1328px);
+    box-sizing: border-box;
     align-items: center;
     gap: 20px;
     margin: 0 auto 38px;
@@ -24593,7 +24597,8 @@ textarea.contact-form-control {
 
 #nb-ingredients .nb-ing-body {
     display: block;
-    max-width: 1680px;
+    width: min(100%, 1328px);
+    box-sizing: border-box;
     margin: 0 auto;
     padding: 0 20px;
 }
@@ -24673,6 +24678,50 @@ textarea.contact-form-control {
     color: #fff;
     font-size: 16px;
     line-height: 1.55;
+}
+
+#nb-ingredients .nb-detail-what {
+    margin: 20px 0 4px;
+    color: #ff378e;
+    font-size: 22px;
+    font-weight: 800;
+}
+
+#nb-ingredients .nb-detail-read-more {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 8px;
+    min-height: 28px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #f4b2ff;
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1.4;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+#nb-ingredients .nb-detail-read-more span {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    margin: -4px 0 0 4px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+    transition: transform .2s ease;
+}
+
+#nb-ingredients .nb-detail-read-more.nb-read-more-open span {
+    margin-top: 5px;
+    transform: rotate(225deg);
+}
+
+#nb-ingredients .nb-detail-benefits[hidden] {
+    display: none !important;
 }
 
 #nb-ingredients .nb-detail-benefits h5 {

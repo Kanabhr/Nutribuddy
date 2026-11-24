@@ -5,7 +5,14 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 
-return Application::configure(basePath: dirname(__DIR__))
+// Laravel 11.57's framework defaults still reference the deprecated PDO MySQL
+// SSL constant on PHP 8.5 while the application config uses the replacement.
+set_error_handler(static function (int $severity, string $message): bool {
+    return $severity === E_DEPRECATED
+        && str_contains($message, 'PDO::MYSQL_ATTR_SSL_CA');
+});
+
+$app = Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         commands: __DIR__.'/../routes/console.php',
@@ -57,3 +64,5 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions) {
         //
     })->create();
+
+return $app;

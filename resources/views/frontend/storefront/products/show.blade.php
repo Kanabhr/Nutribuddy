@@ -265,8 +265,14 @@
                 </div>
             </div>
             <dialog class="pdp-gallery-dialog" data-gallery-dialog aria-label="Product image zoom">
-                <button type="button" data-gallery-close aria-label="Close zoom">×</button>
+                <div class="pdp-gallery-dialog-head">
+                    <strong>Product gallery · <span data-gallery-dialog-count>1 / {{ max(1, $product->images->count()) }}</span></strong>
+                    <button type="button" class="pdp-gallery-dialog-close" data-gallery-close aria-label="Close zoom">×</button>
+                </div>
+                <button type="button" class="pdp-gallery-dialog-nav pdp-gallery-dialog-prev" data-gallery-dialog-prev aria-label="Previous image">‹</button>
                 <img src="{{ $mainGalleryImage ? $productImageUrl($mainGalleryImage->image_path) : '' }}" alt="{{ $product->name }}">
+                <button type="button" class="pdp-gallery-dialog-nav pdp-gallery-dialog-next" data-gallery-dialog-next aria-label="Next image">›</button>
+                <p class="pdp-gallery-dialog-caption">Meet your buddy</p>
             </dialog>
         </div>
 
@@ -378,14 +384,17 @@
                         <strong>From ₹569<small>/month</small></strong>
                         <small>Lower price from month 2</small>
                     </span>
-                    <svg class="pdp-subscription-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
+                    <button type="button" class="pdp-subscription-toggle" id="pdpSubscriptionToggle"
+                        aria-label="Toggle subscription plans" aria-controls="pdpSubscriptionPanel" aria-expanded="false">
+                        <svg class="pdp-subscription-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </button>
                 </label>
                 <div class="pdp-subscription-panel" id="pdpSubscriptionPanel" hidden>
                     <span class="pdp-subscription-chip">Save from month 2 · Cancel anytime</span>
                     <div class="pdp-subscription-plans">
-                        <label class="pdp-subscription-plan" data-pdp-subscription-plan>
+                        <label class="pdp-subscription-plan" data-pdp-subscription-plan data-plan-months="2" data-plan-monthly="599" data-plan-total="1248" data-plan-saving="150">
                             <input type="radio" name="pdpSubscriptionPlan" value="2">
                             <span class="pdp-plan-copy">
                                 <span class="pdp-plan-heading"><b>2 months</b><strong>₹599<small>/month</small></strong></span>
@@ -393,7 +402,7 @@
                                 <span class="pdp-plan-badges"><span class="pdp-plan-save">Save ₹150 vs. MRP</span></span>
                             </span>
                         </label>
-                        <label class="pdp-subscription-plan" data-pdp-subscription-plan>
+                        <label class="pdp-subscription-plan" data-pdp-subscription-plan data-plan-months="3" data-plan-monthly="579" data-plan-total="1807" data-plan-saving="290">
                             <input type="radio" name="pdpSubscriptionPlan" value="3">
                             <span class="pdp-plan-copy">
                                 <span class="pdp-plan-heading"><b>3 months</b><span class="pdp-plan-tag pdp-plan-recommended">Recommended</span><strong>₹579<small>/month</small></strong></span>
@@ -401,7 +410,7 @@
                                 <span class="pdp-plan-badges"><span class="pdp-plan-save">Save ₹290 vs. MRP</span></span>
                             </span>
                         </label>
-                        <label class="pdp-subscription-plan" data-pdp-subscription-plan>
+                        <label class="pdp-subscription-plan" data-pdp-subscription-plan data-plan-months="4" data-plan-monthly="569" data-plan-total="2356" data-plan-saving="440">
                             <input type="radio" name="pdpSubscriptionPlan" value="4">
                             <span class="pdp-plan-copy">
                                 <span class="pdp-plan-heading"><b>4 months</b><span class="pdp-plan-tag pdp-plan-best">Best value</span><strong>₹569<small>/month</small></strong></span>
@@ -417,6 +426,25 @@
                                 </span>
                             </span>
                         </label>
+                    </div>
+                    <div class="pdp-subscription-summary" id="pdpSubscriptionSummary" hidden aria-live="polite">
+                        <div class="pdp-subscription-summary-head">
+                            <strong>Your payment plan</strong>
+                            <small data-plan-deliveries></small>
+                        </div>
+                        <div class="pdp-subscription-summary-rows">
+                            <div data-plan-row="1"><span>Month 1 (today)</span><strong>₹649</strong></div>
+                            <div data-plan-row="2"><span>Month 2</span><strong data-plan-month-2></strong></div>
+                            <div data-plan-row="3"><span>Month 3</span><strong data-plan-month-3></strong></div>
+                            <div data-plan-row="4"><span>Month 4</span><strong data-plan-month-4></strong></div>
+                        </div>
+                        <div class="pdp-subscription-summary-total">
+                            <strong>Plan total</strong>
+                            <strong data-plan-total></strong>
+                        </div>
+                        <strong class="pdp-subscription-summary-saving" data-plan-saving></strong>
+                        <p>One payment each month · UPI or card autopay. Pause or cancel future deliveries anytime.</p>
+                        <small>Product payments shown. Delivery fees and eligible offers appear at checkout.</small>
                     </div>
                 </div>
             </fieldset>
@@ -509,23 +537,58 @@
 
             <section class="pdp-reference-features" aria-label="Product features">
                 <div class="pdp-reference-feature">
-                    <span class="pdp-reference-feature-icon"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M9 38 38 9M17 13l18 18M13 18l17 17M19 11c4 4 4 8 0 12l-7 7a7 7 0 0 0 10 10l7-7c4-4 8-4 12 0M32 8l8 8"/></svg></span>
+                    <span class="pdp-reference-feature-icon">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z" />
+                            <path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97" />
+                            <path d="m2 22 20-20" />
+                        </svg>
+                    </span>
                     <span>No Added<br>Colours</span>
                 </div>
                 <div class="pdp-reference-feature">
-                    <span class="pdp-reference-feature-icon"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M9 39 39 9M17 15l16 16M14 24l10 10M23 12l13 13M11 30l8 8M30 17l7-7M8 39h30M18 11v17a7 7 0 0 1-7 7M28 9v8a7 7 0 0 0 7 7"/></svg></span>
+                    <span class="pdp-reference-feature-icon">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="m2 2 20 20" />
+                            <path d="M10 7v10.9" />
+                            <path d="M14 6.1V17" />
+                            <path d="M16 7V3a1 1 0 0 1 1.707-.707 2.5 2.5 0 0 0 2.152.717 1 1 0 0 1 1.131 1.131 2.5 2.5 0 0 0 .717 2.152A1 1 0 0 1 21 8h-4" />
+                            <path d="M16.536 7.465a5 5 0 0 0-7.072 0l-2 2a5 5 0 0 0 0 7.07 5 5 0 0 0 7.072 0l2-2a5 5 0 0 0 0-7.07" />
+                            <path d="M8 17v4a1 1 0 0 1-1.707.707 2.5 2.5 0 0 0-2.152-.717 1 1 0 0 1-1.131-1.131 2.5 2.5 0 0 0-.717-2.152A1 1 0 0 1 3 16h4" />
+                        </svg>
+                    </span>
                     <span>No Refined<br>Sugar</span>
                 </div>
                 <div class="pdp-reference-feature">
-                    <span class="pdp-reference-feature-icon"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M9 40h30L27 20V9M21 9h12M18 29h17M12 36l25-27M23 20v-4"/></svg></span>
+                    <span class="pdp-reference-feature-icon">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2" />
+                            <path d="M6.453 15h11.094" />
+                            <path d="M8.5 2h7" />
+                            <path d="m2 22 20-20" />
+                        </svg>
+                    </span>
                     <span>No<br>Preservatives</span>
                 </div>
                 <div class="pdp-reference-feature">
-                    <span class="pdp-reference-feature-icon"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="m10 17 14-8 14 8v16l-14 8-14-8V17ZM10 17l14 8 14-8M24 25v16M7 41 41 7M16 13l18 10"/></svg></span>
+                    <span class="pdp-reference-feature-icon">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" />
+                            <path d="M12 3.27V12" />
+                            <path d="m3.3 7 8.7 5 8.7-5" />
+                            <path d="M12 22V12" />
+                            <path d="m2 22 20-20" />
+                        </svg>
+                    </span>
                     <span>No<br>Gelatin</span>
                 </div>
                 <div class="pdp-reference-feature">
-                    <span class="pdp-reference-feature-icon"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M39 8c-17 0-28 8-28 22 0 6 4 10 10 10 13 0 21-13 18-32ZM10 40c4-9 10-15 20-21"/></svg></span>
+                    <span class="pdp-reference-feature-icon">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8c0 5.5-4.78 10-10 10Z" />
+                            <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+                        </svg>
+                    </span>
                     <span>100%<br>Vegetarian</span>
                 </div>
             </section>
@@ -1021,11 +1084,23 @@
     <section class="ps-section ps-problems-section">
         <div class="ps-inner">
 
-            @if(!empty($product->problem_cards) && count($product->problem_cards) > 0)
+            @php
+                $problemCards = is_array($product->problem_cards) ? $product->problem_cards : [];
+                if (empty($problemCards) && $isBrainBoosterProduct) {
+                    $problemCards = [
+                        ['title' => 'Everyday meals, changing needs', 'description' => 'A varied diet is the foundation. Some children may need additional nutritional support.', 'icon' => 'img/child-iamges.png'],
+                        ['title' => 'Picky eating, familiar favourites', 'description' => 'A limited variety of foods can make it harder to cover every nutrient.', 'icon' => 'img/bread1.png'],
+                        ['title' => 'Busy days, busy families', 'description' => 'Simple, consistent routines can help make daily nutrition easier.', 'icon' => 'img/BUSY-P.jpg'],
+                        ['title' => 'More screens, less outdoor play', 'description' => 'Active play, enough sleep and a balanced diet belong in every child’s routine.', 'icon' => 'img/boy.png'],
+                    ];
+                }
+            @endphp
+
+            @if(count($problemCards) > 0)
             <!-- HEADER -->
             <div class="ps-header reveal">
-                <div class="eyebrow">{{ $product->problem_heading ?? 'The Real Picture' }}</div>
-                <h2 class="ps-title">{!! $product->problem_title ?? 'Kids Face <span class="acc">Real Problems</span> <br>We Built a <span class="acc2">Real Solution</span>' !!}</h2>
+                <div class="eyebrow">{{ $product->problem_heading ?? ($isBrainBoosterProduct ? 'THE REAL PICTURE' : 'The Real Picture') }}</div>
+                <h2 class="ps-title">{!! $product->problem_title ?? ($isBrainBoosterProduct ? 'Real-life challenges.<br><span class="acc">Thoughtful daily support.</span>' : 'Kids Face <span class="acc">Real Problems</span> <br>We Built a <span class="acc2">Real Solution</span>') !!}</h2>
                 <p class="ps-sub">{{ $product->problem_subtitle ?? "Today's kids miss out on essential nutrition every day. We see the gap — and we've closed it." }}</p>
             </div>
             <div class="problem-grid">
@@ -1034,7 +1109,7 @@
                     $pcClasses = ['pc1', 'pc2', 'pc3', 'pc1'];
                     $dClasses = ['d1', 'd2', 'd3', 'd1'];
                 @endphp
-                @foreach($product->problem_cards as $index => $card)
+                @foreach($problemCards as $index => $card)
                     @if(!empty($card['title']) || !empty($card['description']) || !empty($card['icon']))
                     @php
                         $iconUrl = !empty($card['icon']) ? (Str::startsWith($card['icon'], ['img/', 'assets/']) ? asset($card['icon']) : asset('storage/' . $card['icon'])) : '';
@@ -1094,12 +1169,22 @@
     </section>
 
     <div class="ps-inner">
-            @if (!empty($product->benefits_cards))
+            @php
+                $benefitCards = is_array($product->benefits_cards) ? $product->benefits_cards : [];
+                if (empty($benefitCards) && $isBrainBoosterProduct) {
+                    $benefitCards = [
+                        ['title' => 'Nutrition for Curious Minds', 'description' => 'B vitamins contribute to normal nervous-system function, supporting everyday nutrition through their learning years.', 'icon' => 'img/brain.png'],
+                        ['title' => 'Ayurveda Meets Modern Nutrition', 'description' => 'Brahmi and Shankhpushpi come together with algal DHA, choline, vitamins and minerals.', 'icon' => 'img/brahmi.png'],
+                        ['title' => 'Growing, Playing, Exploring', 'description' => 'Vitamin D3 supports normal bone development, while B vitamins help the body release energy from food.', 'icon' => 'img/bones.png'],
+                        ['title' => 'A Little Routine They Can Enjoy', 'description' => 'Red grape flavour, plant-based pectin and no refined sugar, gelatin, preservatives or added colours.', 'icon' => 'img/btn-leafimg.png'],
+                    ];
+                }
+            @endphp
+
+            @if (count($benefitCards) > 0)
             <!-- DIVIDER -->
             <div class="ps-divider reveal">
-                <div class="div-arrow">↓</div>
                 <div class="div-badge"> The Nutribuddy Benefits</div>
-                <div class="div-arrow">↓</div>
             </div>
 
             <div class="problem-grid">
@@ -1111,10 +1196,10 @@
                         ['pc' => 'pc1', 'd' => 'd1', 'pi' => 'pi4'],
                     ];
                 @endphp
-                @foreach($product->benefits_cards as $index => $card)
+                @foreach($benefitCards as $index => $card)
                     @php
                         $c = $nbClasses[$index % 4];
-                        $iconUrl = !empty($card['icon']) ? asset('storage/' . $card['icon']) : '';
+                        $iconUrl = !empty($card['icon']) ? $problemSolutionAsset($card['icon']) : '';
                     @endphp
                     <div class="prob-card {{ $c['pc'] }} reveal {{ $c['d'] }}">
                         @if($iconUrl)
@@ -1360,6 +1445,52 @@
     <script>
 
         document.addEventListener('DOMContentLoaded', function () {
+
+            const purchaseOptions = Array.from(document.querySelectorAll('[data-pdp-purchase-option]'));
+            const purchaseInputs = Array.from(document.querySelectorAll('input[name="pdpPurchaseOption"]'));
+            const subscriptionOption = document.querySelector('.pdp-subscription-option');
+            const subscriptionPanel = document.getElementById('pdpSubscriptionPanel');
+            const subscriptionToggle = document.getElementById('pdpSubscriptionToggle');
+
+            if (subscriptionOption && subscriptionPanel && subscriptionToggle) {
+                function setSubscriptionPanel(open) {
+                    subscriptionPanel.hidden = !open;
+                    subscriptionOption.classList.toggle('is-open', open);
+                    subscriptionToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                }
+
+                purchaseInputs.forEach(function (input) {
+                    input.addEventListener('change', function () {
+                        purchaseOptions.forEach(function (option) {
+                            const optionInput = option.querySelector('input[name="pdpPurchaseOption"]');
+                            option.classList.toggle('selected', optionInput === input && input.checked);
+                        });
+
+                        setSubscriptionPanel(input.value === 'subscribe' && input.checked);
+                    });
+                });
+
+                subscriptionToggle.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    const subscriptionInput = subscriptionOption.querySelector('input[name="pdpPurchaseOption"]');
+
+                    if (!subscriptionInput.checked) {
+                        subscriptionInput.checked = true;
+                        subscriptionInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        return;
+                    }
+
+                    setSubscriptionPanel(subscriptionPanel.hidden);
+                });
+
+                const selectedPurchaseInput = purchaseInputs.find(function (input) {
+                    return input.checked;
+                });
+
+                setSubscriptionPanel(selectedPurchaseInput?.value === 'subscribe');
+            }
 
             document.querySelectorAll('.ps-problems-section .problem-grid').forEach(function (grid, gridIndex) {
 

@@ -195,12 +195,68 @@
 
         const dialog = document.querySelector('[data-gallery-dialog]');
         const dialogImage = dialog?.querySelector('img');
-        document.querySelector('[data-gallery-zoom]')?.addEventListener('click', () => {
-            if (!dialog || !dialogImage) return;
+        const dialogCount = dialog?.querySelector('[data-gallery-dialog-count]');
+        const dialogPrev = dialog?.querySelector('[data-gallery-dialog-prev]');
+        const dialogNext = dialog?.querySelector('[data-gallery-dialog-next]');
+        let customCursorWasEnabled = false;
+
+        const getActiveGalleryIndex = () => {
+            const activeIndex = thumbs.findIndex(thumb => thumb.classList.contains('active'));
+            if (activeIndex >= 0) return activeIndex;
+
+            const currentSrc = mainImage.getAttribute('src') || '';
+            const matchedIndex = thumbs.findIndex(thumb => thumb.querySelector('img')?.getAttribute('src') === currentSrc);
+            return matchedIndex >= 0 ? matchedIndex : 0;
+        };
+
+        const syncGalleryDialog = () => {
+            if (!dialogImage) return;
+
+            const index = getActiveGalleryIndex();
+            const total = Math.max(1, thumbs.length);
             dialogImage.src = mainImage.currentSrc || mainImage.src;
-            dialog.showModal();
-        });
+            if (dialogCount) dialogCount.textContent = `${index + 1} / ${total}`;
+            if (dialogPrev) dialogPrev.disabled = total < 2;
+            if (dialogNext) dialogNext.disabled = total < 2;
+        };
+
+        const restoreCustomCursor = () => {
+            if (customCursorWasEnabled) {
+                document.body.classList.add('has-custom-cursor');
+            }
+            customCursorWasEnabled = false;
+        };
+
+        const openGalleryDialog = () => {
+            if (!dialog || !dialogImage) return;
+            syncGalleryDialog();
+            customCursorWasEnabled = document.body.classList.contains('has-custom-cursor');
+            document.body.classList.remove('has-custom-cursor');
+
+            if (typeof dialog.showModal === 'function') {
+                dialog.showModal();
+            } else {
+                dialog.setAttribute('open', '');
+            }
+        };
+
+        document.querySelector('[data-gallery-zoom]')?.addEventListener('click', openGalleryDialog);
         document.querySelector('[data-gallery-close]')?.addEventListener('click', () => dialog?.close());
+        dialogPrev?.addEventListener('click', () => {
+            if (thumbs.length < 2) return;
+            const nextIndex = (getActiveGalleryIndex() - 1 + thumbs.length) % thumbs.length;
+            const nextThumb = thumbs[nextIndex];
+            changePdpImage(nextThumb, nextThumb.querySelector('img')?.src, nextIndex + 1);
+            syncGalleryDialog();
+        });
+        dialogNext?.addEventListener('click', () => {
+            if (thumbs.length < 2) return;
+            const nextIndex = (getActiveGalleryIndex() + 1) % thumbs.length;
+            const nextThumb = thumbs[nextIndex];
+            changePdpImage(nextThumb, nextThumb.querySelector('img')?.src, nextIndex + 1);
+            syncGalleryDialog();
+        });
+        dialog?.addEventListener('close', restoreCustomCursor);
         dialog?.addEventListener('click', event => {
             if (event.target === dialog) dialog.close();
         });
@@ -679,6 +735,11 @@
         const purchaseOptionLabels = document.querySelectorAll('[data-pdp-purchase-option]');
         const subscriptionPanel = document.getElementById('pdpSubscriptionPanel');
         const subscriptionPlanLabels = document.querySelectorAll('[data-pdp-subscription-plan]');
+        const subscriptionSummary = document.getElementById('pdpSubscriptionSummary');
+        const planDeliveries = subscriptionSummary?.querySelector('[data-plan-deliveries]');
+        const planTotal = subscriptionSummary?.querySelector('[data-plan-total]');
+        const planSaving = subscriptionSummary?.querySelector('[data-plan-saving]');
+        const planRows = Array.from(subscriptionSummary?.querySelectorAll('[data-plan-row]') || []);
         const stickyPurchaseType = document.querySelector('[data-pdp-sticky-purchase-type]');
         const syncPurchaseOption = () => {
             const subscriptionSelected = isSubscriptionPreviewSelected();
@@ -700,14 +761,46 @@
             document.getElementById('pdp-purchase-options')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             subscribeOption?.focus({ preventScroll: true });
         });
+        const syncSubscriptionPlan = () => {
+            let selectedPlan = null;
+
+            subscriptionPlanLabels.forEach(plan => {
+                const input = plan.querySelector('input[name="pdpSubscriptionPlan"]');
+                const selected = Boolean(input?.checked);
+                plan.classList.toggle('selected', selected);
+                if (selected) selectedPlan = plan;
+            });
+
+            if (!subscriptionSummary) return;
+            subscriptionSummary.hidden = !selectedPlan;
+            if (!selectedPlan) return;
+
+            const months = Number(selectedPlan.dataset.planMonths || 0);
+            const monthly = selectedPlan.dataset.planMonthly || '';
+            planDeliveries.textContent = `${months} monthly deliveries`;
+            planTotal.textContent = `₹${selectedPlan.dataset.planTotal}`;
+            planSaving.textContent = `You save ₹${selectedPlan.dataset.planSaving} compared with MRP`;
+
+            planRows.forEach(row => {
+                const month = Number(row.dataset.planRow);
+                const visible = month <= months;
+                row.hidden = !visible;
+                if (visible && month > 1) {
+                    row.querySelector('strong').textContent = `₹${monthly}`;
+                }
+            });
+        };
+
         subscriptionPlanLabels.forEach(label => {
             label.querySelector('input[name="pdpSubscriptionPlan"]')?.addEventListener('change', () => {
                 subscriptionPlanLabels.forEach(plan => {
                     const input = plan.querySelector('input[name="pdpSubscriptionPlan"]');
                     plan.classList.toggle('selected', Boolean(input?.checked));
                 });
+                syncSubscriptionPlan();
             });
         });
+        syncSubscriptionPlan();
 
         const stickyPurchaseBar = document.querySelector('[data-pdp-sticky-purchase]');
         if (stickyPurchaseBar) {
