@@ -101,6 +101,15 @@
                                 </td>
                                 <td class="text-end">
                                     <div class="d-flex align-items-center justify-content-end gap-2">
+                                           <a href="{{ route('admin.ecommerce.products.preview', $product) }}" target="_blank" rel="noopener"
+                                            class="btn btn-sm btn-outline-secondary radius-8 d-inline-flex align-items-center gap-1" title="Preview on desktop">
+                                             <iconify-icon icon="lucide:monitor"></iconify-icon> Preview
+                                        </a>
+                                         <a href="{{ route('admin.ecommerce.products.preview', $product) }}"
+                                           onclick="window.open(this.href, 'productPreviewMobile', 'width=420,height=860,resizable=yes,scrollbars=yes'); return false;"
+                                          class="btn btn-sm btn-outline-secondary radius-8 d-inline-flex align-items-center gap-1" title="Preview at phone width">
+                                          <iconify-icon icon="lucide:smartphone"></iconify-icon> Mobile
+                                        </a>
                                         <a href="{{ route('admin.ecommerce.products.edit', $product) }}" class="btn btn-sm btn-outline-primary-600 radius-8 d-inline-flex align-items-center gap-1">
                                             <iconify-icon icon="lucide:edit"></iconify-icon> Edit
                                         </a>

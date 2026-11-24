@@ -17,6 +17,10 @@ class AdminSessionTimeout
 {
     public function handle(Request $request, Closure $next): Response
     {
+        // Only admin pages are subject to this check; leave the public shop alone.
+        if (! $request->is('admin', 'admin/*')) {
+            return $next($request);
+        }
         if (! Auth::guard('admin')->check()) {
             return $next($request);
         }

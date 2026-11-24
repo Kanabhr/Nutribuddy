@@ -170,7 +170,12 @@
                         <div class="col-md-6"><strong>Placed At:</strong>
                             {{ optional($order->placed_at)->format('d M Y H:i') ?? (optional($order->created_at)->format('d M Y H:i') ?? 'N/A') }}
                         </div>
-                        <div class="col-md-6"><strong>Customer:</strong> {{ $order->customer_name }}
+                            <div class="col-md-6"><strong>Customer:</strong>
+                            @if($order->user_id && auth('admin')->user()?->canAny(['view customers', 'manage customers']))
+                                <a href="{{ route('admin.ecommerce.customers.show', $order->user_id) }}" class="text-primary-600 fw-semibold">{{ $order->customer_name }}</a>
+                            @else
+                                {{ $order->customer_name }}
+                            @endif
                             ({{ $order->customer_phone }})</div>
                         <div class="col-md-6"><strong>Email:</strong> {{ $order->customer_email ?: 'N/A' }}</div>
                         <div class="col-md-6"><strong>Payment:</strong> {{ strtoupper($order->payment_method) }} /
