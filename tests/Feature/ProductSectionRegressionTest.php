@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Inventory;
 use App\Models\Ingredient;
 use App\Models\Product;
+use App\Models\ProductImage;
 use App\Models\ProductReview;
 use App\Models\ProductVariant;
 use App\Models\TaxRate;
@@ -61,6 +62,13 @@ class ProductSectionRegressionTest extends TestCase
             'coins_reward' => 91,
         ]);
 
+        ProductImage::create([
+            'product_id' => $product->id,
+            'image_path' => 'img/newwkadha.png',
+            'is_primary' => true,
+            'sort_order' => 1,
+        ]);
+
         $variant = ProductVariant::create([
             'product_id' => $product->id,
             'name' => '60 Gummies Pack',
@@ -94,6 +102,7 @@ class ProductSectionRegressionTest extends TestCase
         $response->assertStatus(200);
         $response->assertViewIs('pages.product');
         $response->assertViewHas('product');
+        $response->assertSee('/img/newwkadha.png', false);
         $response->assertSee('pdp-reference-features');
         $response->assertSee('assets/research/world-nutrition-map.html');
         $response->assertSee('assets/brain/routine-before.png');
@@ -113,6 +122,7 @@ class ProductSectionRegressionTest extends TestCase
         $response->assertSee('Choose your plan');
         $response->assertSee('Explore ingredients');
         $response->assertSee('Ingredient Transparency');
+        $response->assertDontSee('nb-summary-bar', false);
         $response->assertSee('What’s inside');
         $response->assertSee('nb-ingredient-nav', false);
         $response->assertSee('role="tablist"', false);

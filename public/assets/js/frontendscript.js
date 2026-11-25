@@ -2515,54 +2515,82 @@ document.querySelectorAll('.reveal').forEach(r => ro.observe(r));
           <h3 class="nb-detail-name">${i.name}</h3>
           <p class="nb-detail-latin">${i.latin || i.catLabel}</p>
           <div class="nb-ingredient-amount"><b>AMOUNT PER GUMMY</b><strong>${i.dosage || 'See product label'}</strong></div>
+          <h4 class="nb-detail-what">What it does</h4>
           <p class="nb-detail-desc">${i.desc}</p>
-          <div class="nb-detail-benefits"><h5>Key Benefits</h5><div class="nb-benefit-tags">
+          <button class="nb-detail-read-more" type="button" aria-expanded="false">
+            Read more <span aria-hidden="true"></span>
+          </button>
+          <div class="nb-detail-benefits" hidden><h5>Key Benefits</h5><div class="nb-benefit-tags">
             ${i.benefits.map(b => `<span class="nb-benefit-tag">${b}</span>`).join('')}
           </div></div>
         </div>
       </article>
     `).join('');
+
+    detailEl.querySelectorAll('.nb-detail-read-more').forEach(button => {
+      button.addEventListener('click', () => {
+        const benefits = button.parentElement?.querySelector('.nb-detail-benefits');
+        if (!benefits) return;
+        const expanded = button.getAttribute('aria-expanded') === 'true';
+        button.setAttribute('aria-expanded', String(!expanded));
+        button.classList.toggle('nb-read-more-open', !expanded);
+        benefits.hidden = expanded;
+      });
+    });
   }
 
   function showDetail(id) {
     activeId = id;
+    const selectedId = String(id);
     listEl.querySelectorAll('.nb-ing-tab').forEach(tab => {
-      const selected = tab.dataset.id === id;
+      const selected = tab.dataset.id === selectedId;
       tab.classList.toggle('nb-row-active', selected);
       tab.setAttribute('aria-selected', String(selected));
       tab.tabIndex = selected ? 0 : -1;
     });
     if (emptyEl) emptyEl.classList.add('nb-hidden');
-    detailEl.querySelectorAll('.nb-detail-card').forEach(c => c.classList.toggle('nb-card-active', c.dataset.detail === id));
+    detailEl.querySelectorAll('.nb-detail-card').forEach(c => c.classList.toggle('nb-card-active', c.dataset.detail === selectedId));
+    renderMobCards('all', selectedId);
   }
 
-  function renderMobCards(filter) {
+  function renderMobCards(filter, selectedId = activeId) {
     if (!mobCardsEl) return;
     const filtered = filter === 'all' ? ingredients : ingredients.filter(i => i.cat === filter);
-    mobCardsEl.innerHTML = filtered.map(i => `
-      <div class="nb-mob-card" data-mobid="${i.id}">
+    const selected = filtered.find(i => String(i.id) === String(selectedId)) || filtered[0];
+    if (!selected) {
+      mobCardsEl.innerHTML = '';
+      return;
+    }
+    const i = selected;
+    mobCardsEl.innerHTML = `
+      <div class="nb-mob-card nb-mob-open" data-mobid="${i.id}">
         <div class="nb-mob-card-head">
-          <div class="nb-mob-card-emoji" style="width:32px;height:32px;border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${i.emojiBg || 'rgba(255,255,255,0.05)'}">
-            <img src="${i.image || 'img/logo.png'}" alt="${i.name}" style="width:100%;height:100%;object-fit:cover;">
+          <div class="nb-mob-card-emoji" style="background:${i.emojiBg || 'rgba(255,255,255,0.05)'}">
+            <img src="${i.image || 'img/logo.png'}" alt="${i.name}" loading="lazy">
           </div>
-          <div class="nb-mob-card-name">${i.name}</div>
+          <div class="nb-mob-card-heading">
+            <div class="nb-mob-card-name">${i.name}</div>
+            <div class="nb-mob-card-latin">${i.latin || i.catLabel}</div>
+          </div>
           <div class="nb-mob-card-arrow">▼</div>
         </div>
         <div class="nb-mob-card-body">
+          <div class="nb-mob-card-amount"><b>AMOUNT PER GUMMY</b><strong>${i.dosage || 'See product label'}</strong></div>
           <div class="nb-mob-card-desc">${i.desc}</div>
-          <div class="nb-mob-card-benefits">
+          <button class="nb-mob-read-more" type="button" aria-expanded="false">Read more <span aria-hidden="true">⌄</span></button>
+          <div class="nb-mob-card-benefits" hidden>
             ${i.benefits.map(b => `<span class="nb-mob-benefit">${b}</span>`).join('')}
           </div>
         </div>
       </div>
-    `).join('');
-    mobCardsEl.querySelectorAll('.nb-mob-card-head').forEach(head => {
-      head.addEventListener('click', () => {
-        const card = head.closest('.nb-mob-card');
-        const wasOpen = card.classList.contains('nb-mob-open');
-        mobCardsEl.querySelectorAll('.nb-mob-card').forEach(c => c.classList.remove('nb-mob-open'));
-        if (!wasOpen) card.classList.add('nb-mob-open');
-      });
+    `;
+    mobCardsEl.querySelector('.nb-mob-read-more')?.addEventListener('click', event => {
+      const button = event.currentTarget;
+      const benefits = mobCardsEl.querySelector('.nb-mob-card-benefits');
+      const expanded = button.getAttribute('aria-expanded') === 'true';
+      button.setAttribute('aria-expanded', String(!expanded));
+      button.querySelector('span').textContent = expanded ? '⌄' : '⌃';
+      if (benefits) benefits.hidden = expanded;
     });
   }
 
@@ -2582,7 +2610,16 @@ document.querySelectorAll('.reveal').forEach(r => ro.observe(r));
   };
 
   document.querySelectorAll('[data-nb-scroll]').forEach(button => {
-    button.addEventListener('click', () => listEl.scrollBy({ left: Number(button.dataset.nbScroll) * 300, behavior: 'smooth' }));
+    button.addEventListener('click', () => {
+      const tabs = [...listEl.querySelectorAll('.nb-ing-tab')];
+      if (!tabs.length) return;
+
+      const currentIndex = Math.max(0, tabs.findIndex(tab => tab.dataset.id === String(activeId)));
+      const nextIndex = (currentIndex + Number(button.dataset.nbScroll) + tabs.length) % tabs.length;
+      const nextTab = tabs[nextIndex];
+      nextTab?.click();
+      nextTab?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    });
   });
 
   renderList();
