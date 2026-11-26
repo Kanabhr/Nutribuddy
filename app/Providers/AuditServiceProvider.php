@@ -7,6 +7,9 @@ use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\OrderReturn;
 use App\Models\Payment;
+use App\Models\Product;
+use Illuminate\Support\Facades\Event;
+use Spatie\Permission\Models\Role;
 use App\Models\ProductVariant;
 use App\Models\Setting;
 use App\Observers\AuditableObserver;
@@ -43,5 +46,19 @@ class AuditServiceProvider extends ServiceProvider
         Setting::observe($observer);
         Inventory::observe($observer);
         ProductVariant::observe($observer);
+                Product::observe($observer);
+        Role::observe($observer);
+
+        // Successful admin logins only. Failed logins fire a different event and are not logged.
+        Event::listen(\Illuminate\Auth\Events\Login::class, function ($event) {
+            if ($event->guard !== 'admin') {
+                return;
+            }
+            try {
+                app(\App\Services\Audit\AuditService::class)->record($event->user, 'login', [], ['ip' => request()->ip()]);
+            } catch (\Throwable $e) {
+                // Never let an audit failure block a login.
+            }
+        });
     }
 }

@@ -90,6 +90,11 @@ class AuditService
     private function mask(array $values, ?Setting $settingModel = null): array
     {
         $filtered = array_diff_key($values, array_flip(self::MASKED_KEYS));
+            foreach ($filtered as $field => $value) {
+            if (is_string($value) && mb_strlen($value) > 500) {
+                $filtered[$field] = mb_substr($value, 0, 500).'...';
+            }
+        }
 
         if ($settingModel !== null && isset($filtered['value'])) {
             $keyName = strtolower((string) ($settingModel->key ?? ''));

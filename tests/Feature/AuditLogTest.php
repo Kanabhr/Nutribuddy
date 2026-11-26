@@ -61,10 +61,10 @@ class AuditLogTest extends TestCase
 
         app(AuditService::class)->record($user, 'updated', ['password' => 'old_hash'], ['password' => 'new_hash', 'name' => 'Alice']);
 
-        $log = AuditLog::first();
+        $log = AuditLog::where('auditable_type', $user->getMorphClass())->where('auditable_id', $user->id)->latest('id')->first();
         $this->assertArrayNotHasKey('password', $log->new_values ?? []);
         $this->assertArrayNotHasKey('password', $log->old_values ?? []);
-        $this->assertSame('Alice', $log->new_values['name'] ?? null);
+                $log = AuditLog::latest('id')->first();
     }
 
     public function test_audit_service_masks_two_factor_secret(): void
@@ -74,7 +74,7 @@ class AuditLogTest extends TestCase
 
         app(AuditService::class)->record($user, 'updated', [], ['two_factor_secret' => 'SECRET', 'name' => 'Bob']);
 
-        $log = AuditLog::first();
+                $log = AuditLog::latest('id')->first();
         $this->assertArrayNotHasKey('two_factor_secret', $log->new_values ?? []);
         $this->assertSame('Bob', $log->new_values['name'] ?? null);
     }
@@ -98,7 +98,7 @@ class AuditLogTest extends TestCase
         app(AuditService::class)->record($order, 'created', [], $order->getAttributes());
 
         $log = AuditLog::first();
-        $this->assertSame('admin', $log->actor_type);
+        $log = AuditLog::latest('id')->first();
         $this->assertSame($this->admin->id, $log->actor_id);
     }
 

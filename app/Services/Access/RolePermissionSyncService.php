@@ -40,6 +40,17 @@ class RolePermissionSyncService
             Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'admin']);
         }
 
+         $before = $role->permissions()->pluck('name')->sort()->values()->all();
         $role->syncPermissions($permissions);
+        try {
+            app(\App\Services\Audit\AuditService::class)->record(
+                $role,
+                'permissions_changed',
+                ['permissions' => $before],
+                ['permissions' => collect($permissions)->sort()->values()->all()]
+            );
+        } catch (\Throwable $e) {
+            // Never let an audit failure block a role change.
+        }
     }
 }

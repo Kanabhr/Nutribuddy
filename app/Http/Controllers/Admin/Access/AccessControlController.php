@@ -106,7 +106,18 @@ class AccessControlController extends Controller
     {
         abort_unless($this->isManagedAdmin($admin), 404);
 
+        $rolesBefore = $admin->roles()->pluck('name')->sort()->values()->all();
         $this->accessControl->updateAdmin($admin, $request->validated());
+        try {
+            app(\App\Services\Audit\AuditService::class)->record(
+                $admin,
+                'roles_changed',
+                ['roles' => $rolesBefore],
+                ['roles' => $admin->roles()->pluck('name')->sort()->values()->all()]
+            );
+        } catch (\Throwable $e) {
+            // Never let an audit failure block the update.
+        }
 
         return response()->json(['success' => true, 'message' => 'User updated successfully.']);
     }
