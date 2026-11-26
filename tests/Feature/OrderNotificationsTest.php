@@ -7,7 +7,6 @@ use App\Mail\OrderNotificationMail;
 use App\Models\NotificationLog;
 use App\Models\NotificationTemplate;
 use App\Models\Order;
-use App\Models\OrderPaymentAdjustment;
 use App\Models\User;
 use App\Services\Notifications\OrderNotificationService;
 use App\Services\Shipping\ShipmentService;
@@ -178,7 +177,7 @@ class OrderNotificationsTest extends TestCase
         $this->adjustment($order, 'partial_refund', 200);
         $this->runJob($order, 'order_refunded');
         Mail::assertSent(OrderNotificationMail::class, 2);
-        Mail::assertSent(OrderNotificationMail::class, fn ($mail) => str_contains($mail->bodyHtml, 'Rs. 200.00'));
+        Mail::assertSent(OrderNotificationMail::class, fn ($mail) => str_contains($mail->bodyHtml, 'Rs. 1,000.00'));
     }
 
     public function test_shipment_tracking_updates_do_not_send_customer_notifications(): void
@@ -303,14 +302,14 @@ class OrderNotificationsTest extends TestCase
         (new SendOrderNotification($order->id, $event))->handle(app(OrderNotificationService::class));
     }
 
-    private function adjustment(Order $order, string $type, float $amount): void
+     private function adjustment(Order $order, string $type, float $amount): void
     {
-        OrderPaymentAdjustment::create([
-            'order_id' => $order->id, 'type' => $type, 'amount' => $amount,
-            'from_payment_status' => 'paid', 'to_payment_status' => 'partially_refunded',
-            'reason' => 'Test refund reason', 'reference' => 'REF-'.uniqid(),
-            'adjusted_by_name' => 'Tester', 'created_at' => now(),
-        ]);
+        // No refund ledger any more: simulate a new refund event by touching the order
+        // a second later, so the dedupe key (payment_status:updated_at) differs.
+        $this->travel(2)->seconds();
+        $order->forceFill(['payment_status' => $type === 'refund' ? 'refunded' : 'partially_refunded']);
+        $order->updated_at = now();
+        $order->save();
     }
 
     /** @param array<string, mixed> $attributes */

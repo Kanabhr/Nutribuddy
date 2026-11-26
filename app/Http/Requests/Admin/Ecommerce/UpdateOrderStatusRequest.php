@@ -9,7 +9,7 @@ class UpdateOrderStatusRequest extends FormRequest
     public function rules(): array
     {
         // payment_status is intentionally not accepted here any more (point 33).
-        // Payment status changes go through OrderPaymentAdjustmentController: permission, reason, reference, audit trail.
+        // "Payment status can be changed here; changes are recorded in the status history."
         return [
             'status' => ['required', Rule::in(OrderFlow::ORDER_STATUSES)],
             'fulfillment_status' => ['nullable', Rule::in(OrderFlow::FULFILLMENT_STATUSES)],

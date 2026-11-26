@@ -6,7 +6,6 @@ use App\Mail\OrderNotificationMail;
 use App\Models\NotificationLog;
 use App\Models\NotificationTemplate;
 use App\Models\Order;
-use App\Models\OrderPaymentAdjustment;
 use App\Support\NotificationEvents;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
@@ -157,19 +156,15 @@ class OrderNotificationService
         if ($event !== NotificationEvents::REFUNDED) {
             return '';
         }
-
-        $count = OrderPaymentAdjustment::query()
-            ->where('order_id', $order->id)->whereIn('type', ['refund', 'partial_refund'])->count();
-
-        return $order->payment_status.':'.$count;
+        // No refund ledger any more: key on the payment status and the time of this change,
+        // so each refund event gets its own slot and retries of the same event do not resend.
+        return $order->payment_status.':'.optional($order->updated_at)->timestamp;
     }
 
     /** @return array<string, string> */
     public function values(Order $order): array
     {
-        $refund = OrderPaymentAdjustment::query()
-            ->where('order_id', $order->id)->whereIn('type', ['refund', 'partial_refund'])
-            ->orderByDesc('id')->value('amount');
+        $refund = null; // Refund amounts are no longer recorded separately; falls back to the order total below.
 
         return [
             'customer_name' => $order->customer_name ?: 'Customer',
