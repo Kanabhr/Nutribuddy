@@ -47,7 +47,12 @@ class OrderWorkflowService
                 'from_fulfillment_status' => $previousFulfillmentStatus,
                 'to_fulfillment_status' => $data['fulfillment_status'],
                 'updated_by' => $adminId,
-                'note' => $data['admin_note'] ?? null,
+                'note' => trim(
+                    ($previousPaymentStatus !== $order->payment_status
+                        ? 'Payment: '.str_replace('_', ' ', (string) $previousPaymentStatus).' to '.str_replace('_', ' ', (string) $order->payment_status).'. '
+                        : '')
+                    .($data['admin_note'] ?? '')
+                ) ?: null,
             ]);
 
             return true;
