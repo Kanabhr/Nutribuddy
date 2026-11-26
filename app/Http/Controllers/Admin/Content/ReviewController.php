@@ -26,7 +26,7 @@ class ReviewController extends Controller
         $customerStats = Order::query()
             ->whereIn('user_id', $reviews->pluck('user_id')->filter()->unique())
             ->where('status', '!=', 'cancelled')
-            ->selectRaw('user_id, COUNT(*) as orders_count, COALESCE(SUM(grand_total), 0) as total_spent')
+            ->selectRaw("user_id, COUNT(*) as orders_count, COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN grand_total ELSE 0 END), 0) as total_spent")
             ->groupBy('user_id')
             ->get()
             ->keyBy('user_id');

@@ -92,6 +92,7 @@ Route::prefix('admin/ecommerce')->name('admin.ecommerce.')->middleware('auth:adm
     
     // -- Products Management --
     Route::middleware('permission:view products|manage products,admin')->group(function () {
+           Route::get('products/{product}/preview', [\App\Http\Controllers\Admin\Ecommerce\ProductPreviewController::class, 'show'])->name('products.preview');
         Route::resource('categories', AdminCategoryController::class)->only(['index', 'show']);
         Route::resource('attributes', AdminAttributeController::class)->only(['index', 'show']);
         Route::resource('ingredient-categories', AdminIngredientCategoryController::class)->only(['index', 'show']);

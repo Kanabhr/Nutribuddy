@@ -51,7 +51,11 @@
                                             {{ $avatarInitial }}
                                         </div>
                                         <div class="d-flex flex-column">
-                                            <h6 class="text-sm mb-0 fw-medium">{{ $customerName }}</h6>
+                                              @if($return->order?->user_id && auth('admin')->user()?->canAny(['view customers', 'manage customers']))
+                                         <h6 class="text-sm mb-0 fw-medium"><a href="{{ route('admin.ecommerce.customers.show', $return->order->user_id) }}" class="text-primary-600">{{ $customerName }}</a></h6>
+                                         @else
+                                          <h6 class="text-sm mb-0 fw-medium">{{ $customerName }}</h6>
+                                     @endif
                                             <span class="text-xs text-secondary-light">{{ $customerEmail }}</span>
                                         </div>
                                     </div>

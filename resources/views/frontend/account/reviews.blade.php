@@ -243,7 +243,7 @@
                                     {{ $review->comment }}
                                 </p>
                             </div>
-
+                            @include('partials.review-admin-reply', ['review' => $review])
                             @if(!empty($review->images) || $review->image_path || $review->video_path)
                                 <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
                                     @php
