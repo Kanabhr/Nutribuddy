@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Frontend\Account;
 
 use App\Http\Controllers\Controller;
 use App\Models\CoinTransaction;
+use App\Services\Loyalty\CoinLedgerService;
 
 class UserWalletController extends Controller
 {
@@ -14,6 +15,10 @@ class UserWalletController extends Controller
             ->latest()
             ->paginate(15);
 
-        return view('frontend.account.wallet', compact('user', 'transactions'));
+        $ledger = app(CoinLedgerService::class);
+        $availableCoins = $ledger->availableBalance($user);
+        $pendingCoins = $ledger->pendingBalance($user);
+
+        return view('frontend.account.wallet', compact('user', 'transactions', 'availableCoins', 'pendingCoins'));
     }
 }

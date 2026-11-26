@@ -102,6 +102,33 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="mb-20 p-16 rounded-3" style="background-color: #f8fafc; border: 1px solid #e2e8f0;">
+                            <label for="cod_limit" class="form-label mb-1 fw-bold" style="color: #063c36; font-size: 0.95rem;">COD Order Limit (₹)</label>
+                            <input type="number" step="0.01" min="0" class="form-control" name="cod_limit" id="cod_limit" value="{{ old('cod_limit', $settings['cod_limit'] ?? 5000) }}">
+                            <p class="mb-0 mt-1 text-muted" style="font-size: 0.85rem;">COD is refused for orders above this amount (exactly this amount is allowed). Default 5000. 0 means no limit.</p>
+                            @error('cod_limit')<span class="text-danger small">{{ $message }}</span>@enderror
+                        </div>
+                        <div class="mb-20 p-16 rounded-3" style="background-color: #f8fafc; border: 1px solid #e2e8f0;">
+                            <label for="cod_fee" class="form-label mb-1 fw-bold" style="color: #063c36; font-size: 0.95rem;">COD Fee (₹ per order)</label>
+                            <input type="number" step="0.01" min="0" class="form-control" name="cod_fee" id="cod_fee" value="{{ old('cod_fee', $settings['cod_fee'] ?? 0) }}">
+                            <p class="mb-0 mt-1 text-muted" style="font-size: 0.85rem;">Added to COD orders only, as a separate non-taxable line. It earns no coins and is not refunded on returns. 0 means no fee.</p>
+                            @error('cod_fee')<span class="text-danger small">{{ $message }}</span>@enderror
+                        </div>
+                        <div class="mb-20 p-16 rounded-3" style="background-color: #f8fafc; border: 1px solid #e2e8f0;">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <label for="online_switch_discount_enabled" class="form-label mb-1 fw-bold" style="color: #063c36; font-size: 0.95rem; cursor: pointer;">Online Payment Discount After Choosing COD</label>
+                                    <p class="mb-0 text-muted" style="font-size: 0.85rem;">Applies only when the customer selects COD first and then switches to online payment. The COD fee is dropped on the switch.</p>
+                                </div>
+                                <div class="form-check form-switch p-0 m-0 ms-3 d-flex align-items-center">
+                                    <input type="hidden" name="online_switch_discount_enabled" value="0">
+                                    <input class="form-check-input m-0" type="checkbox" role="switch" name="online_switch_discount_enabled" value="1" id="online_switch_discount_enabled" {{ ($settings['online_switch_discount_enabled'] ?? '0') == '1' ? 'checked' : '' }} style="width: 42px; height: 21px; cursor: pointer;">
+                                </div>
+                            </div>
+                            <label for="online_switch_discount_amount" class="form-label mb-1 mt-3 fw-bold" style="color: #063c36; font-size: 0.95rem;">Discount Amount (₹)</label>
+                            <input type="number" step="0.01" min="0" class="form-control" name="online_switch_discount_amount" id="online_switch_discount_amount" value="{{ old('online_switch_discount_amount', $settings['online_switch_discount_amount'] ?? 20) }}">
+                            @error('online_switch_discount_amount')<span class="text-danger small">{{ $message }}</span>@enderror
+                        </div>
                         <p class="mb-0" style="color: #626c72; line-height: 1.5; font-size: 0.95rem;">
                             <strong style="color: #063c36;">Note:</strong> Enable this option to allow customers to pay cash on delivery. When OTP verification is enabled, customers must verify their phone number via OTP to place a COD order.
                         </p>

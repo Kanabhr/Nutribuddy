@@ -25,12 +25,14 @@ class OrderCoinsRegressionTest extends TestCase
         event(new OrderPaid($order));
         event(new OrderPaid($order));
 
-        $this->assertSame(50, (int) $user->fresh()->coins_balance);
+        // R2: coins are Pending at payment; the balance changes only when they unlock.
+        $this->assertSame(10, (int) $user->fresh()->coins_balance);
         $this->assertDatabaseHas('coin_transactions', [
             'user_id' => $user->id,
             'order_id' => $order->id,
             'type' => 'earned',
             'amount' => 40,
+            'status' => 'pending',
         ]);
         $this->assertDatabaseCount('coin_transactions', 1);
     }

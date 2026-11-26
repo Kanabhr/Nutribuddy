@@ -297,6 +297,18 @@
                             <strong>{{ (float) $order->shipping_total > 0 ? '₹' . number_format((float) $order->shipping_total, 2) : 'FREE' }}</strong>
                         </div>
 
+                        @if((float) data_get($order->pricing_snapshot, 'cod_fee', 0) > 0.01)
+                            <div class="inv-total-line">
+                                <span>COD Fee (non-taxable)</span>
+                                <strong>₹{{ number_format((float) data_get($order->pricing_snapshot, 'cod_fee', 0), 2) }}</strong>
+                            </div>
+                        @endif
+                        @if((float) data_get($order->pricing_snapshot, 'online_switch_discount', 0) > 0.01)
+                            <div class="inv-total-line">
+                                <span>Online Payment Discount</span>
+                                <strong>- ₹{{ number_format((float) data_get($order->pricing_snapshot, 'online_switch_discount', 0), 2) }}</strong>
+                            </div>
+                        @endif
                         <div class="inv-total-line grand-tot">
                             <span>Grand Total</span>
                             <strong>₹{{ number_format(round($order->grand_total)) }}</strong>

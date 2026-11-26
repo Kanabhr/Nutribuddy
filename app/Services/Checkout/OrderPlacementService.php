@@ -67,6 +67,12 @@ class OrderPlacementService
             $coinsToRedeem = (int) $user->coins_balance;
 
             $pricing = $this->pricingService->calculate($cart->items, $coupon, $coinsToRedeem, $address->state);
+            // R9/R10: COD fee on COD orders; online-switch discount when COD was selected first in this checkout.
+            $pricing = $this->pricingService->applyPaymentMethodAdjustments(
+                $pricing,
+                $validated['payment_method'] ?? null,
+                (bool) session()->get(CheckoutSummaryService::COD_SELECTED_SESSION_KEY, false)
+            );
             $this->validateCouponRules($coupon, (float) $pricing['subtotal'], $user->id);
             $this->validateInventory($cart);
 
@@ -85,6 +91,9 @@ class OrderPlacementService
 
             return $order->load(['items', 'payments', 'statusHistories']);
         });
+
+        // R10: the "customer picked COD first" flag only lives for one checkout.
+        session()->forget(CheckoutSummaryService::COD_SELECTED_SESSION_KEY);
 
         $this->sendOrderMails($order);
         $this->notifyAdmins($order);
@@ -188,6 +197,9 @@ class OrderPlacementService
                 'line_items' => $pricing['line_items'],
                 'coupon' => $coupon?->only(['id', 'code', 'discount_type', 'discount_value']),
                 'coins_earned' => $pricing['total_coins_earned'],
+                // R9/R10: stored in the snapshot (no orders columns). Read with data_get(..., 0) for old orders.
+                'cod_fee' => (float) ($pricing['cod_fee'] ?? 0),
+                'online_switch_discount' => (float) ($pricing['online_switch_discount'] ?? 0),
             ],
         ]);
     }
@@ -195,14 +207,8 @@ class OrderPlacementService
     private function recordRedeemedCoins(Order $order, User $user): void
     {
         if ($order->coins_redeemed > 0) {
-            $user->decrement('coins_balance', $order->coins_redeemed);
-            CoinTransaction::create([
-                'user_id' => $user->id,
-                'order_id' => $order->id,
-                'type' => 'spent',
-                'amount' => $order->coins_redeemed,
-                'description' => "Coins redeemed for discount on order #{$order->order_number}",
-            ]);
+            // R6: spends Available coins only, oldest first.
+            app(\App\Services\Loyalty\CoinLedgerService::class)->spend($user, (int) $order->coins_redeemed, $order);
         }
     }
 

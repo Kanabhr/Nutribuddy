@@ -10,3 +10,5 @@ Artisan::command('inspire', function () {
 use Illuminate\Support\Facades\Schedule;
 
 Schedule::command('diet:expire-subscriptions')->daily();
+Schedule::command('coins:unlock-pending')->hourly();
+Schedule::command('coins:expire')->daily();

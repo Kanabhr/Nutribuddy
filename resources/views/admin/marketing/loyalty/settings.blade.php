@@ -104,6 +104,21 @@
 
 
                         <div class="col-md-6">
+                            <label class="form-label fw-bold">Coins Earned (% of cart value)</label>
+                            <div class="coin-input-group">
+                                <span class="coin-icon">
+                                    <iconify-icon icon="solar:medal-ribbons-star-outline"></iconify-icon>
+                                </span>
+                                <input type="number" name="loyalty_earn_percent" step="0.01" min="0" max="100"
+                                    value="{{ old('loyalty_earn_percent', $settings['loyalty_earn_percent'] ?? 0.5) }}"
+                                    class="form-control" placeholder="e.g. 0.5">
+                                <span class="coin-suffix">% of cart value</span>
+                            </div>
+                            <p class="text-xs text-secondary-light mt-2">Value percentage of the product total before coupon, coins and other discounts. Shipping and COD fee earn nothing. Example: 0.5 with 10 coins = ₹1 gives 5 coins per ₹100.</p>
+                            @error('loyalty_earn_percent')<span class="text-danger small">{{ $message }}</span>@enderror
+                        </div>
+
+                        <div class="col-md-6">
                             <label class="form-label fw-bold">System Status</label>
                             <div class="d-flex align-items-center gap-3 mt-1">
                                 <input type="hidden" name="loyalty_enabled" value="0">

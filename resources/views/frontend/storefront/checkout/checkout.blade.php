@@ -237,7 +237,7 @@
                     <div class="payment-methods">
                         @if ($cashfreeEnabled)
                             <div class="pay-method {{ $defaultMethod === 'cashfree' ? 'selected' : '' }}" id="payMethodCashfree" data-method="cashfree"
-                                onclick="selectPayMethod(this,'cashfree')">
+                                onclick="selectPayMethod(this,'cashfree',true)">
                                 <div class="pay-head">
                                     <div class="pay-radio"></div>
                                     <div class="pay-icon">💵</div>
@@ -252,7 +252,7 @@
 
                         @if ($razorpayEnabled)
                             <div class="pay-method {{ $defaultMethod === 'razorpay' ? 'selected' : '' }}" id="payMethodRazorpay" data-method="razorpay"
-                                onclick="selectPayMethod(this,'razorpay')">
+                                onclick="selectPayMethod(this,'razorpay',true)">
                                 <div class="pay-head">
                                     <div class="pay-radio"></div>
                                     <div class="pay-icon">💳</div>
@@ -267,7 +267,7 @@
 
                         @if ($codEnabled)
                             <div class="pay-method {{ $defaultMethod === 'cod' ? 'selected' : '' }}" id="payMethodCod" data-method="cod"
-                                onclick="selectPayMethod(this,'cod')">
+                                onclick="selectPayMethod(this,'cod',true)">
                                 <div class="pay-head">
                                     <div class="pay-radio"></div>
                                     <div class="pay-icon">🤝</div>
@@ -361,6 +361,14 @@
                     <div class="pb-row" id="coinDiscountRow" style="display:none">
                         <span class="pb-label">NB Coins Discount</span>
                         <span class="pb-val green" id="coinDiscountVal">− ₹0</span>
+                    </div>
+                    <div class="pb-row" id="onlineSwitchRow" style="display:none">
+                        <span class="pb-label">Online Payment Discount</span>
+                        <span class="pb-val green" id="onlineSwitchVal">− ₹0</span>
+                    </div>
+                    <div class="pb-row" id="codFeeRow" style="display:none">
+                        <span class="pb-label">COD Fee</span>
+                        <span class="pb-val" id="codFeeVal">+ ₹0</span>
                     </div>
                     <div class="pb-divider"></div>
                     <div class="pb-total-row">

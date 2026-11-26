@@ -169,9 +169,7 @@
                     'save_amount' => max(0, $comparePrice - $price),
                     'discount_percent' =>
                         $comparePrice > $price ? round((($comparePrice - $price) / $comparePrice) * 100) : 0,
-                    'coins' => !empty($product->coins_reward)
-                        ? (int) $product->coins_reward
-                        : (int) round($price * 0.05),
+                    'coins' => \App\Services\Loyalty\CoinRewardCalculator::forAmount($price),
                     'stock_qty' => $stockQty,
                     'track_stock' => (bool) ($variant->inventory?->track_stock ?? false),
                     'is_in_stock' => (bool) ($variant->inventory?->is_in_stock ?? true),
@@ -312,7 +310,7 @@
                         <path d="M8 11.8v6.4M10 13.2c-.4-.7-1-1-2-1s-1.8.5-1.8 1.3c0 2 3.8.8 3.8 2.8 0 .8-.8 1.4-2 1.4-.9 0-1.7-.4-2.1-1.1M14 3.5a7 7 0 0 1 6.5 6.5M17 3.5h-3.5V7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
                     <b id="pdpCashback">Earn
-                        {{ !empty($product->coins_reward) ? $product->coins_reward : round($initialPrice * 0.05) }} NB
+                        {{ \App\Services\Loyalty\CoinRewardCalculator::forAmount((float) $initialPrice) }} NB
                         Coins on this purchase</b>
                     <svg class="pdp-coins-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                         <path d="m9 18 6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
@@ -332,7 +330,7 @@
                             <path d="M13.744 17.736a6 6 0 1 1-7.48-7.48M15 6h1v4m-9.866 4.768.866-.5 2 3.464" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
                             <circle cx="16" cy="8" r="6" stroke="currentColor" stroke-width="1.8" />
                         </svg>
-                        <strong><span id="pdpCoinsModalAmount">{{ !empty($product->coins_reward) ? $product->coins_reward : round($initialPrice * 0.05) }}</span> NB Coins</strong>
+                        <strong><span id="pdpCoinsModalAmount">{{ \App\Services\Loyalty\CoinRewardCalculator::forAmount((float) $initialPrice) }}</span> NB Coins</strong>
                         <p>Shown on this <span id="pdpCoinsModalPrice">₹{{ number_format($initialPrice, 0) }}</span> purchase.</p>
                     </div>
                     <p>Earn rewards when you shop. Eligible coins and redemption terms will be shown in your account once the loyalty programme is connected.</p>

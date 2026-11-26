@@ -16,6 +16,17 @@ class CoinTransaction extends Model
         'type',
         'amount',
         'description',
+        'status',
+        'reason',
+        'remaining',
+        'available_at',
+        'expires_at',
+        'idempotency_key',
+    ];
+
+    protected $casts = [
+        'available_at' => 'datetime',
+        'expires_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

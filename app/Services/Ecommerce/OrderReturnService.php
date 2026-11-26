@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderReturn;
 use App\Models\OrderReturnItem;
+use App\Services\Loyalty\CoinLedgerService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -31,6 +32,11 @@ class OrderReturnService
                 $lockedOrder = Order::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
                 if ($lockedOrder->status !== 'delivered') {
                     return ['success' => false, 'message' => 'Return allowed only for delivered orders.'];
+                }
+
+                // R4: returns are accepted only within the return window after delivery.
+                if (! app(CoinLedgerService::class)->isWithinReturnWindow($lockedOrder)) {
+                    return ['success' => false, 'message' => 'The '.CoinLedgerService::returnWindowDays().'-day return window for this order has passed.'];
                 }
 
                 $returnLines = collect($validated['items'])
