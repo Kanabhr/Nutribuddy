@@ -334,3 +334,11 @@ Route::middleware('auth:admin')->prefix('admin/2fa')->name('admin.2fa.')->group(
         ->middleware('throttle:admin-login')
         ->name('verify');
 });
+// -- Customer notification templates (point 26) --------------------------------
+Route::middleware(['auth:admin', 'permission:manage administration,admin'])
+    ->prefix('admin/system')
+    ->name('admin.system.')
+    ->group(function () {
+        Route::get('notification-templates', [\App\Http\Controllers\Admin\System\NotificationTemplateController::class, 'index'])->name('notification-templates.index');
+        Route::put('notification-templates/{template}', [\App\Http\Controllers\Admin\System\NotificationTemplateController::class, 'update'])->name('notification-templates.update');
+    });

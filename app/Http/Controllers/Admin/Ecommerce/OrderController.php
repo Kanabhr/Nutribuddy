@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin\Ecommerce;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Ecommerce\UpdateOrderStatusRequest;
+use App\Services\Notifications\OrderNotificationService;
 use App\Mail\OrderStatusUpdatedMail;
 use App\Models\Order;
 use App\Services\Ecommerce\OrderWorkflowService;
@@ -54,7 +55,7 @@ class OrderController extends Controller
             return back()->with('error', 'Invalid order status transition.');
         }
 
-        if ($order->customer_email) {
+        if ($order->customer_email && ! app(OrderNotificationService::class)->handlesEmailForStatus($order->status)) {
             Mail::to($order->customer_email)->queue(new OrderStatusUpdatedMail($order));
         }
 
