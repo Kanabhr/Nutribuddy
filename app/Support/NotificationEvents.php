@@ -2,15 +2,20 @@
 
 namespace App\Support;
 
-/** Customer notification events (point 26) and the values templates may use. */
+/**
+ * Customer notification events (point 26) and the values templates may use.
+ *
+ * Triggers are admin/customer order status changes and payment status changes only (senior's answer to Q5).
+ * There is no "out for delivery" order status, so that event is not sent.
+ */
 class NotificationEvents
 {
     public const PLACED = 'order_placed';
     public const CONFIRMED = 'order_confirmed';
     public const SHIPPED = 'order_shipped';
-    public const OUT_FOR_DELIVERY = 'out_for_delivery';
     public const DELIVERED = 'order_delivered';
     public const REFUNDED = 'order_refunded';
+    public const CANCELLED = 'order_cancelled';
 
     /**
      * Order placed has no email here: the existing order confirmation email
@@ -24,9 +29,9 @@ class NotificationEvents
             self::PLACED => ['label' => 'Order placed', 'channels' => ['whatsapp']],
             self::CONFIRMED => ['label' => 'Order confirmed', 'channels' => ['email', 'whatsapp']],
             self::SHIPPED => ['label' => 'Order shipped (with tracking)', 'channels' => ['email', 'whatsapp']],
-            self::OUT_FOR_DELIVERY => ['label' => 'Out for delivery', 'channels' => ['email', 'whatsapp']],
             self::DELIVERED => ['label' => 'Order delivered', 'channels' => ['email', 'whatsapp']],
             self::REFUNDED => ['label' => 'Refund processed', 'channels' => ['email', 'whatsapp']],
+            self::CANCELLED => ['label' => 'Order cancelled', 'channels' => ['email', 'whatsapp']],
         ];
     }
 
@@ -42,6 +47,7 @@ class NotificationEvents
             'confirmed' => self::CONFIRMED,
             'shipped' => self::SHIPPED,
             'delivered' => self::DELIVERED,
+            'cancelled' => self::CANCELLED,
             default => null,
         };
     }
@@ -55,10 +61,8 @@ class NotificationEvents
             'order_total' => 'Order total, for example Rs. 1,250.00',
             'order_date' => 'Date the order was placed',
             'order_link' => 'Link to the order page',
-            'courier' => 'Courier name (empty until assigned)',
-            'awb' => 'AWB / tracking number (empty until assigned)',
-            'tracking_url' => 'Tracking link (empty until an AWB exists)',
-            'tracking_line' => 'Ready-made tracking text: courier, AWB and link',
+            'awb' => 'AWB number (empty until assigned)',
+            'tracking_line' => 'Ready-made text with the AWB number',
             'refund_amount' => 'Amount of the latest refund',
         ];
     }

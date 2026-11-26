@@ -32,9 +32,12 @@ class OrderNotificationsTest extends TestCase
 
     public function test_default_templates_exist_after_migrating(): void
     {
-        $this->assertSame(5, NotificationTemplate::where('channel', 'email')->where('enabled', false)->count());
-        $this->assertSame(0, NotificationTemplate::where('enabled', true)->count());
-        $this->assertSame(6, NotificationTemplate::where('channel', 'whatsapp')->where('enabled', false)->count());
+        $this->assertSame(5, NotificationTemplate::where('channel', 'email')->count());
+        $this->assertSame(6, NotificationTemplate::where('channel', 'whatsapp')->count());
+        $this->assertSame(0, NotificationTemplate::where('enabled', true)->count(), 'Every template starts disabled.');
+        $this->assertDatabaseMissing('notification_templates', ['event' => 'out_for_delivery']);
+        $this->assertArrayNotHasKey('courier', \App\Support\NotificationEvents::placeholders());
+        $this->assertArrayNotHasKey('tracking_url', \App\Support\NotificationEvents::placeholders());
     }
 
     public function test_order_events_queue_the_right_notification(): void
@@ -48,8 +51,10 @@ class OrderNotificationsTest extends TestCase
         $order->update(['status' => 'shipped']);
         $order->update(['status' => 'delivered']);
         $order->update(['payment_status' => 'partially_refunded']);
+        $cancelled = $this->order(['status' => 'pending']);
+        $cancelled->update(['status' => 'cancelled']);
 
-        foreach (['order_confirmed', 'order_shipped', 'order_delivered', 'order_refunded'] as $event) {
+        foreach (['order_confirmed', 'order_shipped', 'order_delivered', 'order_refunded', 'order_cancelled'] as $event) {
             Queue::assertPushed(SendOrderNotification::class, fn ($job) => $job->event === $event);
         }
 
@@ -61,10 +66,10 @@ class OrderNotificationsTest extends TestCase
 
     public function test_email_is_sent_once_with_tracking_details(): void
     {
-      $this->enableEmailTemplates();
         Mail::fake();
         Queue::fake();
-        $order = $this->order(['customer_email' => 'buyer@example.com', 'customer_name' => 'Asha', 'awb_code' => 'AWB123', 'courier_name' => 'Delhivery']);
+        $this->enable('order_shipped', 'email');
+        $order = $this->order(['customer_email' => 'buyer@example.com', 'customer_name' => 'Asha', 'awb_code' => 'AWB123', 'courier_name' => 'Delhivery', 'shiprocket_status' => 'IN TRANSIT']);
 
         $this->runJob($order, 'order_shipped');
         $this->runJob($order, 'order_shipped');
@@ -74,16 +79,17 @@ class OrderNotificationsTest extends TestCase
             return $mail->hasTo('buyer@example.com')
                 && str_contains($mail->subjectText, $order->order_number)
                 && str_contains($mail->bodyHtml, 'AWB123')
-                && str_contains($mail->bodyHtml, 'Delhivery');
+                && ! str_contains($mail->bodyHtml, 'Delhivery')   // only awb_code is used
+                && ! str_contains($mail->bodyHtml, 'tracking/');
         });
         $this->assertDatabaseHas('notification_logs', ['order_id' => $order->id, 'event' => 'order_shipped', 'channel' => 'email', 'status' => 'sent']);
     }
 
     public function test_customer_name_is_escaped_in_the_email(): void
     {
-        $this->enableEmailTemplates();
         Mail::fake();
         Queue::fake();
+        $this->enable('order_confirmed', 'email');
         $order = $this->order(['customer_email' => 'buyer@example.com', 'customer_name' => '<script>alert(1)</script>']);
 
         $this->runJob($order, 'order_confirmed');
@@ -91,11 +97,10 @@ class OrderNotificationsTest extends TestCase
         Mail::assertSent(OrderNotificationMail::class, fn ($mail) => ! str_contains($mail->bodyHtml, '<script>') && str_contains($mail->bodyHtml, '&lt;script&gt;'));
     }
 
-    public function test_disabled_template_sends_nothing(): void
+    public function test_nothing_is_sent_until_a_template_is_enabled(): void
     {
         Mail::fake();
         Queue::fake();
-        NotificationTemplate::where('event', 'order_delivered')->where('channel', 'email')->update(['enabled' => false]);
         $order = $this->order(['customer_email' => 'buyer@example.com']);
 
         $this->runJob($order, 'order_delivered');
@@ -106,9 +111,9 @@ class OrderNotificationsTest extends TestCase
 
     public function test_missing_email_is_skipped_not_failed(): void
     {
-        $this->enableEmailTemplates();
         Mail::fake();
         Queue::fake();
+        $this->enable('order_confirmed', 'email');
         $order = $this->order(['customer_email' => null]);
 
         $this->runJob($order, 'order_confirmed');
@@ -130,6 +135,7 @@ class OrderNotificationsTest extends TestCase
         $order = $this->order(['customer_phone' => '9876543210', 'customer_email' => null, 'customer_name' => 'Asha', 'awb_code' => 'AWB123']);
 
         $this->runJob($order, 'order_shipped');
+
         Http::assertSent(fn ($request) => $request['campaignName'] === 'ship_camp'
             && $request['destination'] === '919876543210'
             && $request['templateParams'] === ['Asha', (string) $order->order_number, 'AWB123']);
@@ -159,9 +165,9 @@ class OrderNotificationsTest extends TestCase
 
     public function test_each_refund_is_notified_once(): void
     {
-        $this->enableEmailTemplates();
         Mail::fake();
         Queue::fake();
+        $this->enable('order_refunded', 'email');
         $order = $this->order(['customer_email' => 'buyer@example.com', 'payment_status' => 'partially_refunded', 'grand_total' => 1000]);
 
         $this->adjustment($order, 'partial_refund', 300);
@@ -175,30 +181,82 @@ class OrderNotificationsTest extends TestCase
         Mail::assertSent(OrderNotificationMail::class, fn ($mail) => str_contains($mail->bodyHtml, 'Rs. 200.00'));
     }
 
-    public function test_out_for_delivery_is_notified_once_from_shipment_updates(): void
+    public function test_shipment_tracking_updates_do_not_send_customer_notifications(): void
     {
         Queue::fake();
         $order = $this->order(['awb_code' => 'AWB777', 'shiprocket_shipment_id' => '1', 'shiprocket_status' => 'IN TRANSIT', 'shiprocket_status_at' => now()->subDay()]);
         Queue::fake(); // ignore the jobs from creating the order
 
-        $service = app(ShipmentService::class);
-        $service->handleWebhook(['awb' => 'AWB777', 'current_status' => 'OUT FOR DELIVERY', 'current_timestamp' => now()->subHour()->format('d m Y H:i:s')]);
-        $service->handleWebhook(['awb' => 'AWB777', 'current_status' => 'OUT FOR DELIVERY', 'current_timestamp' => now()->format('d m Y H:i:s')]);
+        app(ShipmentService::class)->handleWebhook(['awb' => 'AWB777', 'current_status' => 'OUT FOR DELIVERY', 'current_timestamp' => now()->format('d m Y H:i:s')]);
 
-        Queue::assertPushed(SendOrderNotification::class, 1);
-        Queue::assertPushed(SendOrderNotification::class, fn ($job) => $job->event === 'out_for_delivery' && $job->orderId === $order->id);
+        Queue::assertNotPushed(SendOrderNotification::class);
+    }
+
+    public function test_failed_whatsapp_is_logged_and_retried_without_resending_what_worked(): void
+    {
+        Queue::fake();
+        Mail::fake();
+        config(['services.aisensy.enabled' => true, 'services.aisensy.api_key' => 'test-key', 'services.aisensy.endpoint' => 'https://aisensy.test/api']);
+        $this->enable('order_shipped', 'email');
+        NotificationTemplate::where('event', 'order_shipped')->where('channel', 'whatsapp')->update(['enabled' => true, 'whatsapp_campaign' => 'ship_camp', 'whatsapp_params' => ['order_number']]);
+        $order = $this->order(['customer_phone' => '9876543210', 'customer_email' => 'buyer@example.com']);
+        $service = app(OrderNotificationService::class);
+
+        Http::fake(['*' => Http::response(['error' => 'down'], 500)]);
+        $this->assertTrue($service->send($order, 'order_shipped'), 'a failed channel is reported');
+        $this->assertDatabaseHas('notification_logs', ['order_id' => $order->id, 'channel' => 'whatsapp', 'status' => 'failed']);
+        $this->assertDatabaseHas('notification_logs', ['order_id' => $order->id, 'channel' => 'email', 'status' => 'sent']);
+
+        Http::swap(new \Illuminate\Http\Client\Factory);
+        Http::fake(['*' => Http::response(['success' => true], 200)]);
+        $this->assertFalse($service->send($order, 'order_shipped'));
+        $this->assertDatabaseHas('notification_logs', ['order_id' => $order->id, 'channel' => 'whatsapp', 'status' => 'sent']);
+        $this->assertSame(1, NotificationLog::where('order_id', $order->id)->where('channel', 'whatsapp')->count());
+        Mail::assertSent(OrderNotificationMail::class, 1); // the email was not sent a second time
+    }
+
+    public function test_the_job_retries_three_times_after_the_first_attempt(): void
+    {
+        Queue::fake();
+        config(['services.aisensy.enabled' => true, 'services.aisensy.api_key' => 'test-key', 'services.aisensy.endpoint' => 'https://aisensy.test/api']);
+        Http::fake(['*' => Http::response(['error' => 'down'], 500)]);
+        NotificationTemplate::where('event', 'order_shipped')->where('channel', 'whatsapp')->update(['enabled' => true, 'whatsapp_campaign' => 'ship_camp', 'whatsapp_params' => ['order_number']]);
+        $order = $this->order(['customer_phone' => '9876543210', 'customer_email' => null]);
+
+        $this->assertSame(4, (new SendOrderNotification($order->id, 'order_shipped'))->tries);
+
+        foreach ([1 => 60, 2 => 300, 3 => 900] as $attempt => $delay) {
+            $queueJob = \Mockery::mock(\Illuminate\Contracts\Queue\Job::class);
+            $queueJob->shouldReceive('attempts')->andReturn($attempt);
+            $queueJob->shouldReceive('release')->once()->with($delay);
+
+            $job = new SendOrderNotification($order->id, 'order_shipped');
+            $job->setJob($queueJob);
+            $job->handle(app(OrderNotificationService::class));
+        }
+
+        // The 4th attempt is the last one: no further release.
+        $queueJob = \Mockery::mock(\Illuminate\Contracts\Queue\Job::class);
+        $queueJob->shouldReceive('attempts')->andReturn(4);
+        $queueJob->shouldReceive('release')->never();
+        $job = new SendOrderNotification($order->id, 'order_shipped');
+        $job->setJob($queueJob);
+        $job->handle(app(OrderNotificationService::class));
+
+        $this->assertDatabaseHas('notification_logs', ['order_id' => $order->id, 'channel' => 'whatsapp', 'status' => 'failed']);
     }
 
     public function test_generic_status_email_is_replaced_only_when_a_template_handles_the_status(): void
     {
-        $this->enableEmailTemplates();
         $service = app(OrderNotificationService::class);
 
+        // Disabled by default, so the old generic status email keeps working.
+        $this->assertFalse($service->handlesEmailForStatus('confirmed'));
+
+        $this->enable('order_confirmed', 'email');
         $this->assertTrue($service->handlesEmailForStatus('confirmed'));
         $this->assertFalse($service->handlesEmailForStatus('processing'));
-
-        NotificationTemplate::where('event', 'order_confirmed')->where('channel', 'email')->update(['enabled' => false]);
-        $this->assertFalse($service->handlesEmailForStatus('confirmed'));
+        $this->assertFalse($service->handlesEmailForStatus('cancelled'));
     }
 
     public function test_admin_page_needs_permission_and_saves_templates(): void
@@ -233,6 +291,11 @@ class OrderNotificationsTest extends TestCase
         $whatsapp->refresh();
         $this->assertTrue($whatsapp->enabled);
         $this->assertSame(['customer_name', 'order_number'], $whatsapp->whatsapp_params);
+    }
+
+    private function enable(string $event, string $channel): void
+    {
+        NotificationTemplate::where('event', $event)->where('channel', $channel)->update(['enabled' => true]);
     }
 
     private function runJob(Order $order, string $event): void
@@ -273,9 +336,5 @@ class OrderNotificationsTest extends TestCase
         $admin->assignRole($role);
 
         return $admin;
-    }
-        private function enableEmailTemplates(): void
-    {
-        \App\Models\NotificationTemplate::query()->where('channel', 'email')->update(['enabled' => true]);
     }
 }

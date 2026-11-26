@@ -309,7 +309,6 @@ class ShipmentService
     /** Update the order's last known shipment status unless a newer one is already stored. */
     private function applyStatus(Order $order, string $status, Carbon $at, ?string $courier, bool $quiet): void
     {
-        $before = self::classify($order->shiprocket_status);
         $currentAt = $order->shiprocket_status_at ? Carbon::parse($order->shiprocket_status_at) : null;
 
         if ($courier && blank($order->courier_name)) {
@@ -324,10 +323,6 @@ class ShipmentService
         }
 
         $quiet ? $order->saveQuietly() : $order->save();
-
-if ($before !== 'out_for_delivery' && self::classify($order->shiprocket_status) === 'out_for_delivery') {
-    \App\Jobs\SendOrderNotification::dispatch($order->id, 'out_for_delivery');
-}
     }
 
     /**

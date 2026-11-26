@@ -7,7 +7,6 @@ use App\Models\NotificationLog;
 use App\Models\NotificationTemplate;
 use App\Models\Order;
 use App\Models\OrderPaymentAdjustment;
-use App\Services\Shipping\ShipmentService;
 use App\Support\NotificationEvents;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
@@ -34,10 +33,11 @@ class OrderNotificationService
             ->where('event', $event)->where('channel', 'email')->where('enabled', true)->exists();
     }
 
-    public function send(Order $order, string $event): void
+    /** @return bool true when at least one channel failed (so the caller may retry later) */
+    public function send(Order $order, string $event): bool
     {
         if (! NotificationEvents::isKnown($event)) {
-            return;
+            return false;
         }
 
         $values = $this->values($order);
@@ -45,17 +45,20 @@ class OrderNotificationService
 
         $templates = NotificationTemplate::query()->where('event', $event)->where('enabled', true)->get();
 
+        $anyFailed = false;
         foreach ($templates as $template) {
-            $this->deliver($order, $event, $template, $values, $key);
+            $anyFailed = $this->deliver($order, $event, $template, $values, $key) || $anyFailed;
         }
+
+        return $anyFailed;
     }
 
     /** @param array<string, string> $values */
-    private function deliver(Order $order, string $event, NotificationTemplate $template, array $values, string $key): void
+    private function deliver(Order $order, string $event, NotificationTemplate $template, array $values, string $key): bool
     {
         $log = $this->claim($order, $event, $template->channel, $key);
         if (! $log) {
-            return; // already sent, or being sent right now
+            return false; // already sent, or being sent right now
         }
 
         try {
@@ -68,6 +71,8 @@ class OrderNotificationService
         }
 
         $log->update(['status' => $status, 'recipient' => $recipient, 'error' => $error ? Str::limit($error, 480, '') : null]);
+
+        return $status === 'failed';
     }
 
     /** Reserve the (order, event, channel) slot. Returns null when it must not be sent again. */
@@ -162,19 +167,6 @@ class OrderNotificationService
     /** @return array<string, string> */
     public function values(Order $order): array
     {
-        $trackingUrl = ShipmentService::trackingUrl($order) ?? '';
-
-        $lines = [];
-        if (filled($order->courier_name)) {
-            $lines[] = 'Courier: '.$order->courier_name;
-        }
-        if (filled($order->awb_code)) {
-            $lines[] = 'Tracking number (AWB): '.$order->awb_code;
-        }
-        if ($trackingUrl !== '') {
-            $lines[] = 'Track your shipment: '.$trackingUrl;
-        }
-
         $refund = OrderPaymentAdjustment::query()
             ->where('order_id', $order->id)->whereIn('type', ['refund', 'partial_refund'])
             ->orderByDesc('id')->value('amount');
@@ -185,10 +177,10 @@ class OrderNotificationService
             'order_total' => 'Rs. '.number_format((float) $order->grand_total, 2),
             'order_date' => Carbon::parse($order->placed_at ?? $order->created_at)->format('d M Y'),
             'order_link' => route('user.orders.detail-page', $order),
-            'courier' => (string) $order->courier_name,
             'awb' => (string) $order->awb_code,
-            'tracking_url' => $trackingUrl,
-            'tracking_line' => $lines ? implode("\n", $lines) : 'Tracking details will be shared as soon as the courier picks up your order.',
+            'tracking_line' => filled($order->awb_code)
+                ? 'Tracking number (AWB): '.$order->awb_code
+                : 'Tracking details will be shared shortly.',
             'refund_amount' => 'Rs. '.number_format((float) ($refund ?? $order->grand_total), 2),
         ];
     }

@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\Schema;
  * - Reason: editable customer notification templates (email + WhatsApp) and a send log.
  * - Tables: notification_templates (new), notification_logs (new). No existing table is changed.
  * - Existing data: untouched. Default templates are inserted once (insertOrIgnore).
- *   Email defaults are ENABLED for confirmed/shipped/out for delivery/delivered/refunded.
- *   WhatsApp defaults are DISABLED until an AiSensy campaign name is saved in the admin page.
+ *   EVERY default template is DISABLED, so nothing changes for customers until an admin switches it on
+ *   (the senior will provide the approved wording and WhatsApp template names).
  * - Rollback: down() drops both tables, which deletes edited templates and the send log.
  * - Manual production steps: run this migration by hand, then open Admin > System > Notification templates
  *   and fill in the WhatsApp campaign names that exist in the AiSensy dashboard.
@@ -67,18 +67,18 @@ return new class extends Migration
         $email = [
             'order_confirmed' => ['Your order {order_number} is confirmed', "Hi {customer_name},\n\nThank you for your order! Your order {order_number} (total {order_total}) is confirmed and we are getting it ready.".$footer],
             'order_shipped' => ['Your order {order_number} has been shipped', "Hi {customer_name},\n\nGood news! Your order {order_number} is on its way.\n\n{tracking_line}".$footer],
-            'out_for_delivery' => ['Your order {order_number} is out for delivery', "Hi {customer_name},\n\nYour order {order_number} is out for delivery and should reach you today.\n\n{tracking_line}".$footer],
             'order_delivered' => ['Your order {order_number} was delivered', "Hi {customer_name},\n\nYour order {order_number} has been delivered. We hope you enjoy it!".$footer],
+            'order_cancelled' => ['Your order {order_number} has been cancelled', "Hi {customer_name},\n\nYour order {order_number} has been cancelled. If you paid online, the refund will follow as a separate message.".$footer],
             'order_refunded' => ['Refund update for order {order_number}', "Hi {customer_name},\n\nA refund of {refund_amount} has been processed for your order {order_number}. It can take a few business days to appear in your account.".$footer],
         ];
 
         $whatsapp = [
             'order_placed' => ['customer_name', 'order_number', 'order_total', 'order_link'],
             'order_confirmed' => ['customer_name', 'order_number', 'order_link'],
-            'order_shipped' => ['customer_name', 'order_number', 'courier', 'awb', 'tracking_url'],
-            'out_for_delivery' => ['customer_name', 'order_number', 'tracking_url'],
+            'order_shipped' => ['customer_name', 'order_number', 'awb'],
             'order_delivered' => ['customer_name', 'order_number', 'order_link'],
             'order_refunded' => ['customer_name', 'order_number', 'refund_amount'],
+            'order_cancelled' => ['customer_name', 'order_number'],
         ];
 
         foreach ($email as $event => [$subject, $body]) {
