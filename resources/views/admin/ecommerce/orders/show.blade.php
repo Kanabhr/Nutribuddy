@@ -111,11 +111,15 @@
                                 @endforeach
                             </select>
                         </div>
-                        <div class="mb-3">
+                             <div class="mb-3">
                             <label class="form-label">Payment Status</label>
-                            <div class="form-control-plaintext">{{ ucfirst(str_replace('_', ' ', $order->payment_status)) }}
-                                <small class="text-secondary-light d-block">Change it in the Payment card below.</small>
-                            </div>
+                            <select name="payment_status" class="form-select">
+                                @foreach (\App\Support\OrderFlow::PAYMENT_STATUSES as $paymentStatus)
+                                    <option value="{{ $paymentStatus }}" {{ $order->payment_status === $paymentStatus ? 'selected' : '' }}>
+                                        {{ ucfirst(str_replace('_', ' ', $paymentStatus)) }}
+                                    </option>
+                                @endforeach
+                            </select>
                         </div>
 
                         <div class="mb-3">
@@ -123,6 +127,19 @@
                             <textarea name="admin_note" rows="4" class="form-control">{{ $order->admin_note }}</textarea>
                         </div>
                         <button type="submit" class="btn btn-primary">Save Status</button>
+                    </form>
+                        <form method="POST" action="{{ route('admin.ecommerce.orders.awb.update', $order) }}" class="mt-4 pt-3 border-top">
+                        @csrf
+                        @method('PUT')
+                        <div class="mb-3">
+                            <label class="form-label">AWB / Tracking number</label>
+                            <input type="text" name="awb_code" value="{{ old('awb_code', $order->awb_code) }}" maxlength="100" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Courier name</label>
+                            <input type="text" name="courier_name" value="{{ old('courier_name', $order->courier_name) }}" maxlength="100" class="form-control">
+                        </div>
+                        <button type="submit" class="btn btn-outline-primary">Save AWB</button>
                     </form>
                 </div>
             </div>
@@ -414,7 +431,6 @@
                 </div>
             </div>
 
-            @include('admin.ecommerce.orders.partials.payment-adjustments')
 
             <div class="card">
                 <div class="card-header">
