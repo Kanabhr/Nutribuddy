@@ -19,7 +19,8 @@ class UpdatePaymentGatewaySettingsRequest extends FormRequest
     private function codPricingRules(): array
     {
         return [
-            'cod_fee' => ['nullable', 'numeric', 'min:0'],
+             'cod_fee' => ['nullable', 'numeric', 'min:0'],
+            'cod_fee_gst_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'cod_limit' => ['nullable', 'numeric', 'min:0'],
             'online_switch_discount_amount' => ['nullable', 'numeric', 'min:0'],
             'online_switch_discount_enabled' => ['nullable', 'boolean'],

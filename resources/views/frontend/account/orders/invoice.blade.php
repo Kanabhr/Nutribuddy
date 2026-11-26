@@ -299,9 +299,15 @@
 
                         @if((float) data_get($order->pricing_snapshot, 'cod_fee', 0) > 0.01)
                             <div class="inv-total-line">
-                                <span>COD Fee (non-taxable)</span>
+                                <span>COD Fee</span>
                                 <strong>₹{{ number_format((float) data_get($order->pricing_snapshot, 'cod_fee', 0), 2) }}</strong>
                             </div>
+                                                    @if((float) data_get($order->pricing_snapshot, 'cod_fee_tax', 0) > 0.01)
+                            <div class="inv-total-line">
+                                <span>GST included in COD Fee</span>
+                                <strong>₹{{ number_format((float) data_get($order->pricing_snapshot, 'cod_fee_tax', 0), 2) }}</strong>
+                            </div>
+                        @endif
                         @endif
                         @if((float) data_get($order->pricing_snapshot, 'online_switch_discount', 0) > 0.01)
                             <div class="inv-total-line">

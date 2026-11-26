@@ -115,6 +115,12 @@
                             @error('cod_fee')<span class="text-danger small">{{ $message }}</span>@enderror
                         </div>
                         <div class="mb-20 p-16 rounded-3" style="background-color: #f8fafc; border: 1px solid #e2e8f0;">
+                            <label for="cod_fee_gst_percent" class="form-label mb-1 fw-bold" style="color: #063c36; font-size: 0.95rem;">GST included in COD Fee (%)</label>
+                            <input type="number" step="0.01" min="0" max="100" class="form-control" name="cod_fee_gst_percent" id="cod_fee_gst_percent" value="{{ old('cod_fee_gst_percent', $settings['cod_fee_gst_percent'] ?? 0) }}">
+                            <p class="mb-0 mt-1 text-muted" style="font-size: 0.85rem;">The COD fee already includes this GST. Example: fee 40 and 18 means the customer pays 40, of which 6.10 is GST. 0 means no GST is shown.</p>
+                            @error('cod_fee_gst_percent')<span class="text-danger small">{{ $message }}</span>@enderror
+                        </div>
+                        <div class="mb-20 p-16 rounded-3" style="background-color: #f8fafc; border: 1px solid #e2e8f0;">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <label for="online_switch_discount_enabled" class="form-label mb-1 fw-bold" style="color: #063c36; font-size: 0.95rem; cursor: pointer;">Online Payment Discount After Choosing COD</label>

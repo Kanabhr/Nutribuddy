@@ -199,6 +199,7 @@ class OrderPlacementService
                 'coins_earned' => $pricing['total_coins_earned'],
                 // R9/R10: stored in the snapshot (no orders columns). Read with data_get(..., 0) for old orders.
                 'cod_fee' => (float) ($pricing['cod_fee'] ?? 0),
+                'cod_fee_tax' => (float) ($pricing['cod_fee_tax'] ?? 0),
                 'online_switch_discount' => (float) ($pricing['online_switch_discount'] ?? 0),
             ],
         ]);

@@ -56,6 +56,7 @@ class GeneralSettingController extends Controller
             'cod_otp_enabled' => Setting::get('cod_otp_enabled', '1'),
             // R9 / R10
             'cod_fee' => Setting::get('cod_fee', 0),
+            'cod_fee_gst_percent' => Setting::get('cod_fee_gst_percent', 0),
             'cod_limit' => Setting::get('cod_limit', 5000),
             'online_switch_discount_enabled' => Setting::get('online_switch_discount_enabled', '0'),
             'online_switch_discount_amount' => Setting::get('online_switch_discount_amount', 20),
@@ -100,6 +101,9 @@ class GeneralSettingController extends Controller
     {
         if ($request->filled('cod_limit')) {
             Setting::set('cod_limit', $request->input('cod_limit'), 'payment');
+        }
+        if ($request->filled('cod_fee_gst_percent')) {
+            Setting::set('cod_fee_gst_percent', $request->input('cod_fee_gst_percent'), 'payment');
         }
         if ($request->filled('cod_fee')) {
             Setting::set('cod_fee', $request->input('cod_fee'), 'payment');

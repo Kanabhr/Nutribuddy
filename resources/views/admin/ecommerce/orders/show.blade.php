@@ -416,6 +416,35 @@
                         </div>
                         <div class="amount-flow-row">
                             <div>
+                                   @if ((float) data_get($order->pricing_snapshot, 'online_switch_discount', 0) > 0)
++                            <div class="amount-flow-row text-success-600">
++                                <div>
++                                    <span class="amount-flow-label">Online payment discount</span>
++                                    <span class="amount-flow-note">Switched from COD to online</span>
++                                </div>
++                                <strong>- INR {{ number_format((float) data_get($order->pricing_snapshot, 'online_switch_discount', 
+0), 2) }}</strong>
++                            </div>
++                        @endif
++                        @if ((float) data_get($order->pricing_snapshot, 'cod_fee', 0) > 0)
++                            <div class="amount-flow-row">
++                                <div>
++                                    <span class="amount-flow-label">COD fee</span>
++                                    <span class="amount-flow-note">Not refunded on returns</span>
++                                </div>
++                                <strong>+ INR {{ number_format((float) data_get($order->pricing_snapshot, 'cod_fee', 0), 2) }}</stro
+ng>
++                            </div>
+                            @if ((float) data_get($order->pricing_snapshot, 'cod_fee_tax', 0) > 0)
+                                <div class="amount-flow-row">
+                                    <div>
+                                        <span class="amount-flow-label">GST included in COD fee</span>
+                                        <span class="amount-flow-note">Not refunded on returns</span>
+                                    </div>
+                                    <strong>INR {{ number_format((float) data_get($order->pricing_snapshot, 'cod_fee_tax', 0), 2) }}</strong>
+                                </div>
+                            @endif
++                        @endif
                                 <span class="amount-flow-label">Total savings</span>
                             </div>
                             <strong>INR {{ number_format($totalDiscount, 2) }}</strong>

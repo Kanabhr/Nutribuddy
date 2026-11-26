@@ -291,7 +291,7 @@ class CodFeeOnlineSwitchCheckoutTest extends TestCase
         $withFee = $this->place('cod');
         $this->get(route('user.orders.invoice-page', $withFee))
             ->assertOk()
-            ->assertSee('COD Fee (non-taxable)');
+          ->assertSee('COD Fee');
 
         // An order stored before this change (no keys in the snapshot) renders without the rows.
         $snapshot = $withFee->pricing_snapshot;

@@ -2681,11 +2681,14 @@ window.addEventListener("DOMContentLoaded", () => {
         }
 
         // R9: COD fee row (only when charged)
+        const codFeeTax = Number(pricing.cod_fee_tax || 0);
         const codFee = Number(pricing.cod_fee || 0);
         const codFeeRow = document.getElementById('codFeeRow');
         if (codFeeRow) {
             codFeeRow.style.display = codFee > 0 ? 'flex' : 'none';
             document.getElementById('codFeeVal').textContent = `+ ₹${codFee.toLocaleString('en-IN')}`;
+        const codFeeLabel = codFeeRow.querySelector('.pb-label');
+        if (codFeeLabel) codFeeLabel.textContent = codFeeTax > 0 ? 'COD Fee (incl. GST)' : 'COD Fee';
         }
 
         // R10: online payment discount row (only when applied)

@@ -244,9 +244,10 @@ class PricingService
      * @param  array<string, mixed>  $pricing  result of calculate()
      * @return array<string, mixed>
      */
-    public function applyPaymentMethodAdjustments(array $pricing, ?string $paymentMethod, bool $codWasSelected): array
+      public function applyPaymentMethodAdjustments(array $pricing, ?string $paymentMethod, bool $codWasSelected): array
     {
         $codFee = 0.0;
+        $codFeeTax = 0.0;
         $switchDiscount = 0.0;
         $grandTotal = (float) ($pricing['grand_total'] ?? 0);
 
@@ -262,6 +263,9 @@ class PricingService
                 ]);
             }
             $codFee = self::codFeeAmount();
+            // GST-inclusive: the customer pays exactly the fee; the GST is the part of the fee that is tax.
+            $gstPercent = self::codFeeGstPercent();
+            $codFeeTax = round($codFee * $gstPercent / (100 + $gstPercent), 2);
             $grandTotal += $codFee;
         } elseif (in_array($paymentMethod, ['cashfree', 'razorpay'], true)
             && $codWasSelected
@@ -271,12 +275,14 @@ class PricingService
         }
 
         $pricing['cod_fee'] = round($codFee, 2);
+        $pricing['cod_fee_tax'] = round($codFeeTax, 2);
         $pricing['online_switch_discount'] = round($switchDiscount, 2);
         $pricing['grand_total'] = max(0.0, round($grandTotal, 2));
 
         return $pricing;
     }
 
+    /** GST % included in the COD fee (Setting `cod_fee_gst_percent`, default 0 = nothing shown, e.g. 18). */
     /** R8: max order total for COD (Setting `cod_limit`, default 5000, 0 = no limit). */
     public static function codLimitAmount(): float
     {
@@ -284,7 +290,13 @@ class PricingService
 
         return is_numeric($raw) ? max(0.0, (float) $raw) : 5000.0;
     }
+    /** COD fee GST % (Setting `cod_fee_gst_percent`, default 0 = no GST until the admin sets it, e.g. 18). */
+    public static function codFeeGstPercent(): float
+    {
+        $raw = Setting::get('cod_fee_gst_percent', 0);
 
+        return is_numeric($raw) ? min(100.0, max(0.0, (float) $raw)) : 0.0;
+    }
     /** R9: one admin-editable COD fee (Setting `cod_fee`, default 0). */
     public static function codFeeAmount(): float
     {
