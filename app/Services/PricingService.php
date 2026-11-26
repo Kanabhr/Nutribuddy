@@ -6,7 +6,9 @@ use App\Models\Coupon;
 use App\Models\Product;
 use App\Models\Setting;
 use App\Models\TaxRate;
+use App\Services\Loyalty\CoinRewardCalculator;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 
 class PricingService
 {
@@ -93,9 +95,8 @@ class PricingService
                 $lineIgst = 0.0;
             }
 
-            // Calculate Coins Earned for this line item
-            $lineCoinsReward = (int) (!empty($product->coins_reward) ? $product->coins_reward : round($unitPrice * 0.05));
-            $totalCoinsEarned += ($lineCoinsReward * $quantity);
+            // R1: coins earned for this line (informational). The order total is computed once, after the loop.
+            $lineCoinsReward = CoinRewardCalculator::forAmount($lineSubTotal);
 
             // Update actual totals
             $subtotal += $lineSubTotal;
@@ -132,30 +133,15 @@ class PricingService
                 'igst_amount' => round($lineIgst, 0),
                 'show_gst_in_checkout' => $showGstInCheckout,
                 'shipping_amount' => round($lineShipping, 0),
-                'coins_earned' => $lineCoinsReward * $quantity,
+                'coins_earned' => $lineCoinsReward,
             ];
         }
 
-        // ══ COUPON LOGIC ══
-        $discountTotal = 0.0;
-        if ($coupon) {
-            if ($coupon->discount_type === 'percentage') {
-                // Apply percentage on the displayed subtotal (matches user expectations whether tax is hidden or not)
-                $discountTotal = ($displaySubtotal * (float) $coupon->discount_value) / 100;
-            } else {
-                // Fixed amount: user wants the full value to be deducted
-                $discountTotal = (float) $coupon->discount_value;
-            }
+        // R1: coins earned = master % of the cart product total BEFORE coupon, coin and Rs 20 discounts.
+        // Shipping, GST and the COD fee are not part of the base.
+        $totalCoinsEarned = CoinRewardCalculator::forAmount(round($subtotal, 2));
 
-            if ($coupon->max_discount_amount !== null) {
-                $discountTotal = min($discountTotal, (float) $coupon->max_discount_amount);
-            }
-            
-            // Limit discount to Subtotal + Tax (don't go negative)
-            $discountTotal = min($discountTotal, ($subtotal + $taxTotal));
-        }
-
-        // ══ COIN REDEMPTION LOGIC ══
+        // ══ COIN REDEMPTION LOGIC (R11: coins are applied FIRST) ══
         $coinDiscount = 0.0;
         $coinsRedeemed = 0;
         $discountPercent = (int) Setting::get(
@@ -165,11 +151,9 @@ class PricingService
         $coinToCashRate = max(1, (int) Setting::get('loyalty_conversion_rate', 10));
         $isLoyaltyEnabled = (bool) Setting::get('loyalty_enabled', 1);
 
-        // Max coins that can be redeemed based on % of order total (before coupon)
+        // Max coins that can be redeemed: admin % of the order (products + tax), never above that amount.
         $maxAllowedCoinDiscount = (($subtotal + $taxTotal) * $discountPercent) / 100;
-        // After coupon is applied, remaining order value
-        $remainingBalance = ($subtotal + $taxTotal) - $discountTotal;
-        $maxRedeemableCoins = (int) floor(max(0, min($maxAllowedCoinDiscount, $remainingBalance)) * $coinToCashRate);
+        $maxRedeemableCoins = (int) floor(max(0, min($maxAllowedCoinDiscount, $subtotal + $taxTotal)) * $coinToCashRate);
         $adminCoinCap = (int) Setting::get('loyalty_max_redeemable_coins', 0);
         if ($adminCoinCap > 0) {
             $maxRedeemableCoins = min($maxRedeemableCoins, $adminCoinCap);
@@ -178,6 +162,26 @@ class PricingService
         if ($isLoyaltyEnabled && $coinsToRedeem > 0) {
             $coinsRedeemed = min($coinsToRedeem, $maxRedeemableCoins);
             $coinDiscount = $coinsRedeemed / $coinToCashRate;
+        }
+
+        // ══ COUPON LOGIC (R11: applied AFTER coins; percentage is on the full cart value) ══
+        $discountTotal = 0.0;
+        if ($coupon) {
+            if ($coupon->discount_type === 'percentage') {
+                // Percentage on the FULL displayed cart value (senior's decision), not on what is left after coins.
+                $discountTotal = ($displaySubtotal * (float) $coupon->discount_value) / 100;
+            } else {
+                // Fixed amount: the full value, limited below to what is left to pay.
+                $discountTotal = (float) $coupon->discount_value;
+            }
+
+            if ($coupon->max_discount_amount !== null) {
+                $discountTotal = min($discountTotal, (float) $coupon->max_discount_amount);
+            }
+
+            // Safety cap: coins + coupon never exceed Subtotal + Tax, so the total cannot go negative
+            // (this only bites when a coupon is larger than what is left after coins).
+            $discountTotal = min($discountTotal, max(0.0, ($subtotal + $taxTotal) - $coinDiscount));
         }
 
         // ══ TOTALS CALCULATION ══
@@ -225,5 +229,81 @@ class PricingService
             'shipping_total' => $roundedShippingTotal,
             'grand_total' => $grandTotal,
         ];
+    }
+
+    /**
+     * R9 + R10: payment-method adjustments, applied AFTER calculate() so the coupon/coin logic is untouched.
+     *
+     * - COD: adds the admin-set COD fee (non-taxable, earns no coins, never part of a refund).
+     * - Online + customer chose COD first in this checkout + setting on: subtracts the online-switch discount
+     *   (capped at the amount payable so the total never goes below 0). The COD fee is not charged.
+     * - Method not given: nothing changes (existing callers keep today's totals).
+     *
+     * Always returns 'cod_fee' and 'online_switch_discount' (0 when not applicable).
+     *
+     * @param  array<string, mixed>  $pricing  result of calculate()
+     * @return array<string, mixed>
+     */
+    public function applyPaymentMethodAdjustments(array $pricing, ?string $paymentMethod, bool $codWasSelected): array
+    {
+        $codFee = 0.0;
+        $switchDiscount = 0.0;
+        $grandTotal = (float) ($pricing['grand_total'] ?? 0);
+
+        // R8: COD is allowed up to and including the limit (order total before the COD fee). 0 = no limit.
+        $codLimit = self::codLimitAmount();
+        $pricing['cod_limit'] = $codLimit;
+        $pricing['cod_limit_exceeded'] = $codLimit > 0 && round($grandTotal, 2) > $codLimit;
+
+        if ($paymentMethod === 'cod') {
+            if ($pricing['cod_limit_exceeded']) {
+                throw ValidationException::withMessages([
+                    'payment_method' => 'Cash on Delivery is available only for orders up to ₹'.number_format($codLimit, 2).'. Please pay online.',
+                ]);
+            }
+            $codFee = self::codFeeAmount();
+            $grandTotal += $codFee;
+        } elseif (in_array($paymentMethod, ['cashfree', 'razorpay'], true)
+            && $codWasSelected
+            && self::onlineSwitchDiscountEnabled()) {
+            $switchDiscount = min(self::onlineSwitchDiscountAmount(), max(0.0, $grandTotal));
+            $grandTotal -= $switchDiscount;
+        }
+
+        $pricing['cod_fee'] = round($codFee, 2);
+        $pricing['online_switch_discount'] = round($switchDiscount, 2);
+        $pricing['grand_total'] = max(0.0, round($grandTotal, 2));
+
+        return $pricing;
+    }
+
+    /** R8: max order total for COD (Setting `cod_limit`, default 5000, 0 = no limit). */
+    public static function codLimitAmount(): float
+    {
+        $raw = Setting::get('cod_limit', 5000);
+
+        return is_numeric($raw) ? max(0.0, (float) $raw) : 5000.0;
+    }
+
+    /** R9: one admin-editable COD fee (Setting `cod_fee`, default 0). */
+    public static function codFeeAmount(): float
+    {
+        $raw = Setting::get('cod_fee', 0);
+
+        return is_numeric($raw) ? max(0.0, (float) $raw) : 0.0;
+    }
+
+    /** R10: on/off switch (Setting `online_switch_discount_enabled`, default off). */
+    public static function onlineSwitchDiscountEnabled(): bool
+    {
+        return (string) Setting::get('online_switch_discount_enabled', '0') === '1';
+    }
+
+    /** R10: discount amount (Setting `online_switch_discount_amount`, default 20). */
+    public static function onlineSwitchDiscountAmount(): float
+    {
+        $raw = Setting::get('online_switch_discount_amount', 20);
+
+        return is_numeric($raw) ? max(0.0, (float) $raw) : 0.0;
     }
 }

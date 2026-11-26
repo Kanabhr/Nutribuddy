@@ -10,6 +10,8 @@ class UpdateLoyaltySettingsRequest extends FormRequest
             'loyalty_conversion_rate' => 'required|integer|min:1',
             'loyalty_discount_percentage' => 'required|integer|min:0|max:100',
             'loyalty_enabled' => 'required|boolean',
+            // R1: master coin-earning percentage (value % of the cart product total).
+            'loyalty_earn_percent' => 'nullable|numeric|min:0|max:100',
         ];
     }
 }

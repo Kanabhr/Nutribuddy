@@ -54,6 +54,11 @@ class GeneralSettingController extends Controller
             'cashfree_env' => Setting::get('cashfree_env', \App\Services\Payments\CashfreePaymentService::resolveEnvironment()),
             'cod_enabled' => Setting::get('cod_enabled', '1'),
             'cod_otp_enabled' => Setting::get('cod_otp_enabled', '1'),
+            // R9 / R10
+            'cod_fee' => Setting::get('cod_fee', 0),
+            'cod_limit' => Setting::get('cod_limit', 5000),
+            'online_switch_discount_enabled' => Setting::get('online_switch_discount_enabled', '0'),
+            'online_switch_discount_amount' => Setting::get('online_switch_discount_amount', 20),
         ];
 
         return view('admin.system.settings.payment-gateways', compact('settings'));
@@ -72,6 +77,7 @@ class GeneralSettingController extends Controller
         } elseif ($request->has('gateway') && $request->input('gateway') === 'cod') {
             Setting::set('cod_enabled', $request->has('cod_enabled') ? '1' : '0', 'payment');
             Setting::set('cod_otp_enabled', $request->has('cod_otp_enabled') ? '1' : '0', 'payment');
+            $this->saveCodPricingSettings($request);
         } else {
             // General bulk update
             Setting::set('razorpay_enabled', $request->has('razorpay_enabled') ? '1' : '0', 'payment');
@@ -80,9 +86,30 @@ class GeneralSettingController extends Controller
             Setting::set('cashfree_env', $request->input('cashfree_env', 'sandbox'), 'payment');
             Setting::set('cod_enabled', $request->has('cod_enabled') ? '1' : '0', 'payment');
             Setting::set('cod_otp_enabled', $request->has('cod_otp_enabled') ? '1' : '0', 'payment');
+            $this->saveCodPricingSettings($request);
         }
 
         return back()->with('success', 'Payment gateway settings updated successfully.');
+    }
+
+    /**
+     * R9/R10: COD fee and online-switch discount. A setting is written only when its field was posted,
+     * so the bulk-update branch never resets these values.
+     */
+    private function saveCodPricingSettings(UpdatePaymentGatewaySettingsRequest $request): void
+    {
+        if ($request->filled('cod_limit')) {
+            Setting::set('cod_limit', $request->input('cod_limit'), 'payment');
+        }
+        if ($request->filled('cod_fee')) {
+            Setting::set('cod_fee', $request->input('cod_fee'), 'payment');
+        }
+        if ($request->filled('online_switch_discount_amount')) {
+            Setting::set('online_switch_discount_amount', $request->input('online_switch_discount_amount'), 'payment');
+        }
+        if ($request->has('online_switch_discount_enabled')) {
+            Setting::set('online_switch_discount_enabled', $request->boolean('online_switch_discount_enabled') ? '1' : '0', 'payment');
+        }
     }
 
     public function authSettings(): View

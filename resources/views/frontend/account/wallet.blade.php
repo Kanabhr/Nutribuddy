@@ -12,9 +12,23 @@
             <!-- QUICK INFO -->
             <div class="stats-grid">
                 <div class="stat-card" style="background: #fff; border: 2px solid var(--border);">
+                    <div class="sc-icon" style="background: var(--mnl)">✅</div>
+                    <div class="sc-info">
+                        <div class="num" id="wallet-available">{{ $availableCoins }}</div>
+                        <div class="lbl">Available Coins</div>
+                    </div>
+                </div>
+                <div class="stat-card" style="background: #fff; border: 2px solid var(--border);">
+                    <div class="sc-icon" style="background: #fef3c7">⏳</div>
+                    <div class="sc-info">
+                        <div class="num" id="wallet-pending">{{ $pendingCoins }}</div>
+                        <div class="lbl">Pending Coins (unlock 7 days after delivery)</div>
+                    </div>
+                </div>
+                <div class="stat-card" style="background: #fff; border: 2px solid var(--border);">
                     <div class="sc-icon" style="background: var(--mnl)">🪙</div>
                     <div class="sc-info">
-                        <div class="num">{{ $transactions->where('type', 'earned')->sum('amount') }}</div>
+                        <div class="num">{{ $transactions->where('type', 'earned')->where('status', '!=', 'cancelled')->sum('amount') }}</div>
                         <div class="lbl">Total Earned</div>
                     </div>
                 </div>
@@ -55,7 +69,7 @@
                                     <td>
                                         <span class="status-badge {{ $trx->type === 'earned' ? 's-delivered' : 's-cancelled' }}"
                                             style="font-size: 0.7rem;">
-                                            {{ strtoupper($trx->type) }}
+                                            {{ $trx->status === 'pending' ? 'PENDING' : ($trx->status === 'cancelled' ? 'CANCELLED' : ($trx->reason === 'expired' ? 'EXPIRED' : strtoupper($trx->type))) }}
                                         </span>
                                     </td>
                                     <td>

@@ -5,6 +5,14 @@
 @endphp
 
 @section('content')
+<div class="card mb-24" id="coin-liability">
+    <div class="card-body d-flex flex-wrap gap-4">
+        <div><small class="text-secondary-light">Available coins</small><div class="fw-bold">{{ number_format($liability['available']) }}</div></div>
+        <div><small class="text-secondary-light">Pending coins</small><div class="fw-bold">{{ number_format($liability['pending']) }}</div></div>
+        <div><small class="text-secondary-light">Total coins owed</small><div class="fw-bold">{{ number_format($liability['total']) }}</div></div>
+        <div><small class="text-secondary-light">Value (₹)</small><div class="fw-bold">₹{{ number_format($liability['rupee_value'], 2) }}</div></div>
+    </div>
+</div>
 <div class="card basic-data-table">
     <div class="card-header">
         <h5 class="card-title mb-0">Transaction History</h5>
@@ -38,8 +46,14 @@
                             </div>
                         </td>
                         <td>
-                            @if($trx->type === 'earned')
+                            @if($trx->status === 'pending')
+                                <span class="badge bg-warning-100 text-warning-600">PENDING</span>
+                            @elseif($trx->status === 'cancelled')
+                                <span class="badge bg-secondary-100 text-secondary-600">CANCELLED</span>
+                            @elseif($trx->type === 'earned')
                                 <span class="badge bg-success-100 text-success-600">EARNED</span>
+                            @elseif($trx->reason === 'expired')
+                                <span class="badge bg-danger-100 text-danger-600">EXPIRED</span>
                             @else
                                 <span class="badge bg-danger-100 text-danger-600">SPENT</span>
                             @endif

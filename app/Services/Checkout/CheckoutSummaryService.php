@@ -7,6 +7,7 @@ use App\Models\CartItem;
 use App\Models\Coupon;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\Setting;
 use App\Models\User;
 use App\Services\PricingService;
 use Illuminate\Support\Collection;
@@ -14,6 +15,9 @@ use Illuminate\Support\Str;
 
 class CheckoutSummaryService
 {
+    /** R10: set when the logged-in customer actively picks COD; cleared when an order is placed. */
+    public const COD_SELECTED_SESSION_KEY = 'checkout_cod_selected';
+
     public function __construct(private readonly PricingService $pricingService)
     {
     }
@@ -45,6 +49,18 @@ class CheckoutSummaryService
 
         $pricing = $this->pricingService->calculate($cart->items, $coupon, $coinsToRedeem, $shippingState);
         $this->assertCouponMinimum($coupon, (float) $pricing['subtotal']);
+
+        // R9/R10: only when the client names a payment method. Without it the summary is unchanged.
+        $paymentMethod = $validated['payment_method'] ?? null;
+        if ($paymentMethod === 'cod' && (string) Setting::get('cod_enabled', '1') === '1') {
+            // The customer actively selected COD (the page-load summary sends no payment_method).
+            session()->put(self::COD_SELECTED_SESSION_KEY, true);
+        }
+        $pricing = $this->pricingService->applyPaymentMethodAdjustments(
+            $pricing,
+            $paymentMethod,
+            (bool) session()->get(self::COD_SELECTED_SESSION_KEY, false)
+        );
 
         return [
             'cart' => $cart,

@@ -2587,6 +2587,33 @@ window.addEventListener("DOMContentLoaded", () => {
             document.getElementById('coinDiscountVal').textContent = `− ₹${coinDiscount.toLocaleString('en-IN')}`;
         }
 
+        // R9: COD fee row (only when charged)
+        const codFee = Number(pricing.cod_fee || 0);
+        const codFeeRow = document.getElementById('codFeeRow');
+        if (codFeeRow) {
+            codFeeRow.style.display = codFee > 0 ? 'flex' : 'none';
+            document.getElementById('codFeeVal').textContent = `+ ₹${codFee.toLocaleString('en-IN')}`;
+        }
+
+        // R10: online payment discount row (only when applied)
+        const switchDiscount = Number(pricing.online_switch_discount || 0);
+        const switchRow = document.getElementById('onlineSwitchRow');
+        if (switchRow) {
+            switchRow.style.display = switchDiscount > 0 ? 'flex' : 'none';
+            document.getElementById('onlineSwitchVal').textContent = `− ₹${switchDiscount.toLocaleString('en-IN')}`;
+        }
+
+        // R8: hide COD when the order is above the admin COD limit (server also refuses it)
+        const codOption = document.getElementById('payMethodCod');
+        if (codOption && pricing.cod_limit_exceeded !== undefined) {
+            const hideCod = !!pricing.cod_limit_exceeded;
+            codOption.style.display = hideCod ? 'none' : '';
+            if (hideCod && codOption.classList.contains('selected')) {
+                const other = document.querySelector('.pay-method:not(#payMethodCod)');
+                if (other) selectPayMethod(other, other.getAttribute('data-method') || 'cashfree', true);
+            }
+        }
+
         // Update the auto-apply coin info card
         if (pricing.max_redeemable_coins !== undefined) {
             window.__maxRedeemableCoins = Number(pricing.max_redeemable_coins || 0);
@@ -2616,7 +2643,7 @@ window.addEventListener("DOMContentLoaded", () => {
             }
         }
         if (totalEl) totalEl.textContent = `₹${total.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
-        if (savingsEl) savingsEl.textContent = `₹${totalDiscount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+        if (savingsEl) savingsEl.textContent = `₹${(totalDiscount + switchDiscount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
         // Earned Coins Display
         if (loyaltyEl) {
@@ -2737,7 +2764,9 @@ window.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    function selectPayMethod(el, type) {
+    function selectPayMethod(el, type, userClick = false) {
+        const methodChanged = window.__nbPayMethod !== type;
+        window.__nbPayMethod = type;
         document.querySelectorAll('.pay-method').forEach(m => m.classList.remove('selected'));
         el.classList.add('selected');
 
@@ -2750,6 +2779,9 @@ window.addEventListener("DOMContentLoaded", () => {
 
         const placeBtn = document.querySelector('.place-order-btn');
         if (placeBtn) placeBtn.innerHTML = btnText;
+
+        // R9/R10: only a real click re-prices the order (COD fee / online-switch discount).
+        if (userClick && methodChanged) refreshCheckoutSummary();
     }
 
     function syncPlaceBtn() {
@@ -2791,7 +2823,9 @@ window.addEventListener("DOMContentLoaded", () => {
             body: JSON.stringify({
                 coupon_code: normalizedCode || null,
                 // Always send the full balance; server caps it to the allowed % automatically
-                coins_to_redeem: window.NB_CHECKOUT_CONFIG?.userCoinsBalance || 0
+                coins_to_redeem: window.NB_CHECKOUT_CONFIG?.userCoinsBalance || 0,
+                // R9/R10: the server prices COD fee / online-switch discount for the selected method
+                payment_method: window.__nbPayMethod || null
             })
         });
 

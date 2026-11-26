@@ -3,6 +3,7 @@
 namespace App\Services\Ecommerce;
 
 use App\Models\OrderReturn;
+use App\Services\Loyalty\CoinLedgerService;
 use Illuminate\Support\Facades\DB;
 
 /** Applies return review decisions and reconciles fully returned orders. */
@@ -25,6 +26,9 @@ class OrderReturnAdminService
             }
 
             if ($orderReturn->status === 'completed') {
+                // R4: cancel Pending coins in proportion to the returned value (refund amount is not touched).
+                app(CoinLedgerService::class)->cancelPendingForReturns($order);
+
                 $order->load('items.returnItems.returnRequest');
                 $orderedQty = (int) $order->items->sum('quantity');
                 $returnedQty = (int) $order->items->sum(function ($item): int {

@@ -204,7 +204,7 @@ class ProductSectionRegressionTest extends TestCase
         $response->assertDontSee('Why Parents Love Brain Booster Gummies');
         $response->assertDontSee('7-Day Return');
         $response->assertSee('Earn');
-        $response->assertSee('91 NB');
+        $response->assertSee('32 NB');
     }
 
     public function test_authenticated_user_can_add_product_to_cart(): void

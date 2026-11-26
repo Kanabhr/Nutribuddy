@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Marketing\UpdateLoyaltySettingsRequest;
 use App\Models\CoinTransaction;
 use App\Models\Setting;
+use App\Services\Loyalty\CoinLedgerService;
+use App\Services\Loyalty\CoinRewardCalculator;
 use Illuminate\Http\Request;
 
 class LoyaltyController extends Controller
@@ -16,6 +18,7 @@ class LoyaltyController extends Controller
             'loyalty_conversion_rate' => Setting::get('loyalty_conversion_rate', 10),
             'loyalty_discount_percentage' => Setting::get('loyalty_discount_percentage', 10),
             'loyalty_enabled' => Setting::get('loyalty_enabled', 1),
+            'loyalty_earn_percent' => CoinRewardCalculator::earnPercent(),
         ];
 
         return view('admin.marketing.loyalty.settings', compact('settings'));
@@ -26,6 +29,9 @@ class LoyaltyController extends Controller
         Setting::set('loyalty_conversion_rate', $request->loyalty_conversion_rate);
         Setting::set('loyalty_discount_percentage', $request->loyalty_discount_percentage);
         Setting::set('loyalty_enabled', $request->loyalty_enabled);
+        if ($request->filled('loyalty_earn_percent')) {
+            Setting::set(CoinRewardCalculator::EARN_PERCENT_KEY, $request->loyalty_earn_percent);
+        }
 
         return back()->with('success', 'Loyalty settings updated successfully.');
     }
@@ -33,6 +39,8 @@ class LoyaltyController extends Controller
     public function transactions()
     {
         $transactions = CoinTransaction::with(['user', 'order'])->latest()->paginate(20);
-        return view('admin.marketing.loyalty.transactions', compact('transactions'));
+        $liability = app(CoinLedgerService::class)->liabilitySummary();
+
+        return view('admin.marketing.loyalty.transactions', compact('transactions', 'liability'));
     }
 }

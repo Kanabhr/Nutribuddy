@@ -5,7 +5,7 @@ namespace App\Listeners;
 use App\Events\OrderPaid;
 use App\Models\CoinTransaction;
 use App\Models\Order;
-use App\Models\User;
+use App\Services\Loyalty\CoinLedgerService;
 use Illuminate\Support\Facades\DB;
 
 class AwardOrderCoins
@@ -23,21 +23,8 @@ class AwardOrderCoins
                 return;
             }
 
-            $coins = (int) data_get($order->pricing_snapshot, 'coins_earned', 0);
-            if ($coins <= 0) {
-                return;
-            }
-
-            $user = User::query()->whereKey($order->user_id)->lockForUpdate()->firstOrFail();
-            $user->increment('coins_balance', $coins);
-
-            CoinTransaction::create([
-                'user_id' => $user->id,
-                'order_id' => $order->id,
-                'type' => 'earned',
-                'amount' => $coins,
-                'description' => "Coins earned from purchase on order #{$order->order_number}",
-            ]);
+            // R2: coins are created as Pending; the scheduled job unlocks them after delivery + return window.
+            app(CoinLedgerService::class)->createPendingForOrder($order);
         });
     }
 }
